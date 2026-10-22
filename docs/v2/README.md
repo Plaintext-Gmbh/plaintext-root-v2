@@ -15,7 +15,7 @@ mit upstream synchronisiert, veröffentlicht aber unter **eigenen Maven-Koordina
 | Release | `v2/release.sh`, `.woodpecker/deploy.yml`, `scripts/release-vollstaendig.sh` (TAG_PRAEFIX, GRUPPE_PFAD) |
 | PR-Pipeline mit Lader-Probe | `.woodpecker/build.yml`, `v2/lader-probe.sh`, `v2/probe-modul/` |
 | Purge alter v2-Releases | `v2/purge.py`, `v2/test_purge.py` |
-| Wochenanalyse | `.woodpecker/sonar.yml` (Projektschlüssel `plaintext-root-v2`) |
+| Wochenanalyse | keine in v2 — `.woodpecker/sonar.yml` ist ein Stub, der nie läuft (Entscheid Daniel 22.10.2026) |
 
 ## 1. Koordinaten
 
@@ -60,29 +60,14 @@ root nicht vor; alle 1.x-Tags enden auf .0).
    `sync-konflikt`, `master` unverändert. Steht so ein PR offen, tut der nächste Lauf nichts.
 
 **Auslöser** (`.github/workflows/v2-sync.yaml`, `ubuntu-latest`, kostenlos für ein öffentliches Repo,
-kein self-hosted Runner): `schedule` täglich 04:41 UTC (Netz), `workflow_dispatch` (mit
-Trockenlauf-Option), `repository_dispatch` Typ `upstream-release` (Haken für upstream).
+kein self-hosted Runner): **ein geplanter Lauf pro Nacht** (`schedule` 04:41 UTC) und
+`workflow_dispatch` für Hand-Läufe (mit Trockenlauf-Option). Entscheid Daniel 22.10.2026: kein
+Haken in root (v1), kein stündlicher Lauf. Ein upstream-Release kommt also spätestens in der
+folgenden Nacht nach v2 und löst dort das v2-Release aus.
 
 **Keine Schleife**: der Sync läuft nur auf schedule/dispatch; ein Push mit `GITHUB_TOKEN` löst keine
 weiteren Actions aus; das v2-Release pusht nur einen Tag (Woodpecker filtert auf `push` + `master`,
 ein Tag ist Ereignis `tag`).
-
-**Vorschlag für den upstream-Haken** (gehört nach plaintext-root, weil nur dort bekannt ist, wann
-ein Release fertig ist; PR dort durch den Jumphost, Secret `v2_sync_token` = Token mit
-`contents: write`/`repo` auf plaintext-root-v2). Am Ende des Schritts `release` in
-`plaintext-root/.woodpecker/deploy.yml`:
-
-```yaml
-      # Karte 1563: v2 nachziehen lassen (best effort)
-      - >-
-        curl -fsS --max-time 20 -X POST
-        -H "Authorization: Bearer $V2_SYNC_TOKEN" -H "Accept: application/vnd.github+json"
-        https://api.github.com/repos/Plaintext-Gmbh/plaintext-root-v2/dispatches
-        -d '{"event_type":"upstream-release","client_payload":{"version":"'"$(git describe --tags --abbrev=0)"'"}}'
-        || echo "v2-Sync nicht angestossen — der taegliche schedule holt es nach."
-```
-
-Wird der Haken nicht gewünscht, reicht es, den `schedule` auf stündlich zu stellen (`41 * * * *`).
 
 ## 4. Release (`.woodpecker/deploy.yml` → `v2/release.sh`)
 
@@ -104,28 +89,29 @@ Secrets am Repo plaintext-root-v2 (Namen wie root, Werte je nach Vault):
 
 | Secret | gebraucht von | Pflicht |
 |---|---|---|
-| `mvn_deploy_token` | deploy.yml (GitHub Packages, Tag-Push, GitHub-Release), sonar.yml (Rückcommit) | ja |
+| `mvn_deploy_token` | deploy.yml (GitHub Packages, Tag-Push, GitHub-Release) | ja |
 | `maven_nas_token` | deploy.yml (Reposilite) | ja |
 | `github_status_token` | build.yml `testbericht` (Ereignis `pull_request` am Secret!) | ja (sonst startet build.yml nicht) |
-| `sonar_token` | sonar.yml | ja für die Wochenanalyse |
-| `nvd_api_key` | sonar.yml | ja für die Wochenanalyse |
-| `pushover_app_token`, `pushover_user_key` | sonar.yml Meldung | ja (Verweis genügt; leer = nur Log) |
+| `sonar_token`, `nvd_api_key`, `pushover_app_token`, `pushover_user_key` | — (Wochenanalyse nur in root) | nein, liegen ungenutzt am Repo |
 | `ssh_private_key` | — | **nein** (v2 referenziert es nicht) |
 
-Repo-Einstellungen: `trusted.volumes = true` (Allure-Volume `woodpecker-reports`, NVD-Volume),
-Crons `nightly` und `wochenanalyse` nach Bedarf, `cancel_previous_pipeline_events` ohne `push`
-(Karte 1281). **Ein `from_secret` auf ein fehlendes Secret startet die Pipeline gar nicht und
+Repo-Einstellungen: `trusted.volumes = true` (Allure-Volume `woodpecker-reports`),
+`cancel_previous_pipeline_events` ohne `push` (Karte 1281). **Keine Crons** in v2 (build.yml hat
+kein `event: cron`, sonar.yml läuft nie). **Ein `from_secret` auf ein fehlendes Secret startet die Pipeline gar nicht und
 meldet nichts** — deshalb die Liste.
-
-Sonar: Projekt `plaintext-root-v2` wird beim ersten Lauf angelegt (fester Schlüssel).
 
 **Stand 22.10.2026 (Jumphost):** Woodpecker für plaintext-root-v2 aktiv (Repo-Id 18),
 `trusted.volumes=true`, `cancel_previous_pipeline_events=[pull_request]`, Timeout 120 min. Secrets
 angelegt: `github_status_token` und `maven_nas_token` (Ereignisse cron/deployment/manual/push/
 pull_request), `mvn_deploy_token`, `sonar_token`, `nvd_api_key`, `pushover_app_token`,
-`pushover_user_key` (cron/deployment/manual/push). Kein `ssh_private_key`. Die Crons `nightly` und
-`wochenanalyse` sind noch nicht angelegt — bis dahin laufen build.yml nur auf Pull Requests und
-sonar.yml nur manuell (`analyse = voll`).
+`pushover_user_key` (cron/deployment/manual/push). Kein `ssh_private_key`. Keine Crons (Entscheid
+Daniel). Erster PR-Lauf (Pipeline 1, Commit `ed11299f`): build und playwright grün.
+
+**Versionsbasis nach dem halben root-Release 1.789.0 (22.10.2026):** der v2-master stammt aus
+dem Zustand mit POM fest auf `1.789.0` (ohne Prepare-Commit). Ein v2-Release daraus heisst
+`2.789.1`, nie `1.789.0` — das Schema `(M+1).m.n` erzeugt keine 1.x-Nummer, und v2 schreibt nur
+unter `ch/plaintext/v2/`. Nach der Reparatur in root (1.790.0) bringt der nächtliche Sync die
+POM `1.790.0` und die Basis wird `2.790.n`.
 
 ## 6. Purge (`v2/purge.py`)
 
@@ -167,4 +153,4 @@ dort.
 - Lader-Probe mit dem echten Verrechnungs-Jar (nur synthetisches Modul lokal).
 - Branch-Schutz auf `master`: der Sync pusht mit `GITHUB_TOKEN`; eine Schutzregel ohne Ausnahme für
   Actions blockiert das. Dann: Regel anpassen oder den Sync auf PR-Modus umstellen.
-- Die Woodpecker-Repo-Einstellungen (trusted.volumes, Crons) macht der Jumphost.
+- Die Woodpecker-Repo-Einstellungen (trusted.volumes) macht der Jumphost.

@@ -9,8 +9,8 @@ name: v2-sync
 #    und fuer ein OEFFENTLICHES Repo kostet ubuntu-latest kein Kontingent.
 #  * `schedule` laeuft unabhaengig von jedem Push und ist damit das Netz, das kein Woodpecker-Cron
 #    bietet (der nightly-Cron von root war monatelang nicht scharf, siehe upstream repo-lint.yaml).
-#  * `repository_dispatch` ist der Haken, den upstream nach jedem Release ziehen kann (ein curl im
-#    Release-Schritt von plaintext-root/.woodpecker/deploy.yml, Vorschlag in docs/v2/sync.md).
+#  * Entscheid Daniel 22.10.2026: EIN geplanter Lauf pro Nacht, kein Haken in root (v1), kein
+#    stuendlicher Lauf. Dazu `workflow_dispatch` fuer Hand-Laeufe.
 #  * Der eine self-hosted Runner gehoert den bestehenden Repos — hier bewusst NICHT verwendet.
 #
 #  WAS DER PUSH AUSLOEST
@@ -24,7 +24,8 @@ name: v2-sync
 
 on:
   schedule:
-    # Taeglich als Netz, nicht zur vollen Stunde (GitHub verschiebt :00-Zeitplaene bei Andrang).
+    # Jede Nacht einmal, nicht zur vollen Stunde (GitHub verschiebt :00-Zeitplaene bei Andrang).
+    # 04:41 UTC liegt nach dem root-autobump-Fenster der Konsumenten und vor dem Arbeitstag.
     - cron: '41 4 * * *'
   workflow_dispatch:
     inputs:
@@ -32,8 +33,6 @@ on:
         description: "Trockenlauf: mergen und umbenennen, aber weder pushen noch PR anlegen"
         type: boolean
         default: false
-  repository_dispatch:
-    types: [upstream-release]
 
 permissions:
   contents: write
@@ -65,9 +64,7 @@ jobs:
         run: |
           git config user.name  "plaintext-root-v2 sync"
           git config user.email "sync@plaintext.ch"
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            echo "Ausloeser: upstream-release ${{ toJSON(github.event.client_payload) }}"
-          fi
+          echo "Ausloeser: ${{ github.event_name }}"
           if [ "${{ inputs.trocken }}" = "true" ]; then
             v2/sync.sh --trocken
           else

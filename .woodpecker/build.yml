@@ -16,8 +16,7 @@
 when:
   - event: pull_request
   - event: manual
-  - event: cron
-    cron: nightly
+  # Kein `event: cron`: fuer v2 gibt es keine Crons (Entscheid Daniel 22.10.2026).
 
 clone:
   git:
