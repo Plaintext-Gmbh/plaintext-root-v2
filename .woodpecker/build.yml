@@ -63,7 +63,7 @@ steps:
     # als die Standardbibliothek. 16 Tests, darunter der Negativtest (v1-Kandidat -> Abbruch).
     image: python:3.13-alpine
     commands:
-      - sh .woodpecker/waechter.sh
+      - . .woodpecker/waechter.sh
       - python3 -I v2/test_purge.py
 
   # ── Flyway-Dubletten (Karte 1120/1121), wortgleich mit upstream ───────────────────────
@@ -151,7 +151,7 @@ steps:
     environment:
       PGPASSWORD: plaintext
     commands:
-      - sh .woodpecker/waechter.sh
+      - . .woodpecker/waechter.sh
       - 'echo "── flyway_schema_history (postgres-probe, juengste 15) ──"'
       - >-
         psql -h postgres-probe -U plaintext -d plaintext_probe
