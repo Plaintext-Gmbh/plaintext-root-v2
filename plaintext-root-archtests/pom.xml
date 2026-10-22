@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>ch.plaintext</groupId>
+        <groupId>ch.plaintext.v2</groupId>
         <artifactId>plaintext-root-parent</artifactId>
         <version>1.789.0</version>
     </parent>
@@ -60,7 +60,7 @@
              Jetzt deklariert — sonst bricht dieses Modul, wenn root-common seine
              interfaces-Abhaengigkeit verliert, ohne dass jemand archtests angefasst hat. -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-interfaces</artifactId>
         </dependency>
 
@@ -69,11 +69,11 @@
              statt sie nachzubilden. Beide Module liegen in jedem Consumer ohnehin am Klassenpfad
              (ueber plaintext-root-webapp); hier stehen sie, damit die Klasse kompiliert. -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-pageguard</artifactId>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-menu</artifactId>
         </dependency>
         <!-- Binder/YamlPropertySourceLoader fuer PageGuardZuordnungTest (kommt auch transitiv ueber
@@ -85,11 +85,11 @@
 
         <!-- plaintext-root-common bringt transitiv:
              - ch.plaintext.boot.utils.MobileFormLinter (Scan-Logik des Mobile-Linters)
-             - ch.plaintext:plaintext-root-interfaces -> ch.plaintext.PlaintextCron
+             - ch.plaintext.v2:plaintext-root-interfaces -> ch.plaintext.PlaintextCron
              - spring-context (org.springframework.context.annotation.Scope,
                org.springframework.scheduling.annotation.Scheduled) -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-common</artifactId>
         </dependency>
     </dependencies>

@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>ch.plaintext</groupId>
+        <groupId>ch.plaintext.v2</groupId>
         <artifactId>plaintext-root-parent</artifactId>
         <version>1.789.0</version>
     </parent>
@@ -16,28 +16,28 @@
 
     <dependencies>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-interfaces</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-common</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-menu</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-pageguard</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- Standard-LinkTokenStore (JPA). Eine Anwendung mit eigenem Store kann das Modul ausschliessen. -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-freigabe</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -71,7 +71,7 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-archtests</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
@@ -94,7 +94,7 @@
                         </goals>
                         <configuration>
                             <dependenciesToScan>
-                                <dependency>ch.plaintext:plaintext-root-archtests</dependency>
+                                <dependency>ch.plaintext.v2:plaintext-root-archtests</dependency>
                             </dependenciesToScan>
                             <test>PlaintextSessionBeanSerialisierbarTest,PlaintextMcpScopeVertragTest,PlaintextLayeringTest,PlaintextModulgrenzenTest</test>
                             <failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>

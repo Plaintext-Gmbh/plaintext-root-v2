@@ -10,7 +10,7 @@
         <version>4.1.1</version>
     </parent>
 
-    <groupId>ch.plaintext</groupId>
+    <groupId>ch.plaintext.v2</groupId>
     <artifactId>plaintext-root-parent</artifactId>
     <version>1.789.0</version>
     <packaging>pom</packaging>
@@ -250,160 +250,160 @@
 
             <!-- Interne Module -->
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-interfaces</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-common</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-menu</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-pageguard</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-web</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-pageguard</artifactId>
                 <version>${plaintext-root.version}</version>
                 <type>test-jar</type>
                 <scope>test</scope>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-menu-visibility</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-jpa</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-flyway</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-role-assignment</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-webapp</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-admin-cron</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-admin-sessions</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-admin-settings</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-admin-requirements</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
 
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-admin-i18n</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-admin-oidc</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-admin-apitoken</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-admin-secrets</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-admin-sidecars</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-admin-modules</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-admin-mailtemplate</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-admin-webhooks</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-admin-notifications</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-watch</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-freigabe</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-files</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
 
             <!-- Geteilte Architektur-/Lint-Tests -->
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-archtests</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
             <!-- Geteilte Test-Hilfsklassen (EmbeddedPg, Seitenliste), Karte 1298 -->
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-testsupport</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
 
             <!-- Template -->
             <dependency>
-                <groupId>ch.plaintext</groupId>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-template</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
@@ -642,7 +642,7 @@
                              Module mit eigener Liste brauchen combine.self="override" und dieselbe Reihenfolge. -->
                         <annotationProcessorPaths>
                             <path>
-                                <groupId>ch.plaintext</groupId>
+                                <groupId>ch.plaintext.v2</groupId>
                                 <artifactId>plaintext-root-katalog</artifactId>
                                 <version>${plaintext-root.version}</version>
                             </path>

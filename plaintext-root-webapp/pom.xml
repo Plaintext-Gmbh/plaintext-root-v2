@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>ch.plaintext</groupId>
+        <groupId>ch.plaintext.v2</groupId>
         <artifactId>plaintext-root-parent</artifactId>
         <version>1.789.0</version>
     </parent>
@@ -48,28 +48,28 @@
 
         <!-- === Template === -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-template</artifactId>
         </dependency>
 
         <!-- === Plaintext Framework Modules === -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-interfaces</artifactId>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-common</artifactId>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-menu-visibility</artifactId>
         </dependency>
 
         <!-- Seiten-Zugriffsschutz aus der Menue-Sichtbarkeit. Eigenes Modul, damit ihn auch Apps
              nutzen koennen, die nicht auf plaintext-root-webapp aufsetzen. -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-pageguard</artifactId>
         </dependency>
 
@@ -77,35 +77,35 @@
              Eigenes Modul, damit auch Apps sie nutzen koennen, die nicht auf
              plaintext-root-webapp aufsetzen. -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-web</artifactId>
         </dependency>
 
         <!-- Karte 1297: ch.plaintext.boot.menu.MenuItemImpl wird hier benutzt, kam aber nur
              transitiv ueber plaintext-root-web. Jetzt deklariert. -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-menu</artifactId>
         </dependency>
 
         <!-- Testfabrik des Guards, genutzt von MenuLinkInvariantTest. -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-pageguard</artifactId>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-flyway</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-jpa</artifactId>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-role-assignment</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -121,67 +121,67 @@
              Nicht abwaehlbar und warum je einzeln: docs/OPTIONAL_MODULES.md,
              Begruendung des Wegs: docs/adr/0007-admin-module-abwaehlbar-per-exclusions.md. -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-sessions</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-cron</artifactId>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-settings</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-i18n</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-oidc</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-apitoken</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-secrets</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-sidecars</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-modules</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-mailtemplate</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-webhooks</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-notifications</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- Karte 1560: Claude-API (ClaudeClient) + Seite Root -> Claude API. Abwaehlbar. -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-claude</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -192,7 +192,7 @@
              stellt der Eintrag die session-scoped WatchFrameBean in das Sichtfeld der geteilten
              Serialisierbarkeits-Regel (SessionBeanRegelDeckungTest). -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-watch</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -201,7 +201,7 @@
              Ueber das Aggregat bekommen die Apps das Modul mit dem root-Bump; ohne registrierte
              FreigabeQuelle antwortet jede Adresse mit 404. -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-freigabe</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -364,7 +364,7 @@
         <!-- Seit Karte 1298 kommt embedded-postgres ueber plaintext-root-testsupport, zusammen mit
              EmbeddedPg und Seitenliste (vorher fuenfmal kopiert: root, app, guild, schuetu, iot). -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-testsupport</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
@@ -384,7 +384,7 @@
              Moduls ausgefuehrt — Referenz-Implementierung des geteilten Musters. archunit-junit5
              kommt transitiv (compile) ueber dieses Modul auf den Test-Classpath. -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-archtests</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
@@ -441,7 +441,7 @@
                             <goal>unpack-dependencies</goal>
                         </goals>
                         <configuration>
-                            <includeGroupIds>ch.plaintext</includeGroupIds>
+                            <includeGroupIds>ch.plaintext.v2</includeGroupIds>
                             <includeArtifactIds>plaintext-root-template</includeArtifactIds>
                             <includes>META-INF/resources/**</includes>
                             <outputDirectory>${project.build.outputDirectory}</outputDirectory>
@@ -483,7 +483,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <dependenciesToScan>
-                        <dependency>ch.plaintext:plaintext-root-archtests</dependency>
+                        <dependency>ch.plaintext.v2:plaintext-root-archtests</dependency>
                     </dependenciesToScan>
                     <!-- SchlankerKontextTest gehoert in die zweite Ausfuehrung (siehe unten); mit
                          den Modul-Jars auf dem Classpath beweist er nichts und schlaegt bewusst fehl. -->
@@ -536,15 +536,15 @@
                                 <exclude>**/*$*</exclude>
                             </excludes>
                             <classpathDependencyExcludes>
-                                <classpathDependencyExclude>ch.plaintext:plaintext-admin-webhooks</classpathDependencyExclude>
-                                <classpathDependencyExclude>ch.plaintext:plaintext-admin-claude</classpathDependencyExclude>
-                                <classpathDependencyExclude>ch.plaintext:plaintext-admin-notifications</classpathDependencyExclude>
-                                <classpathDependencyExclude>ch.plaintext:plaintext-admin-secrets</classpathDependencyExclude>
-                                <classpathDependencyExclude>ch.plaintext:plaintext-admin-sidecars</classpathDependencyExclude>
-                                <classpathDependencyExclude>ch.plaintext:plaintext-admin-modules</classpathDependencyExclude>
+                                <classpathDependencyExclude>ch.plaintext.v2:plaintext-admin-webhooks</classpathDependencyExclude>
+                                <classpathDependencyExclude>ch.plaintext.v2:plaintext-admin-claude</classpathDependencyExclude>
+                                <classpathDependencyExclude>ch.plaintext.v2:plaintext-admin-notifications</classpathDependencyExclude>
+                                <classpathDependencyExclude>ch.plaintext.v2:plaintext-admin-secrets</classpathDependencyExclude>
+                                <classpathDependencyExclude>ch.plaintext.v2:plaintext-admin-sidecars</classpathDependencyExclude>
+                                <classpathDependencyExclude>ch.plaintext.v2:plaintext-admin-modules</classpathDependencyExclude>
                             </classpathDependencyExcludes>
                             <systemPropertyVariables>
-                                <plaintext.abgewaehlte.module>ch.plaintext:plaintext-admin-webhooks,ch.plaintext:plaintext-admin-notifications,ch.plaintext:plaintext-admin-secrets,ch.plaintext:plaintext-admin-sidecars,ch.plaintext:plaintext-admin-modules,ch.plaintext:plaintext-admin-claude</plaintext.abgewaehlte.module>
+                                <plaintext.abgewaehlte.module>ch.plaintext.v2:plaintext-admin-webhooks,ch.plaintext.v2:plaintext-admin-notifications,ch.plaintext.v2:plaintext-admin-secrets,ch.plaintext.v2:plaintext-admin-sidecars,ch.plaintext.v2:plaintext-admin-modules,ch.plaintext.v2:plaintext-admin-claude</plaintext.abgewaehlte.module>
                             </systemPropertyVariables>
                             <reportsDirectory>${project.build.directory}/surefire-reports-schlank</reportsDirectory>
                         </configuration>

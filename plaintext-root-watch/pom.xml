@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>ch.plaintext</groupId>
+        <groupId>ch.plaintext.v2</groupId>
         <artifactId>plaintext-root-parent</artifactId>
         <version>1.789.0</version>
     </parent>
@@ -16,22 +16,22 @@
 
     <dependencies>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-interfaces</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-common</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-jpa</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-menu</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -39,7 +39,7 @@
              ihre Rollenregel (bis dahin der Alias watch/home -> watch-einstellungen im
              PageAccessGuardService) fragt WatchPage.available() jetzt selbst beim Seitenwaechter. -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-pageguard</artifactId>
             <version>${project.version}</version>
         </dependency>

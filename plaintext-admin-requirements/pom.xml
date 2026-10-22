@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>ch.plaintext</groupId>
+        <groupId>ch.plaintext.v2</groupId>
         <artifactId>plaintext-root-parent</artifactId>
         <version>1.789.0</version>
     </parent>
@@ -17,17 +17,17 @@
     <dependencies>
         <!-- Plaintext modules -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-interfaces</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-common</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-menu</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -71,7 +71,7 @@
         <!-- Geteilte Architektur-Regeln (siehe <build>): dieses Modul haengt NICHT an
              plaintext-root-webapp, deshalb sieht der dortige ArchUnit-Lauf seine Klassen nicht. -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-archtests</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
@@ -103,7 +103,7 @@
                         </goals>
                         <configuration>
                             <dependenciesToScan>
-                                <dependency>ch.plaintext:plaintext-root-archtests</dependency>
+                                <dependency>ch.plaintext.v2:plaintext-root-archtests</dependency>
                             </dependenciesToScan>
                             <!-- PlaintextLayeringTest (Massnahme 12) gehoert dazu: er liest die
                                  target/classes der Module des Reactors, und dieses Modul wird NACH

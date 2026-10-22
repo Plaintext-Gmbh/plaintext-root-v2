@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>ch.plaintext</groupId>
+        <groupId>ch.plaintext.v2</groupId>
         <artifactId>plaintext-root-parent</artifactId>
         <version>1.789.0</version>
     </parent>
@@ -17,7 +17,7 @@
     <dependencies>
         <!-- Karte 1405: nur für die Reaktor-Reihenfolge (der Prozessor läuft über annotationProcessorPaths) -->
         <dependency>
-            <groupId>ch.plaintext</groupId>
+            <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-katalog</artifactId>
             <version>${project.version}</version>
             <scope>provided</scope>
@@ -69,7 +69,7 @@
                          Karte 1422: Katalog VOR Lombok, vollstaendige Liste statt Zusammenfuehren mit dem Parent. -->
                     <annotationProcessorPaths combine.self="override">
                         <path>
-                            <groupId>ch.plaintext</groupId>
+                            <groupId>ch.plaintext.v2</groupId>
                             <artifactId>plaintext-root-katalog</artifactId>
                             <version>${project.version}</version>
                         </path>
