@@ -119,6 +119,14 @@ meldet nichts** — deshalb die Liste.
 
 Sonar: Projekt `plaintext-root-v2` wird beim ersten Lauf angelegt (fester Schlüssel).
 
+**Stand 22.10.2026 (Jumphost):** Woodpecker für plaintext-root-v2 aktiv (Repo-Id 18),
+`trusted.volumes=true`, `cancel_previous_pipeline_events=[pull_request]`, Timeout 120 min. Secrets
+angelegt: `github_status_token` und `maven_nas_token` (Ereignisse cron/deployment/manual/push/
+pull_request), `mvn_deploy_token`, `sonar_token`, `nvd_api_key`, `pushover_app_token`,
+`pushover_user_key` (cron/deployment/manual/push). Kein `ssh_private_key`. Die Crons `nightly` und
+`wochenanalyse` sind noch nicht angelegt — bis dahin laufen build.yml nur auf Pull Requests und
+sonar.yml nur manuell (`analyse = voll`).
+
 ## 6. Purge (`v2/purge.py`)
 
 ```
