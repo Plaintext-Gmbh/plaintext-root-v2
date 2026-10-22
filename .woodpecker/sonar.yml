@@ -1,5 +1,13 @@
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Woodpecker workflow 3 of 3: WEEKLY FULL ANALYSIS
+#  plaintext-root-v2 — Woodpecker workflow 3 of 3: WEEKLY FULL ANALYSIS
+#
+#  v2-FASSUNG (merge=ours in .gitattributes, Karte 1563). Unterschiede zu upstream:
+#    * eigener Sonar-Projektschluessel `plaintext-root-v2` (fest, nicht aus groupId:artifactId —
+#      sonst hiesse er ch.plaintext.v2:plaintext-root-parent und saehe wie ein Tippfehler von v1 aus)
+#    * eigener NVD-Unterordner wp-plaintext-root-v2 im geteilten Volume
+#    * Pushover-Titel nennt v2
+#  Sonst wortgleich. Secrets: sonar_token, nvd_api_key, mvn_deploy_token, pushover_app_token,
+#  pushover_user_key — alle muessen am Repo existieren, sonst startet die Pipeline nicht.
 #
 #  Corresponds to the job `sonar` from the shared GitHub pipeline — now IN FULL,
 #  including `quality-analysis`:
@@ -120,14 +128,12 @@ steps:
       # dual-publish-nas hangs on a property, not on activeByDefault, but the next
       # person who cleans up '-P' here should have looked that up.
       - >-
-        GROUP_ID=$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout);
-        ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout);
-        PROJECT_KEY="$GROUP_ID:$ARTIFACT_ID";
+        PROJECT_KEY="plaintext-root-v2";
         VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout);
         mvn clean verify sonar:sonar -B -DskipITs -DexcludedGroups=quality-gate -Pcoverage,fast
         -Dmaven.build.cache.enabled=false
         -Dsonar.projectKey="$PROJECT_KEY"
-        -Dsonar.projectName="plaintext-root"
+        -Dsonar.projectName="plaintext-root-v2"
         -Dsonar.projectVersion="$VERSION"
         -Dsonar.host.url="$SONAR_HOST_URL"
         -Dsonar.token="$SONAR_TOKEN"
@@ -221,7 +227,7 @@ steps:
       # wertlos, weil er nie fertig wird.
       - >-
         bash -c 'BESTAND=/root/.cache/owasp-dc-data;
-        EIGEN="$BESTAND/wp-plaintext-root";
+        EIGEN="$BESTAND/wp-plaintext-root-v2";
         if mountpoint -q "$BESTAND"; then
           echo "NVD-Bestand persistent: $BESTAND ist ein Volume-Mount.";
         else
@@ -291,7 +297,7 @@ steps:
           echo "OWASP-Suppression (projekt-lokal): $PWD/quality/owasp-suppressions.xml";
         fi;
         export OWASP_SUPPRESSION="$OWASP_SUPPRESSIONS";
-        export OWASP_DATA_DIR="/root/.cache/owasp-dc-data/wp-plaintext-root";
+        export OWASP_DATA_DIR="/root/.cache/owasp-dc-data/wp-plaintext-root-v2";
         bash .plaintext-scripts/quality/owasp-dependency-check.sh "$PWD" 0
         || echo "dependency-check endete mit Fehlercode. Ob das ein Befund oder ein Ausfall war, entscheidet der naechste Befehl am REPORT.";
         true
@@ -403,9 +409,7 @@ steps:
       # Ein fehlender OWASP-Report kann an dieser Stelle nicht mehr vorkommen: der Step
       # davor bricht dann ab und dieser laeuft gar nicht erst.
       - >-
-        GROUP_ID=$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout);
-        ARTIFACT_ID=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout);
-        PROJECT_KEY="$GROUP_ID:$ARTIFACT_ID";
+        PROJECT_KEY="plaintext-root-v2";
         REPORT_TASK=$(find . -path "*/target/sonar/report-task.txt" | head -1);
         OWASP_JSON=$(find . -path "*/target/dependency-check-report.json" | head -1);
         echo "report-task.txt: $REPORT_TASK";
@@ -423,7 +427,7 @@ steps:
         set -e;
         cat /tmp/ci/gate.out;
         echo "$GATE_EXIT" > /tmp/ci/gate.exit;
-        echo "── Quality-Gate plaintext-root ──";
+        echo "── Quality-Gate plaintext-root-v2 ──";
         if [ "$GATE_EXIT" = "10" ]; then echo "BREACHED"; else echo "OK"; fi;
         grep '^  ! ' /tmp/ci/gate.out | sed 's/^  ! //' || true
 
@@ -475,7 +479,7 @@ steps:
         curl -s -o /dev/null --max-time 20 -X POST https://api.pushover.net/1/messages.json
         --form-string "token=$PUSHOVER_APP_TOKEN"
         --form-string "user=$PUSHOVER_USER_KEY"
-        --form-string "title=Voll-Analyse fehlgeschlagen: plaintext-root (Woodpecker)"
+        --form-string "title=Voll-Analyse fehlgeschlagen: plaintext-root-v2 (Woodpecker)"
         --form-string "message=Die woechentliche Voll-Analyse lief NICHT durch — quality/quality-gate.properties zeigt weiterhin seinen alten Stand. Ein dort sichtbares OK ist damit nicht aussagekraeftig. Erste Vermutung: der CVE-Scan hat keinen Report erzeugt (NVD-Bestand pruefen). root ist der Parent-POM von app, guild, iot und schuetu — ein CVE-Ausfall hier faellt fuer alle vier aus."
         --form-string "priority=1"
         --form-string "url=$CI_PIPELINE_URL"
