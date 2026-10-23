@@ -1,0 +1,72 @@
+name: v2-sync
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Sync von upstream plaintext-root nach plaintext-root-v2 (Karte 1563)
+#
+#  WARUM GITHUB ACTIONS UND NICHT WOODPECKER
+#  * Der Job braucht nichts vom NAS: kein Maven, keine Datenbank, keine Reposilite. Er mergt,
+#    benennt um und pusht. Dafuer ist ein GitHub-gehosteter Runner das richtige Werkzeug —
+#    und fuer ein OEFFENTLICHES Repo kostet ubuntu-latest kein Kontingent.
+#  * `schedule` laeuft unabhaengig von jedem Push und ist damit das Netz, das kein Woodpecker-Cron
+#    bietet (der nightly-Cron von root war monatelang nicht scharf, siehe upstream repo-lint.yaml).
+#  * Entscheid Daniel 22.10.2026: EIN geplanter Lauf pro Nacht, kein Haken in root (v1), kein
+#    stuendlicher Lauf. Dazu `workflow_dispatch` fuer Hand-Laeufe.
+#  * Der eine self-hosted Runner gehoert den bestehenden Repos — hier bewusst NICHT verwendet.
+#
+#  WAS DER PUSH AUSLOEST
+#  Ein Push nach master durch diesen Job traegt kein [skip ci]; Woodpecker bekommt den Webhook
+#  und released ein v2 (.woodpecker/deploy.yml). GitHub-Actions-Workflows loest ein Push mit
+#  GITHUB_TOKEN nicht aus — gewollt, dieser Job soll sich nicht selbst anstossen. Schleife:
+#  keine — das v2-Release pusht nur einen Tag, keinen Commit (v2/release.sh).
+#
+#  KONFLIKT: Zweig sync-konflikt/<datum>-<sha> + PR mit Label `sync-konflikt`, master unveraendert.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+on:
+  schedule:
+    # Jede Nacht einmal, nicht zur vollen Stunde (GitHub verschiebt :00-Zeitplaene bei Andrang).
+    # 04:41 UTC liegt nach dem root-autobump-Fenster der Konsumenten und vor dem Arbeitstag.
+    - cron: '41 4 * * *'
+  workflow_dispatch:
+    inputs:
+      trocken:
+        description: "Trockenlauf: mergen und umbenennen, aber weder pushen noch PR anlegen"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: v2-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: upstream nachziehen
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout master mit voller Historie
+        uses: actions/checkout@v7
+        with:
+          ref: master
+          # Voll: der Merge braucht die gemeinsame Basis mit upstream (833 Commits Historie).
+          fetch-depth: 0
+          # Der Token von actions/checkout bleibt im Klon und traegt den Push nach master.
+          persist-credentials: true
+
+      - name: Sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_URL: https://github.com/Plaintext-Gmbh/plaintext-root.git
+        run: |
+          git config user.name  "plaintext-root-v2 sync"
+          git config user.email "sync@plaintext.ch"
+          echo "Ausloeser: ${{ github.event_name }}"
+          if [ "${{ inputs.trocken }}" = "true" ]; then
+            v2/sync.sh --trocken
+          else
+            v2/sync.sh
+          fi

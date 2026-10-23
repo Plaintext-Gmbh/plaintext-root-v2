@@ -47,8 +47,13 @@
 set -uo pipefail
 
 REPOSILITE_BASIS="${REPOSILITE_BASIS:-https://maven.plaintext.ch/releases}"
-GRUPPE_PFAD="ch/plaintext"
 GITHUB_BASIS="https://maven.pkg.github.com/Plaintext-Gmbh/plaintext-mvn"
+# Karte 1563: Gruppenpfad und Tag-Praefix sind Umgebung mit Standard, kein Festwert mehr —
+# plaintext-root-v2 veroeffentlicht unter ch/plaintext/v2 und taggt v2-<version>. Ohne die beiden
+# Variablen verhaelt sich das Skript genau wie vorher (ch/plaintext, Tags ohne Praefix).
+#   GRUPPE_PFAD   Standard: groupId der Wurzel-pom des geprueften Standes, Punkte -> Schraegstriche
+#   TAG_PRAEFIX   Standard leer; "v2-" -> Tags v2-X.Y.Z, Version im Aufruf ohne Praefix
+TAG_PRAEFIX="${TAG_PRAEFIX:-}"
 
 # Absoluten Pfad VOR dem cd merken: der Modus --letzte ruft das Skript je Tag
 # erneut auf, und ein relatives $0 zeigt nach dem cd ins Leere.
@@ -60,12 +65,12 @@ MINDESTALTER_S="${MINDESTALTER_S:-1800}"
 # ── Modus --letzte N: ruft sich selbst je Tag auf und sammelt die Befunde ──────
 if [ "${1:-}" = "--letzte" ]; then
   ANZAHL="${2:-10}"
-  TAGS="$(git tag --sort=-creatordate 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n "$ANZAHL")"
+  TAGS="$(git tag --sort=-creatordate 2>/dev/null | grep -E "^${TAG_PRAEFIX}[0-9]+\.[0-9]+\.[0-9]+$" | sed "s/^${TAG_PRAEFIX}//" | head -n "$ANZAHL")"
   [ -n "$TAGS" ] || { echo "release-vollstaendig: keine Release-Tags gefunden — uebersprungen."; exit 0; }
   JETZT="$(date -u +%s)"
   SCHLECHT=""
   for t in $TAGS; do
-    tzeit="$(git log -1 --format=%ct "$t" 2>/dev/null || echo 0)"
+    tzeit="$(git log -1 --format=%ct "${TAG_PRAEFIX}$t" 2>/dev/null || echo 0)"
     alter=$((JETZT - tzeit))
     if [ "$alter" -lt "$MINDESTALTER_S" ]; then
       echo "  $t  uebersprungen (${alter}s alt, Grenze ${MINDESTALTER_S}s — Release laeuft evtl. noch)"
@@ -96,7 +101,7 @@ fi
 
 VERSION="${1:-}"
 if [ -z "$VERSION" ]; then
-  VERSION="$(git describe --tags --abbrev=0 2>/dev/null)"
+  VERSION="$(git describe --tags --abbrev=0 --match "${TAG_PRAEFIX}[0-9]*" 2>/dev/null | sed "s/^${TAG_PRAEFIX}//")"
 fi
 case "$VERSION" in
   ''|*SNAPSHOT*)
@@ -112,9 +117,9 @@ esac
 #  Waechter, der bei jedem neuen Modul die gesamte Vergangenheit rot faerbt, wird
 #  nach dem zweiten Fehlalarm abgeschaltet und prueft dann gar nichts mehr.
 #  Also: liegt ein Tag mit dieser Version vor, kommt die Modulliste aus dem Tag.
-if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null 2>&1; then
-  QUELLE="$VERSION"
-  hole() { git show "$VERSION:$1" 2>/dev/null; }
+if git rev-parse -q --verify "refs/tags/${TAG_PRAEFIX}$VERSION" >/dev/null 2>&1; then
+  QUELLE="${TAG_PRAEFIX}$VERSION"
+  hole() { git show "${TAG_PRAEFIX}$VERSION:$1" 2>/dev/null; }
 else
   QUELLE="Arbeitsverzeichnis"
   hole() { cat "$1" 2>/dev/null; }
@@ -125,6 +130,10 @@ WURZEL="$(hole pom.xml)"
 
 PARENT_ID="$(printf '%s' "$WURZEL" | sed -n '/<\/parent>/,$p' | grep -m1 -oE '<artifactId>[^<]+' | sed 's/<artifactId>//')"
 [ -n "$PARENT_ID" ] || { echo "release-vollstaendig: artifactId aus pom.xml nicht lesbar." >&2; exit 1; }
+if [ -z "${GRUPPE_PFAD:-}" ]; then
+  GRUPPE_PFAD="$(printf '%s' "$WURZEL" | sed -n '/<\/parent>/,$p' | grep -m1 -oE '<groupId>[^<]+' | sed 's/<groupId>//' | tr . /)"
+fi
+[ -n "$GRUPPE_PFAD" ] || { echo "release-vollstaendig: groupId aus pom.xml nicht lesbar." >&2; exit 1; }
 
 MODULE="$(printf '%s' "$WURZEL" | grep -oE '<module>[^<]+' | sed 's/<module>//')"
 [ -n "$MODULE" ] || { echo "release-vollstaendig: keine <module>-Eintraege in pom.xml." >&2; exit 1; }
@@ -151,7 +160,7 @@ kopf() { printf '%s\n' "──────────────────�
 
 kopf
 echo "Release-Vollstaendigkeit  Version $VERSION"
-echo "Repo: $REPOSILITE_BASIS"
+echo "Repo: $REPOSILITE_BASIS/$GRUPPE_PFAD"
 echo "Modulliste aus: $QUELLE"
 kopf
 
