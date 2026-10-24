@@ -12,6 +12,21 @@ exhaustive.
 
 ## [Unreleased]
 
+### Changed
+- **Release upload hardened against hung and aborted uploads** (Karte 1563). Runs 634 and 641 (22 October 2026)
+  each stalled 46 minutes on one `PUT` to GitHub Packages and died with `Read timed out`, leaving 1.789.0 and
+  1.790.0 half published in both repositories and `master` without the next SNAPSHOT commit. The release step
+  now sets `aether.transport.http.requestTimeout=300000` and explicit `retryHandler.count=3`/`interval=5000`
+  (Resolver 2.0.24 names, as shipped with Maven 3.10.0; the 1.9.x `aether.connector.*` keys are no longer read),
+  and a red `./build release` is followed by `./build nachliefern`: `scripts/release-nachliefern.sh` probes every
+  file of every built module in both repositories and uploads only what is missing (a 409 on a file the probe did
+  not see is an error, not swallowed), `mvn clean deploy -pl` builds the modules the reactor never reached,
+  `release-vollstaendig.sh` verifies both repositories, then plaintext-mvn is mirrored and the SNAPSHOT commit is
+  made as `do_release` would have. Neither `deployAtEnd` nor `retryFailedDeploymentCount` is used: both re-upload
+  files that are already there and run into the same 409. The half releases 1.789.0 and 1.790.0 are not reused;
+  1.791.0 went out complete on 23 October 2026 (run 645) still without this fix, so the first release carrying it
+  is 1.792.0.
+
 ### Fixed
 - **`plaintext-root-files`: link expiry on the same day as the store** (Karte 1559). `FilesService` computed the
   last valid day of a share link in `Europe/Zurich`, the `LinkTokenStore` checks it against the JVM default zone.
@@ -20,6 +35,22 @@ exhaustive.
   `plaintext-admin-requirements`. Both now count days in the JVM default zone, as Draw.io and Diashow links do.
 
 ### Added
+- **UI 2 foundation** (Karte 1548, the five UI principles decided on 15.10.2026). All additive; existing pages look
+  the same after the bump. New file `plaintext-layout/css/layout.css`, loaded by the template after
+  `layout-light/dark.css`: tokens for four colour roles (`--pt-flaeche*`, `--pt-text*`, `--pt-akzent*`,
+  `--pt-status-{ok,warnung,fehler,info}*`), four spacing steps (`--pt-abstand-1..4`), `--pt-radius` and one font
+  in three sizes (`--pt-schrift-{klein,normal,gross}`); dark as a second variable set in the same file. New tags:
+  `pt:seitenkopf` (title left, one main action right, rare actions in a «⋯» menu), `pt:tabelle` (= `pt:table`
+  with paginator only from page 2, German empty state with a way out via `leerText`/`leerWeg`, rows as cards
+  below 640px; columns the card does not need get `colClass="pt-mobil-aus"`), `pt:chip` (status as a quiet chip)
+  and `pt:filter` (filters behind a button on the phone, behaviour in `js/ui-grundlage.js`). `pt:table` gets the
+  optional attributes `paginatorAlwaysVisible`, `leerText`, `leerWeg`, `leerIcon` (unset = unchanged).
+  Living reference: `/styleguide.html` (Admin → Styleguide, ADMIN/ROOT). Screenshots in `docs/ui/1548/`.
+- **`PlaintextUiGrundlageLinterTest`** in `plaintext-root-archtests` (Karte 1548): XHTML without `style="`,
+  without its own `p:growl`, every `h:form` with `_csrf`; the existing state is frozen per file in
+  `plaintext-ui-bestand.txt` at the reactor root and may only shrink. Enforced in root; in consumers it only
+  reports (default `report`) until they write their own baseline with
+  `-Dplaintext.arch.ui-grundlage=bestand-schreiben` and set `enforce`.
 - **Personal file store `plaintext-root-files`** (Karte 1559, ported from the Inventar): every user uploads, lists,
   downloads and deletes their own files under `files/<user>/<name>`; a file lives `plaintext.files.frist` (default
   21 days) after its last change, uploading the same name again replaces it and restarts the period. Share links
@@ -125,6 +156,47 @@ exhaustive.
   `PlaintextModulApiVertragTest` until it carries `@ModulApiUmsetzung` — add it with the bump.
 
 ### Changed
+- **PrimeFaces 15.0.18 → 16.0.1** (Karte 1511, analysis Karte 1507; first cut of the family). **Breaking for
+  consumers** — on the bump:
+  1. **Drop `<classifier>jakarta</classifier>`** from every `org.primefaces:primefaces` (and
+     `primefaces-extensions`) dependency. PF 16 is Jakarta-only and publishes no `-jakarta` jar; a leftover
+     classifier fails the build with `Could not find artifact org.primefaces:primefaces:jar:jakarta:16.0.1`.
+     The root parent now manages `primefaces`, `primefaces-extensions` and `primefaces-themes` without classifier
+     and excludes the `jakarta` jars that JoinFaces 6.1.x's `primefaces-spring-boot-starter` (6.1.2: BOM on PF 15.0.19) still pulls. A
+     consumer that declares the starter **with its own `<exclusions>`** does not inherit those exclusions (Maven
+     applies managed exclusions only when a dependency has none) and must repeat the two
+     (`org.primefaces:primefaces`, `org.primefaces.extensions:primefaces-extensions`). A consumer page using
+     `pe:` needs an explicit `primefaces-extensions` dependency unless it gets it through
+     `plaintext-admin-apitoken`.
+  2. **Replace `p:separator` with `p:divider`** — the tag is gone in PF 16 and Facelets fails the page. A
+     vertical separator in a toolbar becomes `<p:divider layout="vertical"/>`.
+  3. **Dialog CSS on `.ui-dialog-box`**: PF 16 renders `.ui-dialog` as the full-viewport scroll layer and
+     `.ui-dialog-box` as the visible box. Own CSS that sets width, height, shadow or flex on `.ui-dialog` must
+     move to `.ui-dialog .ui-dialog-box`. Root's `mobile-responsive.css` and the `primefaces-plaintext` theme
+     are converted (dialog rules taken over from saga-blue 16.0.1); the `[aria-hidden="false"]` display
+     workaround is gone.
+  4. `p:selectOneButton` renders its text as `label.ui-button-text` instead of `span`; selectors on
+     `span.ui-button-text` need adjusting (none in root).
+  5. `p:accordionPanel activeIndex` is deprecated in PF 16, use `active` (none in root).
+  6. **The EL functions `p:ifGranted`, `p:ifAllGranted`, `p:ifAnyGranted`, `p:ifNoneGranted`, `p:remoteUser`,
+     `p:userPrincipal` are gone** — a page using one fails with `Function [p:ifGranted] not found` (HTTP 500).
+     Root's `topbar.xhtml` now calls `facesContext.externalContext.isUserInRole('ROLE_…')`, which is what
+     `p:ifGranted` did internally.
+  7. Attributes removed in PF 16 (none used in root; grep in consumers): `p:dataExporter exporter`,
+     `p:autoComplete effect/effectDuration`, `p:button onchange/readonly`, `p:calendar showLongMonthNames`,
+     `p:dataTable initMode`, `p:fileUpload validateContentType/virusScan`, `p:graphicImage url`,
+     `collectionType` on `p:selectCheckboxMenu`/`p:selectManyCheckbox`/`p:selectManyMenu`,
+     `p:selectOneMenu inputmode`, `p:timeline timeChangeable`, `p:tree sourceFilterPlaceholder`,
+     `p:treeTable touchable`, `p:chip removeIconClass`, `p:confirmPopup showEffect/hideEffect`.
+  Renovate keeps blocking PrimeFaces majors until the last application is on 16; that rule goes with the last
+  app PR.
+- **Three colour variants instead of ten** (Karte 1548): green (default for new users), blue (fallback for unknown
+  names) and orange (the warm side). Users with a removed variant get the nearest one by hue — turquoise/purple →
+  blue, avocado/lime → green, red/crimson/yellow → orange — written back to their preferences on the next load
+  (`ThemeColorProvider.VARIANTEN`/`RUECKFALL`, also for the colour cookie, the REST endpoint and the login page).
+  Custom colours stay. Visible for those users: their accent colour changes once.
+- `pt:colAmount` cells carry `.pt-zahl` (`font-variant-numeric: tabular-nums`) — digits equally wide, alignment
+  unchanged.
 - **Contracts live with their provider** (Karte 1504, decisions in Karte 1502). New ArchUnit rule `vertragsort`
   (`PlaintextVertragsortTest`): an interface implemented only in another module and not used in its own belongs in
   that provider's `<modul>-api` jar; root's shell (`plaintext-root-interfaces` + platform layer) is exempt.

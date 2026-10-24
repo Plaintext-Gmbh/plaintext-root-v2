@@ -7,12 +7,12 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
+        <version>4.1.2</version>
     </parent>
 
     <groupId>ch.plaintext.v2</groupId>
     <artifactId>plaintext-root-parent</artifactId>
-    <version>1.789.0</version>
+    <version>1.799.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>plaintext-root-parent</name>
@@ -58,13 +58,13 @@
         <plaintext-root.version>${project.version}</plaintext-root.version>
 
         <!-- JSF & Primefaces -->
-        <primefaces-spring-boot-starter.version>6.1.1</primefaces-spring-boot-starter.version>
-        <primefaces.version>15.0.19</primefaces.version>
+        <primefaces-spring-boot-starter.version>6.1.2</primefaces-spring-boot-starter.version>
+        <primefaces.version>16.0.1</primefaces.version>
         <!-- Mindestens 4.1.13: dort schliesst Mojarra CVE-2026-46581 (Pfad-Traversal/RCE ueber
              ui:include, CVSS 7.5). Nicht zurueckdrehen. Die Kehrseite derselben Haertung —
              Facelet-Verweise brauchen seither einen fuehrenden "/" — haelt der Test
              FaceletPfadInvariantTest (plaintext-root-webapp) fest, dort steht die Begruendung. -->
-        <jakarta.faces.version>4.1.18</jakarta.faces.version>
+        <jakarta.faces.version>4.1.19</jakarta.faces.version>
 
         <!-- Cron & Scheduling -->
         <cron4j.version>2.2.5</cron4j.version>
@@ -135,7 +135,7 @@
         -->
         <spring-security.version>7.1.1</spring-security.version>
         <!-- Jackson 3: Boot 4.1.0 pinnt bereits 3.1.4 (CVE-2026-54512 gefixt); explizit als Sicherheitsnetz. -->
-        <jackson-bom.version>3.2.3</jackson-bom.version>
+        <jackson-bom.version>3.2.4</jackson-bom.version>
         <!--
           Jackson 2 (Karte 931): Boot 4.1.0 pinnt 2.21.4, darin CVE-2026-54515 (CVSS 5.3) —
           @JsonIgnoreProperties je Property wird in BeanDeserializerBase.createContextual()
@@ -409,10 +409,31 @@
             </dependency>
 
             <!-- JSF & Primefaces -->
+            <!-- PrimeFaces 16 kennt nur noch Jakarta und veroeffentlicht kein Jar mit
+                 Classifier "jakarta" mehr (Karte 1511). JoinFaces 6.1.x (6.1.2: BOM auf PF 15.0.19) zieht aber genau
+                 primefaces:jar:jakarta und primefaces-extensions:jar:jakarta; mit der hier
+                 verwalteten 16er-Version bricht die Aufloesung ab ("Could not find artifact
+                 org.primefaces:primefaces:jar:jakarta:16.0.x"). Darum schliesst die Verwaltung
+                 beide aus und setzt unten die Jars ohne Classifier ein.
+                 ACHTUNG Maven: Eine Abhaengigkeit mit EIGENEN <exclusions> erbt diese hier
+                 nicht (die Verwaltung ergaenzt Exclusions nur, wenn keine dastehen). Wer den
+                 Starter mit eigener Exclusion deklariert, muss die beiden PrimeFaces-Exclusions
+                 dort wiederholen (siehe plaintext-root-webapp, plaintext-root-flyway).
+                 Die Ausschluesse entfallen, sobald JoinFaces einen Starter fuer PF 16 hat. -->
             <dependency>
                 <groupId>org.joinfaces</groupId>
                 <artifactId>primefaces-spring-boot-starter</artifactId>
                 <version>${primefaces-spring-boot-starter.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.primefaces</groupId>
+                        <artifactId>primefaces</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.primefaces.extensions</groupId>
+                        <artifactId>primefaces-extensions</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.primefaces</groupId>
@@ -420,10 +441,14 @@
                 <version>${primefaces.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.primefaces</groupId>
-                <artifactId>primefaces</artifactId>
+                <groupId>org.primefaces.extensions</groupId>
+                <artifactId>primefaces-extensions</artifactId>
                 <version>${primefaces.version}</version>
-                <classifier>jakarta</classifier>
+            </dependency>
+            <dependency>
+                <groupId>org.primefaces</groupId>
+                <artifactId>primefaces-themes</artifactId>
+                <version>${primefaces.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.glassfish</groupId>
@@ -684,8 +709,11 @@
                      merkt sich das Plugin je Modul nur EINE Ziel-Konfiguration und schiebt am Ende alle Module
                      zweimal ins selbe Repository; Reposilite lehnt das zweite Mal mit 409 ab, GitHub Packages
                      ging leer aus, der Release-Lauf brach nach Tag und Upload ab (SNAPSHOT-Commit fehlte).
-                     Halbe Releases (Zustandsbericht M4) bleiben damit ein offener Punkt — Loesung waere ein
-                     einzelnes Deploy-Ziel oder ein Staging-Verzeichnis, nicht diese Option. -->
+                     Halbe Releases (Zustandsbericht M4) heilt seit Karte 1563 `./build nachliefern`
+                     (scripts/release-nachliefern.sh): nach einem roten `mvn clean deploy` werden die
+                     fehlenden Dateien einzeln nachgeliefert, nie etwas Vorhandenes neu geladen (409).
+                     Auch KEIN retryFailedDeploymentCount: es laedt das ganze Modul neu und laeuft in
+                     denselben 409. -->
             </plugins>
         </pluginManagement>
         <plugins>

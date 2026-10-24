@@ -47,6 +47,7 @@
 set -uo pipefail
 
 REPOSILITE_BASIS="${REPOSILITE_BASIS:-https://maven.plaintext.ch/releases}"
+<<<<<<< HEAD
 GITHUB_BASIS="https://maven.pkg.github.com/Plaintext-Gmbh/plaintext-mvn"
 # Karte 1563: Gruppenpfad und Tag-Praefix sind Umgebung mit Standard, kein Festwert mehr —
 # plaintext-root-v2 veroeffentlicht unter ch/plaintext/v2 und taggt v2-<version>. Ohne die beiden
@@ -54,6 +55,11 @@ GITHUB_BASIS="https://maven.pkg.github.com/Plaintext-Gmbh/plaintext-mvn"
 #   GRUPPE_PFAD   Standard: groupId der Wurzel-pom des geprueften Standes, Punkte -> Schraegstriche
 #   TAG_PRAEFIX   Standard leer; "v2-" -> Tags v2-X.Y.Z, Version im Aufruf ohne Praefix
 TAG_PRAEFIX="${TAG_PRAEFIX:-}"
+=======
+GRUPPE_PFAD="ch/plaintext"
+# Ueberschreibbar nur fuer Tests gegen eine Attrappe (Karte 1563); im Betrieb bleibt es dieser Wert.
+GITHUB_BASIS="${GITHUB_BASIS:-https://maven.pkg.github.com/Plaintext-Gmbh/plaintext-mvn}"
+>>>>>>> 0c6be2556c590cca05b85737f7f58e1a28d82626
 
 # Absoluten Pfad VOR dem cd merken: der Modus --letzte ruft das Skript je Tag
 # erneut auf, und ein relatives $0 zeigt nach dem cd ins Leere.
@@ -128,7 +134,18 @@ fi
 WURZEL="$(hole pom.xml)"
 [ -n "$WURZEL" ] || { echo "release-vollstaendig: pom.xml aus '$QUELLE' nicht lesbar." >&2; exit 1; }
 
-PARENT_ID="$(printf '%s' "$WURZEL" | sed -n '/<\/parent>/,$p' | grep -m1 -oE '<artifactId>[^<]+' | sed 's/<artifactId>//')"
+# Erste artifactId NACH dem </parent>-Block (auch wenn beides auf einer Zeile steht); ohne
+# <parent> die erste artifactId der Datei. Dieselbe Funktion wie in release-nachliefern.sh.
+eigene_artifact_id() {
+  local pom
+  pom="$(cat)"
+  if printf '%s' "$pom" | grep -q '</parent>'; then
+    printf '%s' "$pom" | sed -n '/<\/parent>/,$p' | sed '1s/.*<\/parent>//' | grep -m1 -oE '<artifactId>[^<]+' | sed 's/<artifactId>//'
+  else
+    printf '%s' "$pom" | grep -m1 -oE '<artifactId>[^<]+' | sed 's/<artifactId>//'
+  fi
+}
+PARENT_ID="$(printf '%s' "$WURZEL" | eigene_artifact_id)"
 [ -n "$PARENT_ID" ] || { echo "release-vollstaendig: artifactId aus pom.xml nicht lesbar." >&2; exit 1; }
 if [ -z "${GRUPPE_PFAD:-}" ]; then
   GRUPPE_PFAD="$(printf '%s' "$WURZEL" | sed -n '/<\/parent>/,$p' | grep -m1 -oE '<groupId>[^<]+' | sed 's/<groupId>//' | tr . /)"
@@ -143,7 +160,7 @@ ZU_PRUEFEN="$(printf '%s|pom\n' "$PARENT_ID")"
 for m in $MODULE; do
   MPOM="$(hole "$m/pom.xml")"
   [ -n "$MPOM" ] || { echo "release-vollstaendig: $m/pom.xml fehlt in '$QUELLE'." >&2; exit 1; }
-  aid="$(printf '%s' "$MPOM" | sed -n '/<\/parent>/,$p' | grep -m1 -oE '<artifactId>[^<]+' | sed 's/<artifactId>//')"
+  aid="$(printf '%s' "$MPOM" | eigene_artifact_id)"
   [ -n "$aid" ] || aid="$m"
   pack="$(printf '%s' "$MPOM" | grep -m1 -oE '<packaging>[^<]+' | sed 's/<packaging>//')"
   if [ "$pack" = "pom" ]; then
