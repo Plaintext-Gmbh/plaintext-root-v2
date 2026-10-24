@@ -189,7 +189,9 @@ starten() {   # $1 = Kennung, $2.. = zusaetzliche Umgebungsvariablen (K=V)
 warten_auf_up() {   # $1 = Kennung; Exit 1 wenn Prozess endet oder 300 s um sind
     local log="$ARBEIT/$1.log" i
     for i in $(seq 1 150); do
-        if ! kill -0 "$APP_PID" 2>/dev/null; then return 1; fi
+        if ! kill -0 "$APP_PID" 2>/dev/null; then
+            echo "lader-probe: Huelle $1 beendet, bevor health UP war — letzte Logzeilen:" >&2; tail -30 "$log" >&2; return 1
+        fi
         if curl -fsS --max-time 3 "http://127.0.0.1:$PORT/actuator/health" 2>/dev/null | grep -q '"status":"UP"'; then
             return 0
         fi
