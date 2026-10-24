@@ -142,9 +142,34 @@ if [ -n "$MODUL_GAV" ]; then
     if [ "$NUR_AUSWAHL" = "1" ]; then echo "AUSWAHL $NAME $VERSION root-min ${ROOT_MIN:-?}"; exit 0; fi
     MODUL_JAR="$ARBEIT/$NAME-$VERSION.jar"
     curl -fsS --max-time 300 -o "$MODUL_JAR" "$REPOSILITE_BASIS/$G_PFAD/$NAME/$VERSION/$NAME-$VERSION.jar" || fehler "Download $NAME-$VERSION.jar fehlgeschlagen"
+    POM="$(cd "$ARBEIT" && jar xf "$MODUL_JAR" "META-INF/maven/$GRUPPE/$NAME/pom.xml" 2>/dev/null && cat "META-INF/maven/$GRUPPE/$NAME/pom.xml" 2>/dev/null || true)"
+    [ -n "$POM" ] || fehler "pom.xml im Jar nicht gefunden (META-INF/maven/$GRUPPE/$NAME/pom.xml)"
+    # Bibliotheken (Stueckliste, Karte 1514): ch.plaintext-Abhaengigkeiten ausserhalb von root,
+    # z.B. plaintext-z-messenger-api ab verrechnung 2.2017.0. Ohne sie: NoClassDefFoundError.
+    # ponytail: Version ohne Angabe/als ${...} = Modulversion (app-Reaktor, plaintext.version);
+    # nur direkte Abhaengigkeiten. Bringt eine Bibliothek eigene Nicht-root-Abhaengigkeiten, hier erweitern.
+    BIBS="$(echo "$POM" | awk '
+        /<dependencyManagement>/ {dm=1} /<\/dependencyManagement>/ {dm=0}
+        /<dependency>/ {d=1; g=""; a=""; v=""; sc=""; next}
+        d && /<groupId>/    {g=$0; sub(/.*<groupId>/,"",g); sub(/<.*/,"",g)}
+        d && /<artifactId>/ {a=$0; sub(/.*<artifactId>/,"",a); sub(/<.*/,"",a)}
+        d && /<version>/    {v=$0; sub(/.*<version>/,"",v); sub(/<.*/,"",v)}
+        d && /<scope>/      {sc=$0; sub(/.*<scope>/,"",sc); sub(/<.*/,"",sc)}
+        /<\/dependency>/ {d=0; if (!dm && g=="ch.plaintext" && a !~ /^plaintext-root-/ && sc!="test" && sc!="provided") print a ":" v}')"
+    BIB_LISTE=""; BIB_YAML=""
+    for b in $BIBS; do
+        b_name="${b%%:*}"; b_ver="${b#*:}"; case "$b_ver" in ''|*'$'*) b_ver="$VERSION" ;; esac
+        b_jar="$MODULE/cache/$b_name-$b_ver.jar"
+        curl -fsS --max-time 300 -o "$b_jar" "$REPOSILITE_BASIS/ch/plaintext/$b_name/$b_ver/$b_name-$b_ver.jar" || fehler "Download Bibliothek $b_name-$b_ver.jar fehlgeschlagen"
+        BIB_LISTE="${BIB_LISTE:+$BIB_LISTE, }ch.plaintext:$b_name:$b_ver"
+        BIB_YAML="$BIB_YAML  - name: $b_name
+    gruppe: ch.plaintext
+    version: $b_ver
+    sha256: $(sha256 "$b_jar")
+"
+        sag "Bibliothek ch.plaintext:$b_name:$b_ver"
+    done
     if [ -z "$ROOT_MIN" ]; then
-        POM="$(cd "$ARBEIT" && jar xf "$MODUL_JAR" "META-INF/maven/$GRUPPE/$NAME/pom.xml" 2>/dev/null && cat "META-INF/maven/$GRUPPE/$NAME/pom.xml" 2>/dev/null || true)"
-        [ -n "$POM" ] || fehler "pom.xml im Jar nicht gefunden (META-INF/maven/$GRUPPE/$NAME/pom.xml)"
         ROOT_MIN="$(root_min_aus_pom "$POM")"
         [ -n "$ROOT_MIN" ] || fehler "root-min aus der Elternkette nicht bestimmbar — --root-min angeben"
         sag "root-min aus der Elternkette: $ROOT_MIN"
@@ -163,7 +188,7 @@ sag "Modul $GRUPPE:$NAME:$VERSION sha256 $MODUL_SHA, Migrationen: $(echo "$MODUL
 # flyway_schema_history stehen.
 printf '%s\n' $MODUL_MIGRATIONEN > "$ARBEIT/modul-migrationen.txt"
 
-konfig_schreiben() {   # $1 name $2 version $3 sha $4 root-min
+konfig_schreiben() {   # $1 name $2 version $3 sha $4 root-min [$5 bibliotheken, $6 deren Eintraege]
     cat > "$MODULE/module.yaml" <<EOF
 module:
   - name: $1
@@ -171,6 +196,7 @@ module:
     sha256: $3
     root-min: $4
 EOF
+    if [ -n "${5:-}" ]; then echo "    bibliotheken: [$5]" >> "$MODULE/module.yaml"; printf '%s' "$6" >> "$MODULE/module.yaml"; fi
 }
 
 # ── Huelle starten/stoppen ──────────────────────────────────────────────────
@@ -213,13 +239,13 @@ werkzeuge() { grep -oE 'Registered tools: [0-9]+' "$ARBEIT/$1.log" | tail -1 | g
 FEHLER=0
 
 # ── Probe B: Huelle + Modul auf leerer DB ───────────────────────────────────
-konfig_schreiben "$NAME" "$VERSION" "$MODUL_SHA" "$ROOT_MIN"
+konfig_schreiben "$NAME" "$VERSION" "$MODUL_SHA" "$ROOT_MIN" "${BIB_LISTE:-}" "${BIB_YAML:-}"
 starten B
 if warten_auf_up B; then
     HEALTH="$(curl -fsS "http://127.0.0.1:$PORT/actuator/health")"
     beleg "B health: $HEALTH"
     grep -E '^\[modul-lader\]' "$ARBEIT/B.log" | while read -r z; do beleg "B $z"; done
-    grep -qE "^\[modul-lader\] 1 Module bereit: $NAME:$VERSION" "$ARBEIT/B.log" || { echo "  FEHLT: Zeile '[modul-lader] 1 Module bereit: $NAME:$VERSION'"; FEHLER=1; }
+    grep -qE "^\[modul-lader\] [0-9]+ Module bereit: $NAME:$VERSION" "$ARBEIT/B.log" || { echo "  FEHLT: Zeile '[modul-lader] N Module bereit: $NAME:$VERSION'"; FEHLER=1; }
     N1="$(werkzeuge B)"; beleg "B Registered tools: $N1"
     grep -iE 'flyway|migrat' "$ARBEIT/B.log" | grep -ivE 'DEBUG' | head -8 | while read -r z; do beleg "B $(echo "$z" | cut -c1-200)"; done
     for m in $MODUL_MIGRATIONEN; do
