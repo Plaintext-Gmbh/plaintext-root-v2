@@ -53,7 +53,9 @@ steps:
       # Selbsttest = Fixture (Reaktor-Koordinate umbenannt, Fremd-Artefakt bleibt, Imports unberuehrt),
       # Idempotenz (zweimal laufen = keine Aenderung) und Grep-Test auf dem echten Baum.
       - bash v2/umbenennen.sh --selbsttest
-      - bash -n v2/release.sh && bash -n v2/sync.sh && bash -n v2/lader-probe.sh && bash -n scripts/release-vollstaendig.sh
+      - bash -n v2/release.sh && bash -n v2/sync.sh && bash -n v2/lader-probe.sh && bash -n v2/test-lader-probe-auswahl.sh && bash -n scripts/release-vollstaendig.sh
+      # Auswahl der Modulversion fuer :latest (root-min <= Huelle) an einer Attrappe, ohne Netz und DB
+      - bash v2/test-lader-probe-auswahl.sh
       # Der Release-Lauf wuerde mit dieser Wurzel-groupId arbeiten — hier sichtbar gemacht.
       - 'echo "Wurzel-groupId: $(mvn -q -N help:evaluate -Dexpression=project.groupId -DforceStdout)"'
 
@@ -127,7 +129,8 @@ steps:
       DB_USER: plaintext
       DB_PASSWORD: plaintext
       REPOSILITE_BASIS: https://maven.plaintext.ch/releases
-      # "latest" = juengstes Release laut maven-metadata.xml. Zum Festnageln eine Version eintragen.
+      # "latest" = juengstes Release laut maven-metadata.xml, dessen root-min die Huelle laden kann
+      # (Exit 3, wenn keine der 15 neuesten passt). Zum Festnageln eine Version eintragen.
       PROBE_MODUL_VERSION: latest
       PROBE_ARBEIT: /woodpecker/lader-probe
       JAVA_TOOL_OPTIONS: "-XX:MaxRAM=4g -XX:ActiveProcessorCount=2"
