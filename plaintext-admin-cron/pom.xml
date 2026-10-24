@@ -7,7 +7,7 @@
     <parent>
         <groupId>ch.plaintext.v2</groupId>
         <artifactId>plaintext-root-parent</artifactId>
-        <version>1.789.0</version>
+        <version>1.799.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>plaintext-admin-cron</artifactId>
@@ -103,7 +103,6 @@
         <dependency>
             <groupId>org.primefaces</groupId>
             <artifactId>primefaces</artifactId>
-            <classifier>jakarta</classifier>
         </dependency>
 
         <!-- Servlet API: kein Java-Treffer im Modul (Stand 06.09.2026); nicht Teil der

@@ -121,7 +121,14 @@ steps:
         '</settings>' > /tmp/ci/settings.xml
       - chmod 600 /tmp/ci/settings.xml
       - rm -f /root/.m2/settings.xml
-      - export MAVEN_ARGS="-s /tmp/ci/settings.xml"
+      # Upload-Haertung wie upstream plaintext-root (Karte 1563, Laeufe 634/641 hingen je 46 min an
+      # EINEM PUT nach maven.pkg.github.com): Lese-Timeout 5 min statt 30, 3 Wiederholungen im Abstand
+      # von 5 s. Namen von Resolver 2.x (Maven 3.10); Begruendung ausfuehrlich in upstream deploy.yml.
+      - >-
+        export MAVEN_ARGS="-s /tmp/ci/settings.xml
+        -Daether.transport.http.requestTimeout=300000
+        -Daether.transport.http.retryHandler.count=3
+        -Daether.transport.http.retryHandler.interval=5000"
 
       # ── 4. Testdatenbank ───────────────────────────────────────────────────────────────
       - >-

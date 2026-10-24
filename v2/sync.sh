@@ -75,7 +75,8 @@ sag "$ANZAHL upstream-Commits seit Basis ${BASIS:0:7}${LETZTES_RELEASE:+ (juengs
 
 # Offener Konflikt-PR? Dann nicht noch einen anlegen.
 if command -v gh >/dev/null 2>&1 && [ -n "${GH_TOKEN:-}" ]; then
-    OFFEN="$(gh pr list --state open --label sync-konflikt --json number,headRefName --jq '.[] | "#\(.number) \(.headRefName)"' 2>/dev/null || true)"
+    # am Zweignamen erkennen, nicht am Label: fehlt das Label, bliebe ein offener Konflikt sonst unbemerkt
+    OFFEN="$(gh pr list --state open --json number,headRefName --jq '.[] | select(.headRefName | startswith("sync-konflikt/")) | "#\(.number) \(.headRefName)"' 2>/dev/null || true)"
     if [ -n "$OFFEN" ]; then
         sag "offener sync-konflikt-PR vorhanden — erst aufloesen, dieser Lauf tut nichts:"
         echo "$OFFEN"
@@ -124,9 +125,9 @@ Commit auf diesen Zweig, PR mergen. master ist unveraendert geblieben."
     sag "Konfliktzweig gepusht: $ZWEIG"
     if command -v gh >/dev/null 2>&1 && [ -n "${GH_TOKEN:-}" ]; then
         gh label create sync-konflikt --color B60205 --description "Sync von upstream plaintext-root mit Konflikt, Handarbeit noetig" --force >/dev/null 2>&1 || true
-        gh pr create --base "$ZIEL" --head "$ZWEIG" --label sync-konflikt \
-            --title "Sync-Konflikt upstream $UP_KURZ" \
-            --body "$(cat <<EOF
+        # Karte 1563 (23.10.2026): das Label fehlte im Repo, gh pr create --label brach ab und es gab
+        # keinen PR. Darum zuerst mit Label, und scheitert das, derselbe PR ohne Label.
+        PR_BODY="$(cat <<EOF
 ## Summary
 
 Der automatische Sync von upstream plaintext-root (\`$UP_KURZ\`, $ANZAHL Commits, bis: $UP_BETREFF) ist auf Konflikte gelaufen. \`master\` ist unveraendert; dieser Zweig traegt den Merge **mit Konfliktmarkern**.
@@ -150,7 +151,12 @@ v2/umbenennen.sh && v2/umbenennen.sh --pruefen
 - [ ] PR-Pipeline gruen
 - [ ] Merge durch den Jumphost (der Merge auf master loest ein v2-Release aus)
 EOF
-)" || sag "gh pr create fehlgeschlagen — PR von Hand anlegen (Zweig $ZWEIG, Label sync-konflikt)."
+)"
+        gh pr create --base "$ZIEL" --head "$ZWEIG" --label sync-konflikt \
+            --title "Sync-Konflikt upstream $UP_KURZ" --body "$PR_BODY" \
+        || gh pr create --base "$ZIEL" --head "$ZWEIG" \
+            --title "Sync-Konflikt upstream $UP_KURZ" --body "$PR_BODY" \
+        || sag "gh pr create fehlgeschlagen — PR von Hand anlegen (Zweig $ZWEIG)."
     else
         sag "kein gh/GH_TOKEN — PR von Hand anlegen: Zweig $ZWEIG, Label sync-konflikt."
     fi
