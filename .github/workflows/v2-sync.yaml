@@ -23,10 +23,9 @@ name: v2-sync
 # ═══════════════════════════════════════════════════════════════════════════════
 
 on:
-  schedule:
-    # Jede Nacht einmal, nicht zur vollen Stunde (GitHub verschiebt :00-Zeitplaene bei Andrang).
-    # 04:41 UTC liegt nach dem root-autobump-Fenster der Konsumenten und vor dem Arbeitstag.
-    - cron: '41 4 * * *'
+  # Karte 1595 (Daniel, 26.10.2026): kein geplanter Lauf mehr hier. Den Abgleich macht jeden Samstag
+  # 03:30 der Agenten-Cron ~/scripts/v2-abgleich-agent auf zorin01 (ruft v2/sync.sh, behebt Fehler,
+  # Pushover-Bericht). Zwei geplante Laeufe wuerden sich in die Quere kommen. Dieser Workflow bleibt fuer Hand-Laeufe.
   workflow_dispatch:
     inputs:
       trocken:
