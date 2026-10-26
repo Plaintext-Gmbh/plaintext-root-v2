@@ -5,7 +5,7 @@
 #    * KEIN ./build / plaintext-scripts: v2/release.sh taggt (v2-<version>), setzt die Version nur
 #      im Arbeitsbaum, `mvn clean deploy` in BEIDE Paket-Repos — kein Versions-Commit (der Sync
 #      bliebe sonst an jeder pom.xml haengen), kein SNAPSHOT-Commit, keine Schleife.
-#    * KEIN NAS-Staging, KEIN SSH-Schluessel (.m3-jar-volume ist in v2 entfernt), KEIN Docker-CLI.
+#    * KEIN NAS-Staging, KEIN SSH-Schluessel, KEIN Docker-CLI (.m3-jar-volume liest nur ./build, das v2 nicht nutzt).
 #    * KEIN Spiegel nach Plaintext-Gmbh/plaintext-mvn (git): v2 veroeffentlicht nur in GitHub
 #      Packages und Reposilite.
 #    * Vollstaendigkeitspruefung (Karte 1281) mit TAG_PRAEFIX=v2- und Gruppenpfad ch/plaintext/v2.

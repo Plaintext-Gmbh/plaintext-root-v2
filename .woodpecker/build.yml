@@ -1,23 +1,45 @@
 # ═══════════════════════════════════════════════════════════════════════════════
-#  plaintext-root-v2 — Woodpecker workflow 1 of 3: BUILD & TEST (Karte 1563)
+#  Woodpecker workflow 1 of 3: BUILD & TEST
 #
-#  v2-FASSUNG dieser Datei. Sie steht in .gitattributes auf `merge=ours`: der Sync von upstream
-#  (v2/sync.sh) behaelt sie und meldet nur, wenn upstream seine build.yml geaendert hat.
-#  Unterschiede zu upstream plaintext-root/.woodpecker/build.yml:
-#    * zwei v2-Schritte vorneweg (Umbenennungs-Selbsttest, Purge-Unit-Tests, Skript-Syntax)
-#    * Lader-Probe nach dem Build: Huelle + released plaintext-z-verrechnung ueber loader.path
-#      gegen eine LEERE zweite Postgres (Service postgres-probe), Belege im Log — Karte 1563 (e)
-#    * sonst wortgleich (Flyway-Dubletten, build-und-test, Coverage, Testbericht)
+#  Corresponds to the job `ci` ("Build & Test") from
+#  Plaintext-Gmbh/plaintext-scripts/.github/workflows/ci-cd-pipeline.yaml.
 #
-#  Runs ONLY if `.ci-engine` in the repo root contains the word `woodpecker` (waechter.sh).
-#  Kein `push: master` hier — auf master baut deploy.yml (M1, build once), wie in root.
+#  Runs ONLY if `.ci-engine` in the repo root contains the word `woodpecker` —
+#  see .woodpecker/waechter.sh and docs/CI.md.
+#
+#  THREE workflows, not four as in iot/app/guild/schuetu: `verify-dev.yml` and
+#  `verify-prod.yml` are deliberately absent here. Rationale in docs/CI.md,
+#  section "Was root anders macht" — in short: root runs `release-only`, and the
+#  GitHub pipeline skips both verify jobs for exactly that reason
+#  (`inputs.deploy-target != 'release-only'` resp. `== 'release-all'`).
 # ═══════════════════════════════════════════════════════════════════════════════
 
 when:
+  # NO `push` on master. That is deliberate and the counterpart of M1 ("build once"):
+  # on master the DEPLOY workflow (deploy.yml) builds, and it runs the unit tests
+  # itself via MVN_TEST_FLAG=-DskipITs. The GitHub pipeline expresses this with
+  # `if: inputs.deploy-target == 'ci-only' || inputs.sonar-enabled` on the ci job — on
+  # a release-only run it is skipped. Whoever adds `push: master` here
+  # builds every merge twice and, with WOODPECKER_MAX_WORKFLOWS=2, ties up half the
+  # capacity of the single agent with duplicated work.
   - event: pull_request
+  # `manual` = the "Run pipeline" button in the Woodpecker UI. Without this entry
+  # Woodpecker discards the run with "filtered out all steps" (as happened in the
+  # schuetu trial run on 30.08.2026).
   - event: manual
-  # Kein `event: cron`: fuer v2 gibt es keine Crons (Entscheid Daniel 22.10.2026).
+  # Nightly. The cron job is NOT defined here but created in the Woodpecker
+  # UI under Repo -> Settings -> Crons; `cron:` filters on its NAME. So a cron
+  # named `nightly` must exist, otherwise this branch never runs.
+  # See docs/ci/WOODPECKER_SETUP.md, section 3 (wiring a repository
+  # eingerichtet werden muss".
+  # plaintext-root-v2 (Karte 1563/1595): KEIN `event: cron` — fuer v2 gibt es keine Crons
+  # (Entscheid Daniel 22.10.2026). Diese Datei ist upstream + v2/transformation.patch.
 
+# FULL CLONE WITH TAGS. Woodpecker's default clone is shallow; `git describe --tags`
+# in init_versions (tui-build-logic.sh) would then find no tag and report 0.0.0.
+# For Build & Test that is merely cosmetic, for deploy.yml it would be fatal — the clone
+# is deliberately configured identically in every file, so that nobody relies on
+# "the other workflow already getting it right".
 clone:
   git:
     image: woodpeckerci/plugin-git
@@ -27,16 +49,27 @@ clone:
       tags: true
 
 services:
-  # Wegwerf-Testdatenbank fuer die Unit-Tests (EmbeddedPg startet als root keinen eigenen Server,
-  # Karte 451). Nicht geheim, lebt nur in diesem Lauf.
+  # Woodpecker attaches service containers to the workflow's network; they are reachable
+  # under their NAME as hostname (here: `postgres`), on the regular port 5432.
+  #
+  # THIS IS THE POINT WHERE WOODPECKER HAS IT EASIER THAN GITHUB ACTIONS: the
+  # GitHub pipeline starts Postgres by hand via `docker run --network host` and needs
+  # a per-project reserved port for it (root: 5441, deploy job 5541). Falling back to
+  # 5434 is expressly forbidden there, because the UGREEN photo app occupies that port
+  # permanently. Here the whole port allocation simply disappears: every workflow has
+  # its own network, two concurrent runs cannot collide on a port, and
+  # the container vanishes with the run.
+  #
+  # THROWAWAY TEST DATABASE — not a secret (card 812). It exists only for the duration
+  # of this run, is unreachable from outside and holds no real data.
   postgres:
     image: postgres:18-alpine
     environment:
       POSTGRES_DB: plaintext_root
       POSTGRES_USER: plaintext
       POSTGRES_PASSWORD: plaintext
-  # LEERE Datenbank fuer die Lader-Probe: nichts ausser dem, was die Huelle und das Modul beim
-  # Start selbst migrieren. Eigener Container, damit die Unit-Tests oben nichts hinterlassen.
+  # plaintext-root-v2: LEERE Datenbank fuer die Lader-Probe — nichts ausser dem, was Huelle und
+  # Modul beim Start selbst migrieren.
   postgres-probe:
     image: postgres:18-alpine
     environment:
@@ -45,65 +78,197 @@ services:
       POSTGRES_PASSWORD: plaintext
 
 steps:
-  # ── v2: Umbenennung und Skripte (Sekunden) ────────────────────────────────────────────
+  # ── plaintext-root-v2: Umbenennung, Transformation, Skripte (Sekunden) ──────────────────
   v2-umbenennung:
     image: maven:3.10-eclipse-temurin-25
     commands:
       - . .woodpecker/waechter.sh
-      # Selbsttest = Fixture (Reaktor-Koordinate umbenannt, Fremd-Artefakt bleibt, Imports unberuehrt),
-      # Idempotenz (zweimal laufen = keine Aenderung) und Grep-Test auf dem echten Baum.
       - bash v2/umbenennen.sh --selbsttest
-      - bash -n v2/release.sh && bash -n v2/sync.sh && bash -n v2/lader-probe.sh && bash -n v2/test-lader-probe-auswahl.sh && bash -n scripts/release-vollstaendig.sh
-      # Auswahl der Modulversion fuer :latest (root-min <= Huelle) an einer Attrappe, ohne Netz und DB
+      - bash -n v2/release.sh && bash -n v2/sync.sh && bash -n v2/transformation.sh && bash -n v2/lader-probe.sh && bash -n v2/test-lader-probe-auswahl.sh && bash -n v2/test-sync.sh && bash -n scripts/release-vollstaendig.sh
       - bash v2/test-lader-probe-auswahl.sh
-      # Der Release-Lauf wuerde mit dieser Wurzel-groupId arbeiten — hier sichtbar gemacht.
       - 'echo "Wurzel-groupId: $(mvn -q -N help:evaluate -Dexpression=project.groupId -DforceStdout)"'
 
+  # Karte 1595: v1 (der zuletzt gemergte upstream-Stand) + v2/transformation.sh = dieser Stand,
+  # bis auf die handgepflegten (c)-Dateien. Rot = eine Abweichung ausserhalb von v2/, die weder
+  # die Transformation erzeugt noch die (c)-Liste deckt. Dazu Selbsttest und Sync-Szenarien.
+  v2-transformation:
+    image: maven:3.10-eclipse-temurin-25
+    commands:
+      - . .woodpecker/waechter.sh
+      - git config --global --add safe.directory "$(pwd)"
+      - git config --global user.email "woodpecker@plaintext.ch" && git config --global user.name "WoodpeckerCI"
+      - git fetch -q https://github.com/Plaintext-Gmbh/plaintext-root.git +refs/heads/master:refs/remotes/upstream/master
+      - 'BASIS="$(git merge-base HEAD upstream/master)" && echo "v1-Basis: $BASIS" && bash v2/transformation.sh --pruefen "$BASIS" && bash v2/transformation.sh --selbsttest "$BASIS"'
+      - bash v2/test-sync.sh
+
   v2-purge-tests:
-    # Eigenes, kleines Bild: das Maven-Bild hat kein python3, und das Purge-Skript braucht nichts
-    # als die Standardbibliothek. 16 Tests, darunter der Negativtest (v1-Kandidat -> Abbruch).
     image: python:3.13-alpine
     commands:
       - . .woodpecker/waechter.sh
       - python3 -I v2/test_purge.py
 
-  # ── Flyway-Dubletten (Karte 1120/1121), wortgleich mit upstream ───────────────────────
+  # ── Flyway-Dubletten (Karte 1120/1121, 08.09.2026) ───────────────────────────────────────
+  # ZUERST, weil es Sekunden kostet und der Rest dieses Workflows Minuten.
+  #
+  # WAS ES ABFAENGT: zwei Migrationen mit derselben Versionsnummer. Flyway scannt
+  # `classpath:db/migration` ueber den GESAMTEN Klassenpfad und legt damit alle 16 Module von
+  # plaintext-root in EINEN Versionsraum. Zwei gleiche Nummern -> der Kontext startet nicht:
+  #     Error creating bean with name 'flywayInitializer' …
+  #     Found more than one migration with version 1788709017
+  # In plaintext-guild ist das am 08.09.2026 passiert und erschien als roter PLAYWRIGHT-Lauf,
+  # also an einer Stelle ohne jeden Bezug zur Ursache. Wer nur "Playwright rot" liest, sucht
+  # zuerst in der Oberflaeche.
+  #
+  # WARUM ES HIER STEHT UND NICHT IN DER GETEILTEN PIPELINE: app/guild/schuetu/iot erben die
+  # Pruefung aus dem Job `namespace-lint` (Anzeigename "Repo-Lint") von
+  # plaintext-scripts/.github/workflows/ci-cd-pipeline.yaml. plaintext-root hat als einziges
+  # dieser Repos ueberhaupt KEINE .github/workflows mehr — dort gibt es nichts zu erben.
+  #
+  # WARUM `--basis origin/master`: CI_COMMIT_SHA ist bei Woodpecker der PR-HEAD, nicht der
+  # Merge-Commit. Der haeufigste Fall — zwei Zweige, jeder fuer sich sauber, erst zusammen
+  # kollidierend — waere ohne die Merge-Vorschau unsichtbar. GitHub Actions braucht die Option
+  # nicht, weil actions/checkout dort bei `pull_request` refs/pull/N/merge auscheckt.
+  #
+  # DAS SKRIPT PRUEFT SICH SELBST: es legt in jedem Lauf ein kuenstliches Duplikat an und bricht
+  # ab, wenn es das NICHT rot meldet — und danach umgekehrt, dass ein sauberer Baum gruen
+  # bleibt. Ein gruener Schritt belegt damit beides. Eine Lint-Regel, deren gruener Lauf nie
+  # gegen einen echten Fehlerfall gehalten wurde, belegt gar nichts.
+  #
+  # ── WAS HIER BEWUSST NICHT STEHT (Karte 1128) ───────────────────────────────────────────
+  # Die REPO-UEBERGREIFENDE Pruefung — dieselbe Nummer in root UND in app/guild/schuetu/iot,
+  # die den Kontextstart der Anwendung genauso abbricht — liegt NICHT in dieser Datei, sondern
+  # in .github/workflows/repo-lint.yaml. Sie braucht ein GitHub-Leserecht auf die vier PRIVATEN
+  # Repos, also einen Token mit `repo`-Scope. plaintext-root ist oeffentlich, und die Pipeline
+  # eines Pull Requests laeuft aus DESSEN Fassung dieser Datei — wer einen PR aufmachen darf,
+  # koennte ein `from_secret` also ausgeben lassen. Genau diese Ueberlegung steht weiter unten
+  # schon einmal, als Begruendung dafuer, dass GITHUB_STATUS_TOKEN ausschliesslich
+  # `repo:status` traegt. Ein Leserecht auf alle privaten Repos der Org waere eine andere
+  # Groesse. GitHub Actions gibt einem Fork-PR keine Secrets heraus und hat damit die Grenze,
+  # die Woodpecker an dieser Stelle fehlt.
+  #
+  # Und noch etwas, das dort und nicht hier steht: DIE NACHTSCHICHT. Diese Datei laeuft auf
+  # `pull_request`, `manual` und `cron: nightly` — der Cron ist aber nicht scharf (unter den
+  # letzten 100 Pipelines dieses Repos, zurueck bis 01.09.2026: 32 pull_request, 17 push,
+  # 1 manual, NULL cron). Ein Merge mit `[skip ci]` kaeme hier also an jeder Pruefung vorbei,
+  # ohne dass ihn spaeter etwas einholt. Der `schedule`-Eintrag in repo-lint.yaml ist das Netz
+  # darunter; `schedule` ist vom Skip-Marker nicht betroffen.
   flyway-dubletten:
+    # Dasselbe Bild wie build-und-test: es liegt auf dem Agenten ohnehin im Cache und bringt
+    # bash und git mit. Ein eigenes, kleineres Bild waere ein zusaetzlicher Pull fuer 3 Sekunden
+    # Arbeit.
     image: maven:3.10-eclipse-temurin-25
     commands:
       - . .woodpecker/waechter.sh
-      # SHA-gepinnt (Karte 1093): plaintext-scripts ist oeffentlich. Pin wie upstream (08.09.2026).
+
+      # SHA-GEPINNT wie in deploy.yml (Karte 1093): plaintext-scripts ist oeffentlich; ein
+      # unpinned `git clone` liesse jeden Commit dort sofort in diesem Lauf Code ausfuehren.
+      # Dieser SHA ist plaintext-scripts@master vom 08.09.2026 (Karte 1121). Er ist bewusst
+      # NICHT derselbe wie der deploy.yml-Pin — beide gehoeren irgendwann zusammengefuehrt.
       - >-
         mkdir -p /tmp/werkzeuge &&
         git -C /tmp/werkzeuge init -q &&
         git -C /tmp/werkzeuge remote add origin https://github.com/Plaintext-Gmbh/plaintext-scripts.git &&
         git -C /tmp/werkzeuge fetch -q --depth 1 origin 978714ee05b2527256588962981a889b9e157b00 &&
         git -C /tmp/werkzeuge checkout -q FETCH_HEAD
+
+      # Vorsorge, keine Reparatur: laeuft der Klon-Schritt jemals unter einer anderen uid als
+      # dieser Step, verweigert git das Verzeichnis ("dubious ownership"). Das Skript faende
+      # dann origin/master nicht und der Schritt waere rot — aus einem Grund, der mit Flyway
+      # nichts zu tun hat.
       - git config --global --add safe.directory "$(pwd)"
+
+      # Der Woodpecker-Klon kennt refs/remotes/origin/master nicht von sich aus. Ohne diese
+      # Zeile bricht das Skript ab (es meldet den fehlenden Ref HART, statt die Merge-Vorschau
+      # lautlos zu ueberspringen) — genau deshalb faellt ein vergessener fetch hier auf.
       - git fetch -q origin +refs/heads/master:refs/remotes/origin/master
+
       - bash /tmp/werkzeuge/quality/flyway-dubletten-lint.sh . --basis origin/master
 
-  # ── Build & Test, wortgleich mit upstream (Karte 1542: eigenes lokales Repo je Lauf) ──
   build-und-test:
     image: maven:3.10-eclipse-temurin-25
+    # NO Docker socket. plaintext-app needs one because it has Testcontainers tests in
+    # its normal Surefire run — plaintext-root does NOT have those, and deliberately
+    # so: card 451 (Daniel's decision of 02.08.2026) replaced Testcontainers here
+    # with io.zonky.test:embedded-postgres, PRECISELY to get rid of the
+    # /var/run/docker.sock mounted as root. Recounted on 30.08.2026:
+    # `grep -ril testcontainers` only hits comments in the two poms, the
+    # class comment of EmbeddedPg and .github/workflows/playwright.yaml — not a
+    # single Java class imports the library. Whoever ever adds a socket mount here
+    # reverts that card.
     environment:
+      # Karte 1542: eigenes lokales Repository je Lauf. install schreibt NUR nach
+      # /woodpecker/m2-pipeline (Workspace dieses Laufs); das geteilte /root/.m2 ist nur
+      # noch lesender Schwanz. Ein PR-Zwischenstand mit Release-Version hatte dort das
+      # Release-Artefakt root 1.769.0 ueberschrieben, und app-prod lief damit.
       MAVEN_ARGS: "-Dmaven.repo.local=/woodpecker/m2-pipeline -Dmaven.repo.local.tail=/root/.m2/repository -Dmaven.build.cache.location=/root/.m2/build-cache"
+      # The agent mounts the Maven cache globally as a volume (woodpecker-m2 -> /root/.m2),
+      # hence no separate mount here. The build cache of the maven-build-cache-extension
+      # lives inside it under ~/.m2/build-cache and therefore survives the run.
+      #
+      # THESE THREE LINES ARE NOT OPTIONAL IN ROOT. EmbeddedPg (plaintext-root-webapp,
+      # src/test) only starts an embedded server of its own when
+      # SPRING_DATASOURCE_URL IS MISSING — and `initdb` refuses to run as root
+      # (measured 02.08.2026, PR #22). The step container runs as root. Without these
+      # variables every single one of the roughly ten test classes that use EmbeddedPg
+      # falls over (RepositoryTest, MultiTenancyTest, SecurityTest, FlywayMigrationTest,
+      # SchlankerKontextTest, ...), with a message about initdb that looks like an
+      # environment problem of the agent and is none.
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/plaintext_root
       SPRING_DATASOURCE_USERNAME: plaintext
       SPRING_DATASOURCE_PASSWORD: plaintext
+      # Resource guardrail, taken over word for word from the GitHub pipeline. The NAS box
+      # has 6 cores / 62 GB; without a cap every JVM sizes its heap by HOST RAM
+      # (MaxRAMPercentage 25 % of 62 GB), and does so per Maven JVM AND per Surefire fork.
+      # JAVA_TOOL_OPTIONS is — unlike MAVEN_OPTS — inherited by the forks as well.
+      # In root this weighs more heavily than in the apps: 24 modules, and plaintext-root-webapp
+      # has TWO Surefire executions (the second, `kontext-ohne-abwaehlbare-module`,
+      # starts a Spring context of its own against the same database).
       MAVEN_OPTS: "-Xmx2g -XX:MaxMetaspaceSize=512m"
       JAVA_TOOL_OPTIONS: "-XX:MaxRAM=4g -XX:ActiveProcessorCount=2"
     commands:
       - . .woodpecker/waechter.sh
+
+      # Wait until Postgres listens. Woodpecker starts services and steps AT THE SAME TIME
+      # and knows no `--health-cmd` gate; without this loop the run falls over two minutes
+      # later in the tests with a PSQLException, and that looks like a test failure.
+      # `bash -c` instead of the step shell: the image is Ubuntu-based and has bash, the
+      # step shell is /bin/sh (dash) and does not know /dev/tcp. psql would be the other
+      # option, but costs an apt-get per run.
       - >-
         bash -c 'for i in $(seq 1 60); do
           (echo > /dev/tcp/postgres/5432) 2>/dev/null && { echo "postgres bereit nach $i Versuchen"; exit 0; };
           sleep 2;
         done;
         echo "FEHLER: Service-Container postgres nach 120 s nicht erreichbar." >&2;
+        echo "  Erwartet: Hostname postgres, Port 5432, im Netz dieses Workflows." >&2;
+        echo "  Wenn der Name nicht aufloest, hat der Agent kein Workflow-Netz gebaut" >&2;
+        echo "  (WOODPECKER_BACKEND_DOCKER_NETWORK / Agent-Konfiguration pruefen)." >&2;
         exit 1'
-      # JaCoCo-Gate (40 %) und ArchUnit-Regeln sind scharf — ein rotes Modul ist ein Befund, kein
-      # Pipeline-Fehler. Kein Abschalten des exec-Classifiers, kein -Droot.dual.publish=false.
+
+      # Word for word the ci job of the GitHub pipeline, including the case distinction at
+      # the quality gate guard:
+      #   * scheduled runs (here: cron)  -> the guard RUNS ALONG and colours a
+      #     red gate state visibly red. Until 29.08.2026 it was excluded everywhere,
+      #     so a red gate was visible in NO CI run at all.
+      #   * PR and manual runs -> excluded, so that a hotfix gets through despite a red
+      #     gate. The guard reads the static weekly state, not the PR code.
+      # -DskipITs: integration tests need a running app resp. Playwright browsers.
+      #
+      # TWO GATES THAT ARE ARMED HERE AND NOT IN THE CONSUMERS:
+      #   1. JaCoCo. root sets <jacoco.halt-on-failure>true</jacoco.halt-on-failure> with
+      #      <jacoco.coverage.minimum>0.40</jacoco.coverage.minimum> (status report
+      #      29.08.2026, measure 13); app/guild/iot/schuetu inherit the execution and
+      #      switch it off. A module below 40 % therefore turns this step RED — that
+      #      is the whole point of it and not a pipeline error. Whoever wants to "repair"
+      #      it does not flip the switch but grades <jacoco.coverage.minimum> in the
+      #      affected module (with a rationale and a date, never 0).
+      #   2. The shared arch rules from plaintext-root-archtests — root ships them
+      #      itself and is thus its own first consumer.
+      #
+      # DO NOT TOUCH: no `-Dspring-boot.repackage.*`, no switching off of the
+      # exec classifier, and no `-Droot.dual.publish=false`. The dual publish lives in
+      # .mvn/maven.config and applies to both CI engines; here in the install run it costs
+      # nothing, because the deploy phase is never reached at all.
       - >-
         if [ "$CI_PIPELINE_EVENT" = "cron" ]; then
           echo "Cron-Lauf: Quality-Gate-Waechter laeuft MIT.";
@@ -113,15 +278,9 @@ steps:
           mvn clean install -B -DskipITs -DexcludedGroups=quality-gate;
         fi
 
-  # ── Lader-Probe (Karte 1563 e): Huelle + Verrechnungs-Jar gegen leere Postgres ────────
-  # Belege im Log dieses Schritts: health UP, "[modul-lader] 1 Module bereit", Registered tools
-  # mit/ohne Modul, Modul-Migration im Flyway-Log; Negativproben C (application.yml) und D
-  # (Klasse der Huelle) werden abgewiesen. Die Tabelle flyway_schema_history liest der naechste
-  # Schritt mit psql, weil das Maven-Bild keins hat.
-  #
-  # Das Modul-Jar kommt vom Reposilite (maven.plaintext.ch, LAN) — nur dort liegen die privaten
-  # app-Artefakte. root-min leitet das Skript aus der Elternkette des Jars ab (plaintext-app-parent
-  # -> plaintext-root.version); die Huelle laesst nur Module >= kompatibel-ab (1.767.0) zu.
+  # ── plaintext-root-v2: Lader-Probe (Karte 1563 e) — Huelle + released Modul-Jar ueber
+  # loader.path gegen die leere postgres-probe. Belege im Log: health UP, Module bereit,
+  # Registered tools mit/ohne Modul; Negativproben C (application.yml) und D (Huellen-Klasse).
   lader-probe:
     image: maven:3.10-eclipse-temurin-25
     environment:
@@ -129,8 +288,8 @@ steps:
       DB_USER: plaintext
       DB_PASSWORD: plaintext
       REPOSILITE_BASIS: https://maven.plaintext.ch/releases
-      # "latest" = juengstes Release laut maven-metadata.xml, dessen root-min die Huelle laden kann
-      # (Exit 3, wenn keine der 15 neuesten passt). Zum Festnageln eine Version eintragen.
+      # "latest" = juengstes Release, dessen root-min die Huelle laden kann (Exit 3, wenn keine
+      # der 15 neuesten passt). Zum Festnageln eine Version eintragen.
       PROBE_MODUL_VERSION: latest
       PROBE_ARBEIT: /woodpecker/lader-probe
       JAVA_TOOL_OPTIONS: "-XX:MaxRAM=4g -XX:ActiveProcessorCount=2"
@@ -144,11 +303,10 @@ steps:
         echo "FEHLER: Service-Container postgres-probe nicht erreichbar." >&2; exit 1'
       - mkdir -p "$PROBE_ARBEIT"
       - bash v2/lader-probe.sh --modul-gav "ch.plaintext:plaintext-z-verrechnung:$PROBE_MODUL_VERSION"
-      # Erwartete Skripte fuer den psql-Schritt in den Workspace legen (target/ ist gitignored).
       - mkdir -p target/lader-probe && cp "$PROBE_ARBEIT/modul-migrationen.txt" target/lader-probe/
 
   lader-probe-flyway:
-    # psql aus dem Postgres-Bild statt apt-get im Maven-Bild. Liest die DB, die Probe B gefuellt hat.
+    # psql aus dem Postgres-Bild (das Maven-Bild hat keins). Liest die DB, die Probe B gefuellt hat.
     image: postgres:18-alpine
     environment:
       PGPASSWORD: plaintext
@@ -171,14 +329,24 @@ steps:
   coverage-uebersicht:
     image: maven:3.10-eclipse-temurin-25
     environment:
+      # Karte 1542: eigenes lokales Repository je Lauf. install schreibt NUR nach
+      # /woodpecker/m2-pipeline (Workspace dieses Laufs); das geteilte /root/.m2 ist nur
+      # noch lesender Schwanz. Ein PR-Zwischenstand mit Release-Version hatte dort das
+      # Release-Artefakt root 1.769.0 ueberschrieben, und app-prod lief damit.
       MAVEN_ARGS: "-Dmaven.repo.local=/woodpecker/m2-pipeline -Dmaven.repo.local.tail=/root/.m2/repository -Dmaven.build.cache.location=/root/.m2/build-cache"
+    # `status: [success, failure]` = the counterpart of `if: always()`. The coverage figures
+    # are interesting precisely after a red run — and in root a red run is
+    # more often than not exactly a JaCoCo gate violation, whose module is visible here.
     when:
       - status: [success, failure]
     commands:
       - . .woodpecker/waechter.sh
       - mvn jacoco:report -B || echo "jacoco:report fehlgeschlagen — Uebersicht bleibt leer."
+      # Woodpecker has no $GITHUB_STEP_SUMMARY. The table therefore goes into the step log;
+      # that is the honest substitute, not an equivalent feature (see docs/CI.md,
+      # "Was Woodpecker nicht kann").
       - >-
-        bash -c 'echo "── Code Coverage — plaintext-root-v2 (Gate: 40 %, scharf) ──";
+        bash -c 'echo "── Code Coverage — plaintext-root (Gate: 40 %, scharf) ──";
         find . -path "*/target/site/jacoco/jacoco.csv" | while read -r r; do
           m=$(echo "$r" | sed "s|./\(.*\)/target/.*|\1|");
           missed=$(tail -n +2 "$r" | awk -F, "{s+=\$4} END {print s+0}");
@@ -188,17 +356,59 @@ steps:
         done'
 
   testbericht:
-    # Allure-Bericht wie upstream. Braucht am Repo `trusted.volumes = true` (Volume woodpecker-reports)
-    # und das Secret github_status_token (nur repo:status) — beides Teil der Woodpecker-Aktivierung.
-    # EIN FEHLENDES SECRET STARTET DIE PIPELINE GAR NICHT (gemessen upstream 02.09.2026).
     image: maven:3.10-eclipse-temurin-25
+    # `status: [success, failure]`, same as the step above. The report matters MORE after a
+    # red run than after a green one — that is exactly when you want to know WHICH test
+    # fails, and today that only exists as a .txt excerpt in the log (which lies about
+    # @Nested classes, see allure-bericht.sh). Without this line the report would be missing
+    # precisely in the failure case.
     when:
       - status: [success, failure]
+    # OWN STEP, NOT OWN WORKFLOW. The steps of one workflow run sequentially in the same
+    # agent slot; a second workflow would occupy one of the four slots on the single agent
+    # for twenty seconds of work.
+    #
+    # THE MOUNT IS EXPLICIT AND ONLY HERE. The obvious route would be a second line in
+    # WOODPECKER_BACKEND_DOCKER_VOLUMES on the agent (today: woodpecker-m2:/root/.m2) — but
+    # that hangs the volume into EVERY step of EVERY repo, which is exactly the construction
+    # card 313 files as security-critical. Instead the pattern from
+    # plaintext-guild/.woodpecker/analyse.yml (NVD cache): `trusted.volumes` on the repo
+    # (already set for plaintext-root, checked 31.08.2026 via GET /api/repos/6) and then one
+    # mount per step.
+    #
+    # The volume belongs to the stack plaintext-dockercompose/tri/plaintext-reports; an nginx
+    # there serves it read-only on http://192.168.1.224:1155/.
     volumes:
       - woodpecker-reports:/reports
     environment:
+      # Must match the ports: entry of the plaintext-reports stack. It lives here and not
+      # only in the script so that the address is visible at ONE place in this repo; the
+      # script carries the same value merely as a fallback.
+      # Karte 1043: Der Link zeigt auf die oeffentliche Adresse, nicht mehr auf die interne
+      # 192.168.1.224:1155 — seit Karte 1037 gibt es reports.plaintext.ch hinter dem
+      # Keycloak-Gate, und ein Link, der nur im LAN traegt, ist in einer PR-Checkliste wertlos.
       REPORT_BASE_URL: "https://reports.plaintext.ch"
+      # Runs kept per repo (proposal from card 1018, open question 2). Measured on
+      # pipeline 52: one root report is 24.9 MB, so 30 runs are about 750 MB. /volume1 had
+      # 4.9 TB free on 31.08.2026 — the limit exists so the directory does not grow without
+      # end, not because the space is tight.
       REPORT_KEEP: "30"
+      # Karte 1043: Damit allure-bericht.sh die Zeile "Testbericht (Allure)" samt Link in die
+      # Check-Liste des Pull Requests schreiben kann. Ohne diesen Wert schweigt das Skript und
+      # sagt das im Log — der Bericht selbst entsteht trotzdem.
+      #
+      # DAS SECRET MUSS AM REPO EXISTIEREN, BEVOR DIESE ZEILEN HIER STEHEN. Verweist ein
+      # `from_secret` auf ein fehlendes Secret, startet Woodpecker die Pipeline GAR NICHT und
+      # meldet das auch nicht an GitHub: kein Lauf, keine Zeile, keine Fehlermeldung — der PR
+      # sieht aus, als waere die CI nie angestossen worden (gemessen am 02.09.2026, drei PRs
+      # ueber 20 Minuten stumm). Deshalb kamen diese vier Zeilen erst jetzt nach.
+      #
+      # Der Token ist ein eigener PAT des Kontos Plaintext-User mit AUSSCHLIESSLICH `repo:status`
+      # (Vault-Item github.woodpecker-status) — bewusst nicht der github.claude-review-pat mit
+      # vollem repo-Scope. Sein Secret traegt zusaetzlich das Ereignis `pull_request`, anders als
+      # die uebrigen Secrets dieses Repos: ohne das fehlte es in genau dem Lauf, fuer den es da
+      # ist. Der Preis ist benannt und tragbar — wer eine .woodpecker-Datei in einem PR aendern
+      # darf, koennte den Wert ausgeben lassen, und er kann nichts ausser Commit-Status schreiben.
       GITHUB_STATUS_TOKEN:
         from_secret: github_status_token
     commands:

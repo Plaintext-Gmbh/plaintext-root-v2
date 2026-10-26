@@ -3,19 +3,43 @@
 plaintext-root-v2 ist ein eigenständiges Repository mit der vollen Historie von
 [plaintext-root](https://github.com/Plaintext-Gmbh/plaintext-root) (upstream). Es wird laufend
 mit upstream synchronisiert, veröffentlicht aber unter **eigenen Maven-Koordinaten**
-(`ch.plaintext.v2`) in dieselben Paket-Repos. Alles, was v2 von upstream unterscheidet, liegt in
-`v2/`, `docs/v2/`, `.gitattributes`, `.github/workflows/v2-sync.yaml` und den drei
-`.woodpecker/*.yml` mit `merge=ours`. Die Analyse, aus der die Entscheide folgen:
+(`ch.plaintext.v2`) in dieselben Paket-Repos. Die Analyse, aus der die Entscheide folgen:
 [analyse.md](analyse.md).
 
-| Thema | Datei |
-|---|---|
-| groupId umbenennen (idempotent, Selbsttest) | `v2/umbenennen.sh` |
-| Sync von upstream | `v2/sync.sh`, `.github/workflows/v2-sync.yaml`, `.gitattributes` |
-| Release | `v2/release.sh`, `.woodpecker/deploy.yml`, `scripts/release-vollstaendig.sh` (TAG_PRAEFIX, GRUPPE_PFAD) |
-| PR-Pipeline mit Lader-Probe | `.woodpecker/build.yml`, `v2/lader-probe.sh`, `v2/probe-modul/` |
-| Purge alter v2-Releases | `v2/purge.py`, `v2/test_purge.py` |
-| Wochenanalyse | keine in v2 — `.woodpecker/sonar.yml` ist ein Stub, der nie läuft (Entscheid Daniel 22.10.2026) |
+**Grundsatz (Karte 1595):** ausserhalb von `v2/` ist v2 = **upstream + `v2/transformation.sh`**,
+bis auf fünf handgepflegte (c)-Dateien. CI (`build.yml`, Schritt `v2-transformation`) und der
+Sync prüfen das bei jedem Lauf: `v2/transformation.sh --pruefen <v1-commit>`.
+
+## 0. Abweichungen von upstream (ausserhalb von `v2/`)
+
+Stand: upstream `8fc8c39` (1.805.0-SNAPSHOT). Vorher 45 Dateien (+775/−1506), alle von Hand bzw.
+über `merge=ours` gepflegt; nachher 44 Dateien, davon 39 aus der Transformation, 5 handgepflegt.
+
+| Datei / Gruppe | Klasse | Wie / Begründung |
+|---|---|---|
+| 33 `pom.xml` (Reaktor) | b | `v2/umbenennen.sh`: groupId `ch.plaintext` → `ch.plaintext.v2` |
+| `.woodpecker/sonar.yml` | b | T löscht sie: keine Sonar/OWASP-Läufe in v2 (Entscheid Daniel 22.10.) |
+| `.github/workflows/repo-lint.yaml` | b | T löscht sie: braucht den self-hosted NAS-Runner und `MVN_DEPLOY_TOKEN` (hat v2 nicht), dazu ein `schedule`-Cron |
+| `renovate.json` | b | T setzt `"enabled": false` als erste Eigenschaft: eigene Renovate-PRs kollidierten mit dem Sync |
+| `CLAUDE.md` | b | T stellt den v2-Hinweis voran |
+| `.woodpecker/build.yml` | b | `v2/transformation.patch`: kein `event: cron`, `postgres-probe`, Schritte `v2-umbenennung`, `v2-transformation`, `v2-purge-tests`, `lader-probe`, `lader-probe-flyway`. Sonst upstream wörtlich, upstream-Änderungen kommen mit |
+| `scripts/release-vollstaendig.sh` | b | `v2/transformation.patch`: `GRUPPE_PFAD` aus der POM, `TAG_PRAEFIX` (v2-Tags) |
+| `.m3-jar-volume` | a | wieder wie upstream: liest nur `./build`, das v2 nicht nutzt (`v2/release.sh`) |
+| `quality/quality-gate.properties` (`merge=ours`) | a | Eintrag entfernt, Datei war ohnehin gleich upstream (keine v2-Analyse) |
+| `.woodpecker/deploy.yml` | c | anderer Release-Ablauf: `v2/release.sh` taggt `v2-X` ohne Versions-Commits (sonst Konflikt an 33 `<version>`-Zeilen je Sync), beide Paket-Repos, kein `./build`, kein NAS-Staging/SSH, kein git-Spiegel. Aus der upstream-Fassung nicht ableitbar → `merge=ours`, upstream-Änderungen meldet der Sync als HINWEIS |
+| `.gitattributes` | c | nur in v2: trägt `merge=ours` für `deploy.yml` |
+| `.github/workflows/v2-sync.yaml` | c | nur in v2: Auslöser des Syncs (Actions verlangt den Pfad) |
+| `docs/v2/README.md`, `docs/v2/analyse.md` | c | nur in v2: diese Doku |
+
+Die (c)-Liste steht in `v2/transformation.sh` (`HANDGEPFLEGT`). Weicht eine (c)-Datei nicht mehr ab,
+meldet `--pruefen` einen HINWEIS zum Streichen.
+
+**Eine Datei ausserhalb von `v2/` ändern:** nie direkt (CI wird rot). Stattdessen:
+- groupId: nichts tun, `umbenennen.sh` erledigt es.
+- `build.yml` / `release-vollstaendig.sh`: Datei ändern, dann
+  `v2/transformation.sh --patch-erneuern $(git merge-base HEAD upstream/master)` und beides committen.
+- eine neue Abweichung: als Schritt in `anwenden()` von `v2/transformation.sh`, nur wenn das nicht
+  geht in `HANDGEPFLEGT` (mit Begründung in der Tabelle oben).
 
 ## 1. Koordinaten
 
@@ -49,15 +73,23 @@ root nicht vor; alle 1.x-Tags enden auf .0).
 `v2/sync.sh` (lokal und im Job identisch):
 
 1. `upstream/master` holen; schon enthalten → nichts zu tun.
-2. Arbeitszweig, `git merge --no-ff upstream/master`. `.gitattributes` `merge=ours` hält die
-   v2-Fassung der Pipelines, von `repo-lint.yaml`, `renovate.json`, `quality-gate.properties`;
-   upstream-Änderungen daran werden als HINWEIS gemeldet. Treiber: `git config merge.ours.driver true`
-   (setzt das Skript; lokal einmal selbst setzen).
-3. `v2/umbenennen.sh` → eigener Commit `v2: groupId nach Sync … erneut umbenannt`; `--pruefen` muss
-   grün sein, sonst Abbruch ohne Push.
-4. Push nach `master` **ohne** `[skip ci]` → Woodpecker released (deploy.yml).
-5. Konflikt: Zweig `sync-konflikt/<datum>-<sha>` mit Konfliktmarkern, PR mit Label
-   `sync-konflikt`, `master` unverändert. Steht so ein PR offen, tut der nächste Lauf nichts.
+2. **Vorprüfung:** master = Basis + Transformation bis auf (c)? Sonst Exit 1 („weicht schon vor dem
+   Sync … ab"): eine Handabweichung würde im nächsten Schritt still überschrieben.
+3. Arbeitszweig, `git merge --no-ff --no-commit upstream/master`. Danach gilt ausserhalb von `v2/`
+   und (c) die **upstream-Fassung** (auch bei Konflikten dort), darauf `v2/transformation.sh`, ein
+   Merge-Commit. `deploy.yml` bleibt über `merge=ours`; eine upstream-Änderung daran meldet der Sync
+   als HINWEIS. Passt der Patch nicht mehr → Exit 1, `master` unverändert.
+4. **Nachprüfung:** `transformation.sh --pruefen <upstream>` und `umbenennen.sh --pruefen` grün,
+   sonst Exit 1.
+5. Push nach `master`. Die Merge-Meldung trägt den upstream-Betreff **ohne** Skip-Marker
+   (`[skip ci]`, `[ci skip]` … werden entfernt; vorher liess Woodpecker den Sync-Push `68e57c45`
+   deshalb aus) → Woodpecker released (deploy.yml).
+6. Konflikt (geht nur noch in `v2/` oder einer (c)-Datei): Zweig `sync-konflikt/<datum>-<sha>`
+   mit Konfliktmarkern, PR mit Label `sync-konflikt`, Exit 2, `master` unverändert.
+
+Tests: `v2/test-sync.sh` (lokale Repos, ohne Netz) mit den Fällen sauber trotz Konfliktzeilen,
+Handabweichung (Exit 1), Patch passt nicht (Exit 1), Konflikt in (c) (Exit 2) und Skip-Marker im
+Betreff. `v2/transformation.sh --selbsttest <v1-commit>`: Beweis, Idempotenz, Negativproben.
 
 **Auslöser** (`.github/workflows/v2-sync.yaml`, `ubuntu-latest`, kostenlos für ein öffentliches Repo,
 kein self-hosted Runner): **ein geplanter Lauf pro Nacht** (`schedule` 04:41 UTC) und
@@ -97,7 +129,7 @@ Secrets am Repo plaintext-root-v2 (Namen wie root, Werte je nach Vault):
 
 Repo-Einstellungen: `trusted.volumes = true` (Allure-Volume `woodpecker-reports`),
 `cancel_previous_pipeline_events` ohne `push` (Karte 1281). **Keine Crons** in v2 (build.yml hat
-kein `event: cron`, sonar.yml läuft nie). **Ein `from_secret` auf ein fehlendes Secret startet die Pipeline gar nicht und
+kein `event: cron`, sonar.yml entfernt). **Ein `from_secret` auf ein fehlendes Secret startet die Pipeline gar nicht und
 meldet nichts** — deshalb die Liste.
 
 **Stand 22.10.2026 (Jumphost):** Woodpecker für plaintext-root-v2 aktiv (Repo-Id 18),

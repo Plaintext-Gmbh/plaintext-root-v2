@@ -1,0 +1,193 @@
+diff --git a/.woodpecker/build.yml b/.woodpecker/build.yml
+index ad5211e3..13f1cb0e 100644
+--- a/.woodpecker/build.yml
++++ b/.woodpecker/build.yml
+@@ -32,8 +32,8 @@ when:
+   # named `nightly` must exist, otherwise this branch never runs.
+   # See docs/ci/WOODPECKER_SETUP.md, section 3 (wiring a repository
+   # eingerichtet werden muss".
+-  - event: cron
+-    cron: nightly
++  # plaintext-root-v2 (Karte 1563/1595): KEIN `event: cron` — fuer v2 gibt es keine Crons
++  # (Entscheid Daniel 22.10.2026). Diese Datei ist upstream + v2/transformation.patch.
+ 
+ # FULL CLONE WITH TAGS. Woodpecker's default clone is shallow; `git describe --tags`
+ # in init_versions (tui-build-logic.sh) would then find no tag and report 0.0.0.
+@@ -68,8 +68,45 @@ services:
+       POSTGRES_DB: plaintext_root
+       POSTGRES_USER: plaintext
+       POSTGRES_PASSWORD: plaintext
++  # plaintext-root-v2: LEERE Datenbank fuer die Lader-Probe — nichts ausser dem, was Huelle und
++  # Modul beim Start selbst migrieren.
++  postgres-probe:
++    image: postgres:18-alpine
++    environment:
++      POSTGRES_DB: plaintext_probe
++      POSTGRES_USER: plaintext
++      POSTGRES_PASSWORD: plaintext
+ 
+ steps:
++  # ── plaintext-root-v2: Umbenennung, Transformation, Skripte (Sekunden) ──────────────────
++  v2-umbenennung:
++    image: maven:3.10-eclipse-temurin-25
++    commands:
++      - . .woodpecker/waechter.sh
++      - bash v2/umbenennen.sh --selbsttest
++      - bash -n v2/release.sh && bash -n v2/sync.sh && bash -n v2/transformation.sh && bash -n v2/lader-probe.sh && bash -n v2/test-lader-probe-auswahl.sh && bash -n v2/test-sync.sh && bash -n scripts/release-vollstaendig.sh
++      - bash v2/test-lader-probe-auswahl.sh
++      - 'echo "Wurzel-groupId: $(mvn -q -N help:evaluate -Dexpression=project.groupId -DforceStdout)"'
++
++  # Karte 1595: v1 (der zuletzt gemergte upstream-Stand) + v2/transformation.sh = dieser Stand,
++  # bis auf die handgepflegten (c)-Dateien. Rot = eine Abweichung ausserhalb von v2/, die weder
++  # die Transformation erzeugt noch die (c)-Liste deckt. Dazu Selbsttest und Sync-Szenarien.
++  v2-transformation:
++    image: maven:3.10-eclipse-temurin-25
++    commands:
++      - . .woodpecker/waechter.sh
++      - git config --global --add safe.directory "$(pwd)"
++      - git config --global user.email "woodpecker@plaintext.ch" && git config --global user.name "WoodpeckerCI"
++      - git fetch -q https://github.com/Plaintext-Gmbh/plaintext-root.git +refs/heads/master:refs/remotes/upstream/master
++      - 'BASIS="$(git merge-base HEAD upstream/master)" && echo "v1-Basis: $BASIS" && bash v2/transformation.sh --pruefen "$BASIS" && bash v2/transformation.sh --selbsttest "$BASIS"'
++      - bash v2/test-sync.sh
++
++  v2-purge-tests:
++    image: python:3.13-alpine
++    commands:
++      - . .woodpecker/waechter.sh
++      - python3 -I v2/test_purge.py
++
+   # ── Flyway-Dubletten (Karte 1120/1121, 08.09.2026) ───────────────────────────────────────
+   # ZUERST, weil es Sekunden kostet und der Rest dieses Workflows Minuten.
+   #
+@@ -241,6 +278,54 @@ steps:
+           mvn clean install -B -DskipITs -DexcludedGroups=quality-gate;
+         fi
+ 
++  # ── plaintext-root-v2: Lader-Probe (Karte 1563 e) — Huelle + released Modul-Jar ueber
++  # loader.path gegen die leere postgres-probe. Belege im Log: health UP, Module bereit,
++  # Registered tools mit/ohne Modul; Negativproben C (application.yml) und D (Huellen-Klasse).
++  lader-probe:
++    image: maven:3.10-eclipse-temurin-25
++    environment:
++      DB_URL: jdbc:postgresql://postgres-probe:5432/plaintext_probe
++      DB_USER: plaintext
++      DB_PASSWORD: plaintext
++      REPOSILITE_BASIS: https://maven.plaintext.ch/releases
++      # "latest" = juengstes Release, dessen root-min die Huelle laden kann (Exit 3, wenn keine
++      # der 15 neuesten passt). Zum Festnageln eine Version eintragen.
++      PROBE_MODUL_VERSION: latest
++      PROBE_ARBEIT: /woodpecker/lader-probe
++      JAVA_TOOL_OPTIONS: "-XX:MaxRAM=4g -XX:ActiveProcessorCount=2"
++    commands:
++      - . .woodpecker/waechter.sh
++      - >-
++        bash -c 'for i in $(seq 1 60); do
++          (echo > /dev/tcp/postgres-probe/5432) 2>/dev/null && { echo "postgres-probe bereit nach $i Versuchen"; exit 0; };
++          sleep 2;
++        done;
++        echo "FEHLER: Service-Container postgres-probe nicht erreichbar." >&2; exit 1'
++      - mkdir -p "$PROBE_ARBEIT"
++      - bash v2/lader-probe.sh --modul-gav "ch.plaintext:plaintext-z-verrechnung:$PROBE_MODUL_VERSION"
++      - mkdir -p target/lader-probe && cp "$PROBE_ARBEIT/modul-migrationen.txt" target/lader-probe/
++
++  lader-probe-flyway:
++    # psql aus dem Postgres-Bild (das Maven-Bild hat keins). Liest die DB, die Probe B gefuellt hat.
++    image: postgres:18-alpine
++    environment:
++      PGPASSWORD: plaintext
++    commands:
++      - . .woodpecker/waechter.sh
++      - 'echo "── flyway_schema_history (postgres-probe, juengste 15) ──"'
++      - >-
++        psql -h postgres-probe -U plaintext -d plaintext_probe
++        -c "select installed_rank, version, description, script, success from flyway_schema_history order by installed_rank desc limit 15;"
++      - >-
++        psql -h postgres-probe -U plaintext -d plaintext_probe -tA
++        -c "select 'Migrationen gesamt: ' || count(*) from flyway_schema_history;"
++      - >-
++        for m in $(cat target/lader-probe/modul-migrationen.txt); do
++          n=$(psql -h postgres-probe -U plaintext -d plaintext_probe -tA -c "select count(*) from flyway_schema_history where script='$m' and success");
++          if [ "$n" = "1" ]; then echo "BELEG flyway_schema_history: $m angewandt (success=true)";
++          else echo "FEHLER: $m fehlt in flyway_schema_history" >&2; exit 1; fi;
++        done
++
+   coverage-uebersicht:
+     image: maven:3.10-eclipse-temurin-25
+     environment:
+diff --git a/scripts/release-vollstaendig.sh b/scripts/release-vollstaendig.sh
+index 0ede0ca4..da92a4bc 100755
+--- a/scripts/release-vollstaendig.sh
++++ b/scripts/release-vollstaendig.sh
+@@ -47,9 +47,14 @@
+ set -uo pipefail
+ 
+ REPOSILITE_BASIS="${REPOSILITE_BASIS:-https://maven.plaintext.ch/releases}"
+-GRUPPE_PFAD="ch/plaintext"
+ # Ueberschreibbar nur fuer Tests gegen eine Attrappe (Karte 1563); im Betrieb bleibt es dieser Wert.
+ GITHUB_BASIS="${GITHUB_BASIS:-https://maven.pkg.github.com/Plaintext-Gmbh/plaintext-mvn}"
++# Karte 1563: Gruppenpfad und Tag-Praefix sind Umgebung mit Standard, kein Festwert mehr —
++# plaintext-root-v2 veroeffentlicht unter ch/plaintext/v2 und taggt v2-<version>. Ohne die beiden
++# Variablen verhaelt sich das Skript genau wie vorher (ch/plaintext, Tags ohne Praefix).
++#   GRUPPE_PFAD   Standard: groupId der Wurzel-pom des geprueften Standes, Punkte -> Schraegstriche
++#   TAG_PRAEFIX   Standard leer; "v2-" -> Tags v2-X.Y.Z, Version im Aufruf ohne Praefix
++TAG_PRAEFIX="${TAG_PRAEFIX:-}"
+ 
+ # Absoluten Pfad VOR dem cd merken: der Modus --letzte ruft das Skript je Tag
+ # erneut auf, und ein relatives $0 zeigt nach dem cd ins Leere.
+@@ -61,12 +66,12 @@ MINDESTALTER_S="${MINDESTALTER_S:-1800}"
+ # ── Modus --letzte N: ruft sich selbst je Tag auf und sammelt die Befunde ──────
+ if [ "${1:-}" = "--letzte" ]; then
+   ANZAHL="${2:-10}"
+-  TAGS="$(git tag --sort=-creatordate 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n "$ANZAHL")"
++  TAGS="$(git tag --sort=-creatordate 2>/dev/null | grep -E "^${TAG_PRAEFIX}[0-9]+\.[0-9]+\.[0-9]+$" | sed "s/^${TAG_PRAEFIX}//" | head -n "$ANZAHL")"
+   [ -n "$TAGS" ] || { echo "release-vollstaendig: keine Release-Tags gefunden — uebersprungen."; exit 0; }
+   JETZT="$(date -u +%s)"
+   SCHLECHT=""
+   for t in $TAGS; do
+-    tzeit="$(git log -1 --format=%ct "$t" 2>/dev/null || echo 0)"
++    tzeit="$(git log -1 --format=%ct "${TAG_PRAEFIX}$t" 2>/dev/null || echo 0)"
+     alter=$((JETZT - tzeit))
+     if [ "$alter" -lt "$MINDESTALTER_S" ]; then
+       echo "  $t  uebersprungen (${alter}s alt, Grenze ${MINDESTALTER_S}s — Release laeuft evtl. noch)"
+@@ -97,7 +102,7 @@ fi
+ 
+ VERSION="${1:-}"
+ if [ -z "$VERSION" ]; then
+-  VERSION="$(git describe --tags --abbrev=0 2>/dev/null)"
++  VERSION="$(git describe --tags --abbrev=0 --match "${TAG_PRAEFIX}[0-9]*" 2>/dev/null | sed "s/^${TAG_PRAEFIX}//")"
+ fi
+ case "$VERSION" in
+   ''|*SNAPSHOT*)
+@@ -113,9 +118,9 @@ esac
+ #  Waechter, der bei jedem neuen Modul die gesamte Vergangenheit rot faerbt, wird
+ #  nach dem zweiten Fehlalarm abgeschaltet und prueft dann gar nichts mehr.
+ #  Also: liegt ein Tag mit dieser Version vor, kommt die Modulliste aus dem Tag.
+-if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null 2>&1; then
+-  QUELLE="$VERSION"
+-  hole() { git show "$VERSION:$1" 2>/dev/null; }
++if git rev-parse -q --verify "refs/tags/${TAG_PRAEFIX}$VERSION" >/dev/null 2>&1; then
++  QUELLE="${TAG_PRAEFIX}$VERSION"
++  hole() { git show "${TAG_PRAEFIX}$VERSION:$1" 2>/dev/null; }
+ else
+   QUELLE="Arbeitsverzeichnis"
+   hole() { cat "$1" 2>/dev/null; }
+@@ -137,6 +142,10 @@ eigene_artifact_id() {
+ }
+ PARENT_ID="$(printf '%s' "$WURZEL" | eigene_artifact_id)"
+ [ -n "$PARENT_ID" ] || { echo "release-vollstaendig: artifactId aus pom.xml nicht lesbar." >&2; exit 1; }
++if [ -z "${GRUPPE_PFAD:-}" ]; then
++  GRUPPE_PFAD="$(printf '%s' "$WURZEL" | sed -n '/<\/parent>/,$p' | grep -m1 -oE '<groupId>[^<]+' | sed 's/<groupId>//' | tr . /)"
++fi
++[ -n "$GRUPPE_PFAD" ] || { echo "release-vollstaendig: groupId aus pom.xml nicht lesbar." >&2; exit 1; }
+ 
+ MODULE="$(printf '%s' "$WURZEL" | grep -oE '<module>[^<]+' | sed 's/<module>//')"
+ [ -n "$MODULE" ] || { echo "release-vollstaendig: keine <module>-Eintraege in pom.xml." >&2; exit 1; }
+@@ -163,7 +172,7 @@ kopf() { printf '%s\n' "──────────────────
+ 
+ kopf
+ echo "Release-Vollstaendigkeit  Version $VERSION"
+-echo "Repo: $REPOSILITE_BASIS"
++echo "Repo: $REPOSILITE_BASIS/$GRUPPE_PFAD"
+ echo "Modulliste aus: $QUELLE"
+ kopf
+ 
