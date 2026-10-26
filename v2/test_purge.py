@@ -28,6 +28,8 @@ class FakeNetz:
         self.scopes = scopes
         self.delete_status = delete_status
         self.aufrufe = []
+        self.puts = {}
+        self.metadata = ""
 
     def __call__(self, methode, url, headers, body):
         self.aufrufe.append((methode, url))
@@ -59,7 +61,9 @@ class FakeNetz:
                     return purge.Antwort(204)
             return purge.Antwort(404)
         if methode == "PUT":
-            self.metadata = body.decode()
+            self.puts[pfad] = body.decode()
+            if pfad.endswith("maven-metadata.xml"):
+                self.metadata = body.decode()
             return purge.Antwort(201)
         return purge.Antwort(500)
 
@@ -152,6 +156,12 @@ class TrockenlaufTest(unittest.TestCase):
         self.assertIn("<latest>2.790.1</latest>", self.netz.metadata)
         self.assertIn("<version>2.789.3</version>", self.netz.metadata)
         self.assertNotIn("2.789.2", self.netz.metadata)
+        # Karte 1563: die Pruefsummen passen zur neu geschriebenen maven-metadata.xml
+        import hashlib
+        m = "releases/ch/plaintext/v2/plaintext-root-parent/maven-metadata.xml"
+        xml = self.netz.puts[m].encode()
+        self.assertEqual(self.netz.puts[m + ".sha1"], hashlib.sha1(xml).hexdigest())
+        self.assertEqual(self.netz.puts[m + ".md5"], hashlib.md5(xml).hexdigest())
         self.assertIn("v1-Zaehlung nachher: 4 Versionen", out)
         self.assertIn("v1-Zaehlung nachher: 3 Versionen", out)
 

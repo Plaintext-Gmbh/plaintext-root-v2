@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import os
 import re
@@ -200,7 +201,14 @@ class Reposilite:
         a = self.transport("PUT", f"{self.basis}/{pfad}", {**self.headers, "Content-Type": "application/xml"}, xml.encode())
         if a.status not in (200, 201, 204):
             raise RuntimeError(f"Reposilite PUT {pfad}: {a.status} {a.text()[:200]}")
-        return f"maven-metadata.xml neu geschrieben: {pfad} ({len(plan.behalten)} Versionen)"
+        # Karte 1563: Reposilite erzeugt die Pruefsummen nicht selbst (Reparatur 22.10. lud sie von Hand);
+        # ohne sie passt .sha1/.md5 nach dem Purge nicht mehr zur neuen maven-metadata.xml.
+        for endung, algo in (("sha1", hashlib.sha1), ("md5", hashlib.md5)):
+            a = self.transport("PUT", f"{self.basis}/{pfad}.{endung}", {**self.headers, "Content-Type": "text/plain"},
+                               algo(xml.encode()).hexdigest().encode())
+            if a.status not in (200, 201, 204):
+                raise RuntimeError(f"Reposilite PUT {pfad}.{endung}: {a.status} {a.text()[:200]}")
+        return f"maven-metadata.xml neu geschrieben (mit .sha1/.md5): {pfad} ({len(plan.behalten)} Versionen)"
 
 
 def maven_metadata(artefakt: str, versionen: list[str]) -> str:
