@@ -31,7 +31,8 @@
 #
 #  REIHENFOLGE (Karte 518 wie in do_release): Tag anlegen und pushen, BEVOR etwas veroeffentlicht
 #  wird. Scheitert der Tag-Push, ist nichts draussen. Scheitert mvn deploy danach, gibt es einen
-#  Tag ohne (oder mit halbem) Artefakt — das meldet scripts/release-vollstaendig.sh im naechsten
+#  Tag mit halbem Artefakt — dann liefert scripts/release-nachliefern.sh --runden nach (Karte 1596,
+#  wie `./build nachliefern` in root); bleibt es halb, meldet es release-vollstaendig.sh im naechsten
 #  Lauf (TAG_PRAEFIX=v2-), genau wie in root.
 #
 #  SPERRE: Die Wurzel-groupId MUSS ch.plaintext.v2 sein. Sonst wuerde dieser Lauf v1-Koordinaten
@@ -129,10 +130,17 @@ wiederherstellen() { git checkout -q -- pom.xml '*/pom.xml' 2>/dev/null || git c
 trap wiederherstellen EXIT
 mvn -q -B versions:set -DnewVersion="$NEU" -DgenerateBackupPoms=false
 # shellcheck disable=SC2086
-if ! mvn clean deploy -B $MVN_TEST_FLAG -Dmaven.build.cache.enabled=false; then
-    fehler "mvn clean deploy fehlgeschlagen. Tag $TAG ist draussen, Artefakte fehlen oder sind halb — scripts/release-vollstaendig.sh (TAG_PRAEFIX=v2-) zeigt den Stand."
+if mvn clean deploy -B $MVN_TEST_FLAG -Dmaven.build.cache.enabled=false; then
+    sag "mvn clean deploy fuer $NEU erfolgreich (GitHub Packages + Reposilite ueber dual-publish-nas)."
+else
+    # Karte 1596, wie upstream `./build nachliefern`: der Tag ist draussen, das Release halb (2.805.1/2.805.2:
+    # "Read timed out" gegen GitHub Packages, den der HTTP-Client bei einem PUT nie wiederholt). Datei fuer
+    # Datei nachliefern, ungebaute Module per -pl bauen, Gegenprobe gegen beide Repos. POMs stehen noch auf $NEU.
+    sag "mvn clean deploy rot — Nachlieferung des halben Releases $NEU (scripts/release-nachliefern.sh --runden)"
+    MVN_TEST_FLAG="$MVN_TEST_FLAG" TAG_PRAEFIX="$TAG_PRAEFIX" bash scripts/release-nachliefern.sh --runden "$NEU" \
+        || fehler "mvn clean deploy rot und Nachlieferung nicht vollstaendig. Tag $TAG ist draussen, Artefakte halb — scripts/release-vollstaendig.sh (TAG_PRAEFIX=v2-) zeigt den Stand."
+    sag "Nachlieferung: $NEU liegt vollstaendig in beiden Repos."
 fi
-sag "mvn clean deploy fuer $NEU erfolgreich (GitHub Packages + Reposilite ueber dual-publish-nas)."
 
 # ── 3. GitHub-Release mit Notes (best effort, nie fatal) ───────────────────
 if command -v gh >/dev/null 2>&1 && [ -n "${GITHUB_TOKEN:-}${GH_TOKEN:-}" ]; then

@@ -108,7 +108,10 @@ Auf jeden Push nach `master` (Sync oder gemergter PR): Wurzel-groupId muss `ch.p
 `mvn versions:set` nur im Arbeitsbaum; `mvn clean deploy -DskipITs -DexcludedGroups=quality-gate
 -Dmaven.build.cache.enabled=false` → GitHub Packages (`<distributionManagement>`, Server-ID
 `plaintext`) **und** Reposilite (Profil `dual-publish-nas` aus `.mvn/maven.config`, Server-ID
-`plaintext-nas`); POMs zurücksetzen; GitHub-Release mit Notes (best effort); Schritt
+`plaintext-nas`); ist `mvn clean deploy` rot (halbes Release, z. B. «Read timed out» gegen GitHub Packages), liefert
+`scripts/release-nachliefern.sh --runden <version>` mit `TAG_PRAEFIX=v2-` Datei für Datei nach,
+baut ungebaute Module per `-pl` und zählt beide Repos (Karte 1596, wie `./build nachliefern` in
+root; Tokens nur per `curl --config`); POMs zurücksetzen; GitHub-Release mit Notes (best effort); Schritt
 `vollstaendigkeit` zählt beide Repos (`scripts/release-vollstaendig.sh`, `TAG_PRAEFIX=v2-`,
 Gruppenpfad aus der POM). Kein NAS-Staging, kein SSH, kein Docker, kein git-Spiegel nach
 plaintext-mvn. `[fast]` im Betreff überspringt die Tests, `[halbe-release-ok]` die Vorprüfung.
