@@ -1,24 +1,12 @@
-# Karte 1563: Dateien, in denen plaintext-root-v2 bewusst von upstream (plaintext-root) abweicht.
-#
-# Beim Sync (v2/sync.sh, .github/workflows/v2-sync.yaml) wird upstream/master nach master gemergt.
-# Fuer die hier gelisteten Pfade gilt der Merge-Treiber `ours`: die v2-Fassung bleibt, eine
-# upstream-Aenderung daran loest KEINEN Konflikt aus — sie wird im Sync-Log als Hinweis gemeldet
-# ("upstream aenderte …, v2-Fassung behalten"), damit sie bei Bedarf von Hand uebernommen wird.
-#
-# Der Treiber muss in der Git-Konfiguration existieren, sonst ignoriert git das Attribut still:
+# Karte 1563/1595: Dateien, die in plaintext-root-v2 handgepflegt von upstream abweichen ((c) in
+# docs/v2/README.md) UND auch upstream existieren. Fuer sie gilt beim Sync der Merge-Treiber `ours`:
+# die v2-Fassung bleibt, eine upstream-Aenderung daran meldet v2/sync.sh als HINWEIS.
+# Der Treiber muss in der Git-Konfiguration existieren (v2/sync.sh setzt ihn):
 #     git config merge.ours.driver true
-# v2/sync.sh setzt ihn selbst; wer lokal mergt, setzt ihn einmal (docs/v2/README.md).
 #
-# Alles, was NICHT hier steht, folgt upstream ohne Sonderbehandlung — auch CLAUDE.md, README.md,
-# CHANGELOG.md und die pom.xml (dort erledigt v2/umbenennen.sh die groupId nach jedem Merge).
+# Alles andere ausserhalb von v2/ ist upstream + v2/transformation.sh (groupId, Sonar/Repo-Lint aus,
+# Renovate aus, CLAUDE.md-Kopf, transformation.patch). Der Sync nimmt dafuer die upstream-Fassung
+# und wendet die Transformation neu an; CI prueft «v1 + T = v2 bis auf (c)».
 
-# Woodpecker-Workflows: v2 released ohne ./build, ohne NAS-Staging, mit eigenem Sonar-Schluessel.
-.woodpecker/build.yml      merge=ours
+# Release: v2/release.sh taggt v2-X ohne Versions-Commits, beide Paket-Repos, kein NAS-Staging.
 .woodpecker/deploy.yml     merge=ours
-.woodpecker/sonar.yml      merge=ours
-# GitHub Actions: der Repo-Lint von upstream braucht den self-hosted Runner und private Repos.
-.github/workflows/repo-lint.yaml merge=ours
-# Renovate ist in v2 aus — Abhaengigkeits-Updates kommen ueber den Sync von upstream.
-renovate.json              merge=ours
-# Quality-Gate-Stand: schreibt die v2-Wochenanalyse selbst zurueck.
-quality/quality-gate.properties merge=ours
