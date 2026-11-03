@@ -222,7 +222,10 @@ fi
 
 # ── 4. Push ─────────────────────────────────────────────────────────────────
 sag "Ergebnis ($(git rev-list --count "$ZIEL_SHA..HEAD") neue Commits auf $ZIEL):"
-git log --oneline "$ZIEL_SHA..HEAD" | head -5 | sed 's/^/    /'
+# -n 5 statt "| head -5": git log gibt dann selbst nur 5 Zeilen aus, und kein
+# frueh schliessendes head verursacht SIGPIPE (141) — unter set -euo pipefail
+# hat das bei mehr als 5 neuen Commits das ganze Skript VOR dem Push beendet.
+git log --oneline -n 5 "$ZIEL_SHA..HEAD" | sed 's/^/    /'
 if [ "$TROCKEN" = "1" ]; then
     sag "trocken: kein Push. Arbeitszweig $ARBEIT bleibt zur Ansicht stehen."
     git checkout -q "$ZIEL"
