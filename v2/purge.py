@@ -15,6 +15,15 @@ Löschkandidat wird vor dem Löschen noch einmal gegen die Sperre geprüft (Pfad
 ein Kandidat, der sie nicht erfüllt, bricht den Lauf ab (V1Sperre), auch im Trockenlauf.
 Die Zählung der v1-Versionen vor und nach dem Lauf steht in der Ausgabe und muss gleich sein.
 
+PIN-SCHUTZ (Karte 1635). Vor dem Planen liest das Skript alle veröffentlichten POMs der
+Nicht-root-Artefakte unter releases/ch/plaintext/ (Module, Apps) und sammelt jede Version, mit der
+sie ch.plaintext.v2 benutzen: Parent, Abhängigkeit, Plugin, auch über eine ${property} des POMs.
+Diese Versionen werden in keinem Artefakt gelöscht, auch wenn sie älter als die jüngsten N sind.
+Ein Modul mit Parent ch.plaintext.v2:plaintext-root-parent:2.805.2 braucht beim Bau die ganze
+2.805.2-Linie. Scheitert die Ermittlung oder findet sie keinen Pin, bricht der Lauf ab, bevor
+irgendetwas gelöscht wird (rc 5). Nicht gesehen werden Pins außerhalb veröffentlichter POMs,
+etwa LADER_VERSION in ci/registry.sh der Modul-Repos.
+
 TROCKENLAUF IST DER STANDARD. Gelöscht wird nur mit --scharf.
 
 Aufruf (Jumphost oder Woodpecker-Schritt, nur Python 3 Standardbibliothek):
@@ -49,6 +58,8 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Callable, Iterable
 
@@ -60,10 +71,16 @@ REPOSILITE_V1_PFAD = "releases/ch/plaintext/"
 GITHUB_V1_PRAEFIX = "ch.plaintext."
 
 VERSION_RE = re.compile(r"^\d+(\.\d+)*$")
+# Pin-Schutz: die v1-root-Linie selbst benutzt v2 nie; ihre ~9000 POMs zu lesen kostet nur Zeit.
+PIN_SCAN_OHNE = re.compile(r"^plaintext-(root|admin)-")
 
 
 class V1Sperre(Exception):
     """Ein Löschkandidat liegt nicht im v2-Raum. Der Lauf bricht ab, nichts wird gelöscht."""
+
+
+class PinsFehlen(Exception):
+    """Die benutzten v2-Versionen liessen sich nicht ermitteln (Fehler oder 0 Treffer). Nichts wird geloescht."""
 
 
 class RechteFehlen(Exception):
@@ -105,13 +122,38 @@ def nur_release_versionen(versionen: Iterable[str]) -> list[str]:
     return sorted((v for v in versionen if VERSION_RE.match(v)), key=versions_schluessel, reverse=True)
 
 
-def aufteilen(versionen: Iterable[str], behalten: int) -> tuple[list[str], list[str]]:
-    """(behalten, löschen) — jüngste N bleiben. Unsortierbare Einträge (SNAPSHOT, Text) werden
-    nie gelöscht: sie sind keine Releases dieses Schemas."""
+def aufteilen(versionen: Iterable[str], behalten: int, geschuetzt: Iterable[str] = ()) -> tuple[list[str], list[str]]:
+    """(behalten, löschen) — jüngste N bleiben, dazu jede gepinnte Version. Unsortierbare Einträge
+    (SNAPSHOT, Text) werden nie gelöscht: sie sind keine Releases dieses Schemas."""
     if behalten < 1:
         raise ValueError("--behalten muss mindestens 1 sein")
     sortiert = nur_release_versionen(versionen)
-    return sortiert[:behalten], sortiert[behalten:]
+    geschuetzt = set(geschuetzt)
+    aelter = sortiert[behalten:]
+    return sortiert[:behalten] + [v for v in aelter if v in geschuetzt], [v for v in aelter if v not in geschuetzt]
+
+
+def v2_pins_aus_pom(text: str) -> set[str]:
+    """Versionen, mit denen ein POM ch.plaintext.v2 benutzt (Parent, Abhängigkeit, Plugin; ${property}
+    aus dem eigenen <properties> aufgelöst). Nicht auflösbare Platzhalter zählen nicht: das POM, das
+    die Property definiert, benutzt sie selbst und wird ebenfalls gelesen."""
+    wurzel = ET.fromstring(text)
+    for e in wurzel.iter():
+        e.tag = e.tag.rsplit("}", 1)[-1]
+    props = {p.tag: (p.text or "").strip() for p in wurzel.findall("properties/*")}
+    funde = set()
+    for e in wurzel.iter():
+        if (e.findtext("groupId") or "").strip() != "ch.plaintext.v2":
+            continue
+        v = (e.findtext("version") or "").strip()
+        for _ in range(5):                       # ${a} -> ${b} -> 2.805.2
+            m = re.fullmatch(r"\$\{([^}]+)\}", v)
+            if not m:
+                break
+            v = props.get(m.group(1), "")
+        if VERSION_RE.match(v):
+            funde.add(v)
+    return funde
 
 
 @dataclass
@@ -169,10 +211,29 @@ class Reposilite:
         if ".." in rest or rest.startswith("/"):
             raise V1Sperre(f"Reposilite-Pfad unsauber: {pfad}")
 
-    def planen(self, behalten: int) -> list[Plan]:
+    def _pom_pins(self, artefakt: str, version: str) -> set[str]:
+        a = self.transport("GET", f"{self.basis}/{REPOSILITE_V1_PFAD}{artefakt}/{version}/{artefakt}-{version}.pom",
+                           self.headers, None)
+        if a.status == 404:                      # Versionsverzeichnis ohne POM: benutzt nichts
+            return set()
+        if a.status != 200:
+            raise RuntimeError(f"Reposilite {a.status} beim POM {artefakt}:{version}")
+        text = a.text()
+        return v2_pins_aus_pom(text) if "ch.plaintext.v2" in text else set()
+
+    def v2_pins(self) -> tuple[set[str], int]:
+        """(benutzte v2-Versionen, Anzahl gelesener POMs) über alle Nicht-root-Artefakte unter ch/plaintext/."""
+        artefakte = [a for a in self.verzeichnisse(REPOSILITE_V1_PFAD.rstrip("/"))
+                     if a != "v2" and not PIN_SCAN_OHNE.match(a)]
+        jobs = [(a, v) for a in artefakte for v in self.verzeichnisse(f"{REPOSILITE_V1_PFAD}{a}")]
+        with ThreadPoolExecutor(16) as ex:
+            funde = list(ex.map(lambda j: self._pom_pins(*j), jobs))
+        return set().union(*funde), len(jobs)
+
+    def planen(self, behalten: int, geschuetzt: Iterable[str] = ()) -> list[Plan]:
         plaene = []
         for a in self.artefakte_v2():
-            bleibt, weg = aufteilen(self.versionen(a), behalten)
+            bleibt, weg = aufteilen(self.versionen(a), behalten, geschuetzt)
             p = Plan("reposilite", a, bleibt, weg)
             for v in weg:
                 pfad = f"{REPOSILITE_V2_PFAD}{a}/{v}"
@@ -302,13 +363,13 @@ class GitHubPackages:
                                " fuer den Purge braucht es ein eigenes Token.")
         return f"Token-Scopes: {scopes}"
 
-    def planen(self, behalten: int) -> list[Plan]:
+    def planen(self, behalten: int, geschuetzt: Iterable[str] = ()) -> list[Plan]:
         plaene = []
         for paket in sorted(self.pakete()):
             if not paket.startswith(GITHUB_V2_PRAEFIX):
                 continue
             ids = self.versionen(paket)
-            bleibt, weg = aufteilen(ids.keys(), behalten)
+            bleibt, weg = aufteilen(ids.keys(), behalten, geschuetzt)
             p = Plan("github", paket, bleibt, weg)
             for v in weg:
                 self.pruefe_sperre(paket)
@@ -342,10 +403,27 @@ def plan_ausgeben(plaene: list[Plan], out) -> int:
     return weg
 
 
-def lauf(args, reposilite: Reposilite | None, github: GitHubPackages | None, out=sys.stdout) -> int:
+def pins_ermitteln(quelle: Reposilite | None) -> tuple[list[str], int]:
+    """Benutzte v2-Versionen oder PinsFehlen. Kein Treffer zählt als Fehler: dann ist eher die
+    Ermittlung kaputt, als dass niemand v2 benutzt."""
+    if quelle is None:
+        raise PinsFehlen("keine Reposilite-Quelle fuer die Pin-Ermittlung")
+    try:
+        pins, poms = quelle.v2_pins()
+    except Exception as e:  # noqa: BLE001 — jeder Fehler heisst: Pins unbekannt, also nicht loeschen
+        raise PinsFehlen(f"Pin-Ermittlung gescheitert: {type(e).__name__}: {e}") from e
+    if not pins:
+        raise PinsFehlen(f"Pin-Ermittlung fand in {poms} POMs keine benutzte v2-Version")
+    return nur_release_versionen(pins), poms
+
+
+def lauf(args, reposilite: Reposilite | None, github: GitHubPackages | None, out=sys.stdout,
+         pin_quelle: Reposilite | None = None) -> int:
     modus = "SCHARF" if args.scharf else "TROCKENLAUF"
     print(f"v2-Purge {modus}: behalte je Artefakt die juengsten {args.behalten} Releases", file=out)
     print(f"Sperre: Reposilite nur {REPOSILITE_V2_PFAD}*, GitHub Packages nur {GITHUB_V2_PRAEFIX}*", file=out)
+    pins, poms = pins_ermitteln(pin_quelle or reposilite)   # vor jedem Planen und Loeschen
+    print(f"Pin-Schutz: {len(pins)} benutzte v2-Versionen aus {poms} POMs bleiben: {', '.join(pins)}", file=out)
     rc = 0
     for name, repo in (("Reposilite", reposilite), ("GitHub Packages", github)):
         if repo is None:
@@ -355,7 +433,7 @@ def lauf(args, reposilite: Reposilite | None, github: GitHubPackages | None, out
             print("  " + repo.rechte_pruefen(args.scharf), file=out)
         v1_vorher = repo.v1_zaehlung()
         print(f"  v1-Zaehlung vorher: {v1_vorher} Versionen", file=out)
-        plaene = repo.planen(args.behalten)      # wirft V1Sperre, bevor irgendetwas geloescht wird
+        plaene = repo.planen(args.behalten, pins)  # wirft V1Sperre, bevor irgendetwas geloescht wird
         anzahl = plan_ausgeben(plaene, out)
         if not args.scharf:
             print(f"  Trockenlauf: {anzahl} Versionen wuerden geloescht. Nichts veraendert.", file=out)
@@ -390,16 +468,21 @@ def argumente(argv: list[str]):
 def main(argv: list[str]) -> int:
     args = argumente(argv)
     reposilite = github = None
+    # Die Pins kommen immer aus Reposilite, auch bei --nur github.
+    pin_quelle = Reposilite(os.environ.get("REPOSILITE_BASIS", "https://maven.plaintext.ch"),
+                            os.environ.get("REPOSILITE_USER", "ci"), os.environ.get("REPOSILITE_TOKEN"))
     if args.nur in (None, "reposilite"):
-        reposilite = Reposilite(os.environ.get("REPOSILITE_BASIS", "https://maven.plaintext.ch"),
-                                os.environ.get("REPOSILITE_USER", "ci"), os.environ.get("REPOSILITE_TOKEN"))
+        reposilite = pin_quelle
     if args.nur in (None, "github"):
         github = GitHubPackages(os.environ.get("GITHUB_ORG", "Plaintext-Gmbh"), os.environ.get("GITHUB_TOKEN"))
     try:
-        return lauf(args, reposilite, github)
+        return lauf(args, reposilite, github, pin_quelle=pin_quelle)
     except V1Sperre as e:
         print(f"\nABBRUCH (V1-SPERRE): {e}\nNichts wurde geloescht.", file=sys.stderr)
         return 3
+    except PinsFehlen as e:
+        print(f"\nABBRUCH (PIN-SCHUTZ): {e}\nNichts wurde geloescht.", file=sys.stderr)
+        return 5
     except RechteFehlen as e:
         print(f"\nABBRUCH (RECHTE): {e}", file=sys.stderr)
         return 4

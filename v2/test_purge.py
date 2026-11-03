@@ -18,12 +18,29 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import purge  # noqa: E402
 
 
+def modul_pom(parent=None, archtests=None, extra=""):
+    """Veröffentlichtes Modul-POM wie plaintext-modul-running-parent 3.0.0 (Karte 1635)."""
+    p = (f"<parent><groupId>ch.plaintext.v2</groupId><artifactId>plaintext-root-parent</artifactId>"
+         f"<version>{parent}</version></parent>") if parent else ""
+    d = ("<dependencies><dependency><groupId>ch.plaintext.v2</groupId><artifactId>plaintext-root-archtests</artifactId>"
+         "<version>${plaintext-root-archtests.version}</version></dependency></dependencies>") if archtests else ""
+    props = f"<properties><plaintext-root-archtests.version>{archtests}</plaintext-root-archtests.version></properties>" if archtests else ""
+    return (f'<?xml version="1.0"?><project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion>'
+            f"{p}<groupId>ch.plaintext</groupId><artifactId>m</artifactId>{props}{d}{extra}</project>")
+
+
 class FakeNetz:
-    """Reposilite + GitHub im Speicher. repo: {artefakt: [versionen]} je Gruppe."""
+    """Reposilite + GitHub im Speicher. repo: {artefakt: [versionen]} je Gruppe.
+    modul_poms: {artefakt: {version: pom-text}} — veröffentlichte Nicht-root-Artefakte unter ch/plaintext/,
+    aus denen purge.py die Pins liest. Standard: ein Modul, das die jüngste Testversion 2.790.1 pinnt."""
 
     def __init__(self, reposilite_v2=None, reposilite_v1=None, github=None, scopes="read:packages, delete:packages",
-                 delete_status=204):
-        self.reposilite = {"v2": reposilite_v2 or {}, "v1": reposilite_v1 or {}}
+                 delete_status=204, modul_poms=None, pom_status=200):
+        self.modul_poms = {"plaintext-modul-test": {"3.0.0": modul_pom("2.790.1")}} if modul_poms is None else modul_poms
+        self.pom_status = pom_status
+        v1 = dict(reposilite_v1 or {})
+        v1.update({a: list(vs) for a, vs in self.modul_poms.items()})
+        self.reposilite = {"v2": reposilite_v2 or {}, "v1": v1}
         self.github = github or {}          # paketname -> [versionen]
         self.scopes = scopes
         self.delete_status = delete_status
@@ -40,6 +57,12 @@ class FakeNetz:
     # --- Reposilite ---
     def _reposilite(self, methode, url, body):
         pfad = url.split("https://repo.test/", 1)[1]
+        if methode == "GET" and pfad.endswith(".pom"):
+            art, ver = pfad[len("releases/ch/plaintext/"):].split("/")[:2]
+            text = self.modul_poms.get(art, {}).get(ver)
+            if self.pom_status != 200:
+                return purge.Antwort(self.pom_status)
+            return purge.Antwort(200, text.encode()) if text is not None else purge.Antwort(404)
         if methode == "GET" and pfad.startswith("api/maven/details/"):
             rest = pfad[len("api/maven/details/"):]
             if rest == "releases/ch/plaintext":
@@ -101,7 +124,7 @@ def lauf(netz, *extra, nur=None):
     r = purge.Reposilite("https://repo.test", "ci", "t", netz) if nur in (None, "reposilite") else None
     g = purge.GitHubPackages("Plaintext-Gmbh", "tok", netz) if nur in (None, "github") else None
     out = io.StringIO()
-    rc = purge.lauf(a, r, g, out)
+    rc = purge.lauf(a, r, g, out, pin_quelle=purge.Reposilite("https://repo.test", "ci", "t", netz))
     return rc, out.getvalue()
 
 
@@ -137,7 +160,7 @@ class TrockenlaufTest(unittest.TestCase):
         self.assertNotIn("DELETE", [m for m, _ in self.netz.aufrufe])
         self.assertIn("behalten (2): 2.790.1, 2.789.3", out)
         self.assertIn("loeschen (2): 2.789.2, 2.789.1", out)
-        self.assertIn("v1-Zaehlung vorher: 4 Versionen", out)     # Reposilite v1: 3 + 1
+        self.assertIn("v1-Zaehlung vorher: 5 Versionen", out)     # Reposilite v1: 3 + 1 + Modul
         self.assertIn("v1-Zaehlung vorher: 3 Versionen", out)     # GitHub v1: 2 + 1 (v2x.fremd zaehlt als v1)
         self.assertIn("Trockenlauf: 2 Versionen wuerden geloescht", out)
         self.assertIn("v1 unveraendert.", out)
@@ -162,7 +185,7 @@ class TrockenlaufTest(unittest.TestCase):
         xml = self.netz.puts[m].encode()
         self.assertEqual(self.netz.puts[m + ".sha1"], hashlib.sha1(xml).hexdigest())
         self.assertEqual(self.netz.puts[m + ".md5"], hashlib.md5(xml).hexdigest())
-        self.assertIn("v1-Zaehlung nachher: 4 Versionen", out)
+        self.assertIn("v1-Zaehlung nachher: 5 Versionen", out)
         self.assertIn("v1-Zaehlung nachher: 3 Versionen", out)
 
 
@@ -207,7 +230,7 @@ class SperreTest(unittest.TestCase):
         netz = FakeNetz(reposilite_v2={"plaintext-root-parent": ["2.789.1", "2.789.2"]})
         orig = purge.Reposilite.planen
 
-        def kaputt(self, behalten):
+        def kaputt(self, behalten, geschuetzt=()):
             raise purge.V1Sperre("Test")
         purge.Reposilite.planen = kaputt
         try:
@@ -217,6 +240,89 @@ class SperreTest(unittest.TestCase):
                 purge.lauf(a, purge.Reposilite("https://repo.test", "ci", "t", netz), None, out)
         finally:
             purge.Reposilite.planen = orig
+
+
+class PinSchutzTest(unittest.TestCase):
+    """Karte 1635: benutzte v2-Versionen bleiben; ohne ermittelte Pins wird nichts geloescht."""
+
+    V2 = ["2.805.1", "2.805.2", "2.806.1", "2.809.1", "2.814.1", "2.815.1"]
+
+    def netz(self, **kw):
+        kw.setdefault("modul_poms", {"plaintext-modul-running-parent": {"3.0.0": modul_pom("2.805.2", archtests="2.809.1")},
+                                     "plaintext-modul-running": {"3.0.0": modul_pom()}})
+        return FakeNetz(reposilite_v2={"plaintext-root-common": list(self.V2)},
+                        github={"ch.plaintext.v2.plaintext-root-common": list(self.V2)}, **kw)
+
+    def test_pom_parser(self):
+        self.assertEqual(purge.v2_pins_aus_pom(modul_pom("2.805.2", archtests="2.809.1")), {"2.805.2", "2.809.1"})
+        self.assertEqual(purge.v2_pins_aus_pom(modul_pom()), set())
+        verschachtelt = modul_pom(extra="<properties><a>${b}</a><b>2.812.1</b></properties><build><plugins><plugin>"
+                                        "<groupId>ch.plaintext.v2</groupId><version>${a}</version></plugin></plugins></build>")
+        self.assertEqual(purge.v2_pins_aus_pom(verschachtelt), {"2.812.1"})
+        # exclusion ohne Version, unaufloesbare Property, fremde Gruppe: kein Pin
+        nichts = modul_pom(extra="<dependencies><dependency><groupId>ch.plaintext</groupId><version>1.805.0</version></dependency>"
+                                 "<dependency><groupId>ch.plaintext.v2</groupId><version>${fehlt}</version><exclusions><exclusion>"
+                                 "<groupId>ch.plaintext.v2</groupId><artifactId>*</artifactId></exclusion></exclusions>"
+                                 "</dependency></dependencies>")
+        self.assertEqual(purge.v2_pins_aus_pom(nichts), set())
+
+    def test_positiv_gepinnte_alte_version_bleibt_negativ_ungepinnte_wird_geloescht(self):
+        netz = self.netz()
+        rc, out = lauf(netz, "--behalten", "2", "--scharf")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("Pin-Schutz: 2 benutzte v2-Versionen aus 2 POMs bleiben: 2.809.1, 2.805.2", out)
+        # Positiv: 2.805.2 (Parent) und 2.809.1 (archtests ueber ${property}) sind aelter als die 2 juengsten und bleiben
+        self.assertEqual(netz.reposilite["v2"]["plaintext-root-common"], ["2.805.2", "2.809.1", "2.814.1", "2.815.1"])
+        self.assertEqual(netz.github["ch.plaintext.v2.plaintext-root-common"], ["2.805.2", "2.809.1", "2.814.1", "2.815.1"])
+        self.assertIn("<version>2.805.2</version>", netz.metadata)
+        self.assertIn("<version>2.809.1</version>", netz.metadata)
+        # Negativ: die ungepinnten alten 2.806.1 und 2.805.1 sind weg
+        self.assertNotIn("2.806.1", netz.metadata)
+        deletes = [u for m, u in netz.aufrufe if m == "DELETE"]
+        self.assertEqual(sum("2.806.1" in u for u in deletes), 2, deletes)      # Reposilite + GitHub
+        self.assertEqual(sum("2.805.1" in u for u in deletes), 2, deletes)
+        self.assertFalse(any("2.805.2" in u or "2.809.1" in u for u in deletes), deletes)
+
+    def test_trockenlauf_listet_gepinnte_unter_behalten(self):
+        rc, out = lauf(self.netz(), "--behalten", "2", nur="reposilite")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("behalten (4): 2.815.1, 2.814.1, 2.809.1, 2.805.2", out)
+        self.assertIn("loeschen (2): 2.806.1, 2.805.1", out)
+
+    def assert_abbruch_ohne_delete(self, netz, text):
+        with self.assertRaises(purge.PinsFehlen) as cm:
+            lauf(netz, "--behalten", "1", "--scharf")
+        self.assertIn(text, str(cm.exception))
+        self.assertEqual([m for m, _ in netz.aufrufe if m in ("DELETE", "PUT")], [])
+        self.assertEqual(netz.reposilite["v2"]["plaintext-root-common"], self.V2)
+
+    def test_null_treffer_bricht_ab_ohne_zu_loeschen(self):
+        self.assert_abbruch_ohne_delete(self.netz(modul_poms={"plaintext-modul-x": {"1.0.0": modul_pom()}}),
+                                        "keine benutzte v2-Version")
+
+    def test_keine_modul_artefakte_bricht_ab(self):
+        self.assert_abbruch_ohne_delete(self.netz(modul_poms={}), "in 0 POMs keine benutzte v2-Version")
+
+    def test_pom_lesefehler_bricht_ab_ohne_zu_loeschen(self):
+        self.assert_abbruch_ohne_delete(self.netz(pom_status=500), "Pin-Ermittlung gescheitert")
+
+    def test_kaputtes_pom_bricht_ab_ohne_zu_loeschen(self):
+        self.assert_abbruch_ohne_delete(self.netz(modul_poms={"plaintext-modul-x": {"1.0.0": "<project>ch.plaintext.v2"}}),
+                                        "ParseError")
+
+    def test_root_artefakte_werden_nicht_gelesen(self):
+        netz = self.netz()
+        netz.reposilite["v1"]["plaintext-root-common"] = ["1.805.0"]
+        lauf(netz, "--behalten", "2", nur="reposilite")
+        self.assertFalse(any(u.endswith(".pom") and "plaintext-root-" in u for _, u in netz.aufrufe))
+
+    def test_hauptprogramm_gibt_rc_5(self):
+        orig = purge.lauf
+        purge.lauf = lambda *a, **k: (_ for _ in ()).throw(purge.PinsFehlen("Test"))
+        try:
+            self.assertEqual(purge.main(["--nur", "reposilite"]), 5)
+        finally:
+            purge.lauf = orig
 
 
 class RechteTest(unittest.TestCase):
