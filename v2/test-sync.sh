@@ -83,5 +83,21 @@ sync "$D"; rc=$?
 pruef "D: Exit 2" '[ "$rc" = 2 ]'
 pruef "D: Konfliktzweig nennt docs/v2/README.md" 'grep -q "KONFLIKT" "$D/log" && grep -q "docs/v2/README.md" "$D/log" && [ -n "$(git -C "$D/V" branch --list "sync-konflikt/*")" ]'
 
+# ── E ───────────────────────────────────────────────────────────────────────
+# Mehr als 5 neue Commits: die Ergebnisliste in sync.sh wurde per
+# `git log | head -5` gekuerzt — head schliesst bei mehr als 5 Zeilen frueh,
+# git bekommt SIGPIPE (141), und set -euo pipefail beendet das Skript VOR dem
+# Push (Karte 1634, nachts vom bump-agent gefunden).
+E="$TMP/E"; aufbauen "$E"
+for i in 1 2 3 4 5 6 7; do
+    echo "nr $i" > "$E/U/datei-$i.txt"
+    upstream_commit "$E" "upstream E$i"
+done
+sync "$E"; rc=$?
+pruef "E: Exit 0 trotz mehr als 5 neuen Commits (kein SIGPIPE-Abbruch)" '[ "$rc" = 0 ]'
+pruef "E: Ergebnis nennt 8 neue Commits (7 upstream + Merge)" 'grep -q "Ergebnis (8 neue Commits" "$E/log"'
+pruef "E: Liste bleibt auf 5 Eintraegen gekuerzt" '[ "$(grep -cE "^    [0-9a-f]{7,} " "$E/log")" = 5 ]'
+pruef "E: letzter Sync-Schritt erreicht (trocken, kein Push)" 'grep -q "trocken: kein Push" "$E/log"'
+
 echo "test-sync: $ok ok, $falsch falsch"
-[ "$falsch" = 0 ] || { echo "── Logs ──"; for s in A B C D; do echo "## $s"; tail -15 "$TMP/$s/log"; done; exit 1; }
+[ "$falsch" = 0 ] || { echo "── Logs ──"; for s in A B C D E; do echo "## $s"; tail -15 "$TMP/$s/log"; done; exit 1; }
