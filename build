@@ -56,10 +56,7 @@ mirror_to_plaintext_mvn() {
         return 0
     fi
 
-    # v2 released mit groupId ch.plaintext.v2 — die Artefakte liegen eine Ebene
-    # tiefer (ch/plaintext/v2/<modul>/<version>), das Glob-Muster unten bleibt.
-    # v1 zeigt auf ch/plaintext und bleibt unverändert (Karte 1653).
-    m2="${HOME}/.m2/repository/ch/plaintext/v2"
+    m2="${HOME}/.m2/repository/ch/plaintext"
     if [ ! -d "$m2" ]; then
         echo -e "${RED}plaintext-mvn: $m2 fehlt - lief das Release wirklich durch?${NC}"
         return 1
