@@ -46,7 +46,8 @@
 #                        Commit-Betreff -> -DskipTests (wie root)
 #    MAVEN_ARGS          z.B. "-s /tmp/ci/settings.xml" (Server-IDs plaintext + plaintext-nas)
 #    REPOSILITE_BASIS    Standard https://maven.plaintext.ch/releases (Kollisionspruefung)
-#    GITHUB_TOKEN        optional: GitHub-Release mit generierten Notes (gh), best effort
+#    GITHUB_TOKEN        optional: GitHub-Release mit generierten Notes (gh), best effort;
+#                        ohne Token auch keine Spiegelung nach plaintext-mvn
 #    RELEASE_ZWEIG       Standard master
 # ══════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
@@ -140,6 +141,21 @@ else
     MVN_TEST_FLAG="$MVN_TEST_FLAG" TAG_PRAEFIX="$TAG_PRAEFIX" bash scripts/release-nachliefern.sh --runden "$NEU" \
         || fehler "mvn clean deploy rot und Nachlieferung nicht vollstaendig. Tag $TAG ist draussen, Artefakte halb — scripts/release-vollstaendig.sh (TAG_PRAEFIX=v2-) zeigt den Stand."
     sag "Nachlieferung: $NEU liegt vollstaendig in beiden Repos."
+fi
+
+# ── 2b. Oeffentlicher Spiegel plaintext-mvn (Karte 1653) ───────────────────
+# v2 laeuft nicht ueber ./build, darum lief die Spiegelung hier nie. Kein zweiter Mechanismus:
+# Die Funktion kommt zur Laufzeit aus ./build, nur der Pfad im lokalen Repo ist v2-eigen. Sie
+# nimmt die eben veroeffentlichten Dateien aus ~/.m2 und wiederholt keinen Bau. Fehlschlag wie
+# in root nur als Warnung: Das Release ist gueltig, `mirror_to_plaintext_mvn` liesse sich nachholen.
+RED=""; YELLOW=""; BLUE=""; GREEN=""; NC=""
+SPIEGEL="$(sed -n '/^mirror_to_plaintext_mvn() {/,/^}/p' build | sed 's#/repository/ch/plaintext"#/repository/ch/plaintext/v2"#')"
+if grep -q '/repository/ch/plaintext/v2"' <<<"$SPIEGEL"; then
+    eval "$SPIEGEL"
+    mirror_to_plaintext_mvn "$NEU" && sag "plaintext-mvn: $NEU gespiegelt." \
+        || sag "WARNUNG: Spiegelung nach plaintext-mvn fehlgeschlagen, Release bleibt gueltig."
+else
+    sag "WARNUNG: mirror_to_plaintext_mvn in ./build nicht gefunden oder Pfad geaendert, Spiegelung entfaellt."
 fi
 
 # ── 3. GitHub-Release mit Notes (best effort, nie fatal) ───────────────────
