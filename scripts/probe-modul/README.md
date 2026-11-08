@@ -1,4 +1,4 @@
-# Synthetisches Probe-Modul für `v2/lader-probe.sh` (Karte 1563)
+# Synthetisches Probe-Modul für `scripts/lader-probe.sh` (Karte 1563)
 
 Ohne Zugang zum Reposilite (ausserhalb des LAN) gibt es kein released `plaintext-z-verrechnung`-Jar.
 Dieses Verzeichnis baut ein kleines Modul-Jar, das dieselben Mechanismen anspricht:
@@ -10,7 +10,7 @@ Dieses Verzeichnis baut ein kleines Modul-Jar, das dieselben Mechanismen anspric
 Bauen (JDK 25, die Jars aus `~/.m2` nach einem `mvn install`):
 
 ```
-v2/probe-modul/bauen.sh            # schreibt target/probe-modul-1.0.0.jar
+scripts/probe-modul/bauen.sh            # schreibt target/probe-modul-1.0.0.jar
 ```
 
 Probe lokal (leere Datenbank `plaintext_probe` auf 127.0.0.1:5432, Benutzer plaintext/plaintext):
@@ -18,7 +18,7 @@ Probe lokal (leere Datenbank `plaintext_probe` auf 127.0.0.1:5432, Benutzer plai
 ```
 DB_URL=jdbc:postgresql://127.0.0.1:5432/plaintext_probe \
 PROBE_PSQL=postgresql://plaintext:plaintext@127.0.0.1/plaintext_probe \
-v2/lader-probe.sh --modul-jar v2/probe-modul/target/probe-modul-1.0.0.jar --root-min 1.780.0
+scripts/lader-probe.sh --modul-jar scripts/probe-modul/target/probe-modul-1.0.0.jar --root-min 1.780.0
 ```
 
 `--root-min` ist hier eine Angabe von Hand, weil das synthetische Jar keine Elternkette hat. Beim

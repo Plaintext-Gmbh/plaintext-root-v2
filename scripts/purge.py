@@ -3,7 +3,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 """
-v2/purge.py — alte v2-Releases aus beiden Paket-Repos entfernen (Karte 1563).
+scripts/purge.py — alte v2-Releases aus beiden Paket-Repos entfernen (Karte 1563).
 
 Behält je v2-Artefakt die jüngsten N Releases (Standard 5) und löscht die älteren, in
   * Reposilite   https://maven.plaintext.ch/releases  — NUR unter releases/ch/plaintext/v2/
@@ -27,10 +27,10 @@ etwa LADER_VERSION in ci/registry.sh der Modul-Repos.
 TROCKENLAUF IST DER STANDARD. Gelöscht wird nur mit --scharf.
 
 Aufruf (Jumphost oder Woodpecker-Schritt, nur Python 3 Standardbibliothek):
-    v2/purge.py                               Trockenlauf, beide Repos, N=5
-    v2/purge.py --behalten 3                  Trockenlauf, N=3
-    v2/purge.py --scharf                      löscht
-    v2/purge.py --nur reposilite|github       nur ein Repo
+    scripts/purge.py                               Trockenlauf, beide Repos, N=5
+    scripts/purge.py --behalten 3                  Trockenlauf, N=3
+    scripts/purge.py --scharf                      löscht
+    scripts/purge.py --nur reposilite|github       nur ein Repo
 Umgebung:
     REPOSILITE_BASIS   Standard https://maven.plaintext.ch   (ohne /releases)
     REPOSILITE_TOKEN   Reposilite-Token (Secret maven_nas_token), Benutzer REPOSILITE_USER (Standard ci)

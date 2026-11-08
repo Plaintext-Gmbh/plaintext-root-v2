@@ -1,6 +1,9 @@
-> **plaintext-root-v2 (Karte 1563):** dieses Repo ist die v2-Abspaltung von plaintext-root mit
-> groupId `ch.plaintext.v2`, eigenem Sync, Release (`v2/release.sh`, Tags `v2-X`) und Purge.
-> Alles v2-Spezifische: `docs/v2/README.md`. Der Rest dieser Datei ist upstream-Stand.
+> **plaintext-root-v2 (Karte 1563, seit Karte 1621 das Entwicklungsrepo):** dieses Repo ist die
+> Fortsetzung von plaintext-root (v1, archiviert) mit groupId `ch.plaintext.v2`. Es wird DIREKT
+> entwickelt — Sync und Transformation sind abgebaut, Release via `scripts/release.sh`
+> (Tags `v2-X`, Versionsschnitt 3.0.0). Die Hintergruende der Umbauzeit stehen in
+> `docs/v2/README.md` und `docs/v2/analyse.md`. Der Rest dieser Datei ist der bewaehrte
+> upstream-Stand.
 
 # plaintext-root — Claude orientation
 
