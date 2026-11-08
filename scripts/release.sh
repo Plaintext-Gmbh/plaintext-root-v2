@@ -12,7 +12,9 @@
 #  ./build (kein NAS-Staging/SSH, kein Docker-CLI in Woodpecker, reines Maven-Artefakt).
 #
 #  WARUM EIGENER LAUF STATT do_release: Tag-Praefix `v2-` (versionsbasis() in tui-build-logic.sh
-#  sieht nur unpraefixte Tags und wuerde aus den v2-Tags 1.0.0 rechnen) und kein ./build.
+#  sieht alle Tags) und kein ./build. Seit dem Schnitt 3.0.0 sind die Tags PRÄFIXFREI
+#  (Entscheid Daniel 08.11.2026): die alten v2-2.x-Tags der Übergangszeit behalten ihr
+#  v2-Präfix, alle 3.x-Tags heissen schlicht X.Y.Z.
 #
 #  VERSIONSSCHEMA (Karte 1621, Entscheid Daniel: Schnitt auf 3.0.0)
 #    BASIS   = MAX(POM-Version ohne -SNAPSHOT, hoechster v2-Tag)  — der hoechste Tag ist die
@@ -26,7 +28,7 @@
 #
 #  REIHENFOLGE (Karte 518): Tag anlegen und pushen, BEVOR etwas veroeffentlicht wird. Scheitert
 #  mvn deploy danach, liefert scripts/release-nachliefern.sh --runden nach (Karte 1596); bleibt
-#  es halb, meldet es release-vollstaendig.sh im naechsten Lauf (TAG_PRAEFIX=v2-).
+#  es halb, meldet es release-vollstaendig.sh im naechsten Lauf (TAG_PRAEFIX=).
 #
 #  SPERRE: Die Wurzel-groupId MUSS ch.plaintext.v2 sein, und kein Reaktor-POM darf eine
 #  v1-Koordinate (ch.plaintext) tragen — sonst wuerde dieser Lauf v1-Koordinaten veroeffentlichen.
@@ -51,7 +53,7 @@ cd "$WURZEL"
 REPOSILITE_BASIS="${REPOSILITE_BASIS:-https://maven.plaintext.ch/releases}"
 ZWEIG="${RELEASE_ZWEIG:-master}"
 ERWARTETE_GRUPPE="ch.plaintext.v2"
-TAG_PRAEFIX="v2-"
+TAG_PRAEFIX=""
 
 sag() { echo "release: $*"; }
 fehler() { echo "release: FEHLER: $*" >&2; exit 1; }
@@ -151,7 +153,7 @@ else
     # Datei nachliefern, ungebaute Module per -pl bauen, Gegenprobe gegen beide Repos. POMs stehen noch auf $NEU.
     sag "mvn clean deploy rot — Nachlieferung des halben Releases $NEU (scripts/release-nachliefern.sh --runden)"
     MVN_TEST_FLAG="$MVN_TEST_FLAG" TAG_PRAEFIX="$TAG_PRAEFIX" bash scripts/release-nachliefern.sh --runden "$NEU" \
-        || fehler "mvn clean deploy rot und Nachlieferung nicht vollstaendig. Tag $TAG ist draussen, Artefakte halb — scripts/release-vollstaendig.sh (TAG_PRAEFIX=v2-) zeigt den Stand."
+        || fehler "mvn clean deploy rot und Nachlieferung nicht vollstaendig. Tag $TAG ist draussen, Artefakte halb — scripts/release-vollstaendig.sh (TAG_PRAEFIX=) zeigt den Stand."
     sag "Nachlieferung: $NEU liegt vollstaendig in beiden Repos."
 fi
 

@@ -26,7 +26,9 @@ Historie: [analyse.md](analyse.md) (Karten 1563/1595).
 - `scripts/release.sh` rechnet: `BASIS = MAX(POM ohne -SNAPSHOT, höchster v2-Tag)`; ist die
   Major der POM größer als die Tag-Major (**Versionsschnitt**, z. B. POM `3.0.0-SNAPSHOT` über
   Tag `2.821.1`), wird die POM-Version exakt released, sonst `BASIS + 1 Minor`.
-- Tag-Präfix `v2-` (z. B. `v2-3.0.0`). Der Schnitt auf **3.0.0** war der Entscheid Daniels
+- Tags sind seit dem Schnitt **präfixfrei** (Entscheid Daniel 08.11.2026): `3.0.0`, `3.0.1`, … — die zwei
+  ausgelieferten Präfix-Tags `v2-3.0.0`/`v2-3.1.0` wurden noch am selben Tag zu `3.0.0`/`3.1.0` umbenannt.
+  Die alten `v2-2.x`-Tags der Übergangszeit behalten ihr Präfix (Historie). Der Schnitt auf **3.0.0** war der Entscheid Daniels
   zur Umstellung (Karte 1621); alle Pins der Apps springen einmal auf 3.x.
 - Nach dem Release committet der Lauf `Prepare next development iteration <Version>-SNAPSHOT`
   mit `[skip ci]` — Versions-Commits sind ohne Sync wieder unproblematisch.
