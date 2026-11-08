@@ -12,6 +12,22 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-11-08
+
+### Changed
+- **Version cut to 3.0.0 with the end of v1** (Karte 1621, Daniel's decision). `plaintext-root`
+  (v1) is archived read-only; this repository is now the one and only root development line.
+  Releases continue as `3.x` under groupId `ch.plaintext.v2` (GitHub Packages + Reposilite
+  `ch/plaintext/v2/` + the `plaintext-mvn` git mirror). The version arithmetic in
+  `scripts/release.sh` releases the POM version exactly when its major is ahead of the highest
+  `v2-` tag (the cut), otherwise highest-tag-plus-one-minor; after every release the next
+  SNAPSHOT version is committed (`[skip ci]`).
+- **The v1→v2 sync machinery is dismantled** (Karte 1621): `v2/sync.sh`, `v2/transformation.sh`,
+  `v2/umbenennen.sh`, `v2/transformation.patch`, the nightly sync schedule and the
+  `v2-abgleich-agent` cron are gone. `release.sh`, `purge.py` and the loader probe live in
+  `scripts/` now and are maintained directly. Renovate is re-enabled; the `koordinaten` CI step
+  guards the reactor against stray `ch.plaintext` groupIds. Details: `docs/v2/README.md`.
+
 ### Removed
 - **`PlaintextSecWrapper` and `PlaintextAuthentication` (`plaintext-root-common`) are gone** (Karte 1615). root
   never had an implementation of `PlaintextAuthentication`, so the wrapper returned `null` from `getUser()` (the
