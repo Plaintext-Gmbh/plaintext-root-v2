@@ -3,7 +3,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #
-# v2/test-lader-probe-auswahl.sh — Auswahl der Modulversion in v2/lader-probe.sh (Karte 1563).
+# scripts/test-lader-probe-auswahl.sh — Auswahl der Modulversion in scripts/lader-probe.sh (Karte 1563).
 # Attrappe: Reposilite als file://-Verzeichnis, Huelle als Jar mit nur einem Manifest.
 # Braucht curl und jar, kein Netz, keine DB. Exit 0 = alle Faelle wie erwartet.
 set -eu

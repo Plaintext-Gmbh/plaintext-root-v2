@@ -56,7 +56,7 @@
 #        `mvn clean deploy -pl` bauen", danach die Gegenprobe
 #        `PRUEFE_GITHUB=1 release-vollstaendig.sh` gegen BEIDE Repos. Exit 0 nur,
 #        wenn die Gegenprobe gruen ist. So rufen es `./build nachliefern` (v1) und
-#        v2/release.sh (plaintext-root-v2) auf. Der Arbeitsbaum muss dafuer auf der
+#        scripts/release.sh (plaintext-root-v2) auf. Der Arbeitsbaum muss dafuer auf der
 #        Release-Version stehen (POM = <version>), weil `-pl` aus ihm baut.
 #
 #  Exit 0  alle gebauten Module liegen vollstaendig in allen Zielen, und es gibt

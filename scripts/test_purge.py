@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 """
-Unit-Tests fuer v2/purge.py (Karte 1563). Aufruf: python3 -I v2/test_purge.py
+Unit-Tests fuer scripts/purge.py (Karte 1563). Aufruf: python3 -I scripts/test_purge.py
 
 Der HTTP-Transport wird durch einen Fake ersetzt, der beide Repos in Speicher nachbildet und jeden
 DELETE/PUT aufzeichnet. So laesst sich belegen, dass ein v1-Kandidat den Lauf abbricht, BEVOR

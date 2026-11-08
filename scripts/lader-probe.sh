@@ -4,7 +4,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # ══════════════════════════════════════════════════════════════════════════════
-#  v2/lader-probe.sh — Huelle + Lader + ein Modul-Jar gegen eine leere Postgres (Karte 1563)
+#  scripts/lader-probe.sh — Huelle + Lader + ein Modul-Jar gegen eine leere Postgres (Karte 1563)
 #
 #  Belegt, was Konzept 1503 (Abschnitt 8) als Wegwerf-Probe gemacht hat, wiederholbar und mit
 #  dem gebauten Stand DIESES Repos:
@@ -21,8 +21,8 @@
 #  haelt — hier laufen sie gegen das echte Exec-Jar.
 #
 #  AUFRUF
-#    v2/lader-probe.sh --modul-gav ch.plaintext:plaintext-z-verrechnung:latest   (Woodpecker, LAN)
-#    v2/lader-probe.sh --modul-jar pfad/zum/modul.jar --root-min 1.780.0           (lokal, Testjar)
+#    scripts/lader-probe.sh --modul-gav ch.plaintext:plaintext-z-verrechnung:latest   (Woodpecker, LAN)
+#    scripts/lader-probe.sh --modul-jar pfad/zum/modul.jar --root-min 1.780.0           (lokal, Testjar)
 #  OPTIONEN
 #    --huelle PFAD   Exec-Jar der Huelle (Standard: plaintext-root-webapp/target/*-exec.jar)
 #    --lader PFAD    Lader-Jar          (Standard: plaintext-root-lader/target/plaintext-root-lader-*.jar)

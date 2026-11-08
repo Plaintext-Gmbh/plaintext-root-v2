@@ -32,8 +32,8 @@ when:
   # named `nightly` must exist, otherwise this branch never runs.
   # See docs/ci/WOODPECKER_SETUP.md, section 3 (wiring a repository
   # eingerichtet werden muss".
-  # plaintext-root-v2 (Karte 1563/1595): KEIN `event: cron` — fuer v2 gibt es keine Crons
-  # (Entscheid Daniel 22.10.2026). Diese Datei ist upstream + v2/transformation.patch.
+  - event: cron
+    cron: nightly
 
 # FULL CLONE WITH TAGS. Woodpecker's default clone is shallow; `git describe --tags`
 # in init_versions (tui-build-logic.sh) would then find no tag and report 0.0.0.
@@ -78,34 +78,30 @@ services:
       POSTGRES_PASSWORD: plaintext
 
 steps:
-  # ── plaintext-root-v2: Umbenennung, Transformation, Skripte (Sekunden) ──────────────────
-  v2-umbenennung:
+  # ── Koordinaten-Guard (Karte 1621): die groupId ch.plaintext.v2 ist das Kernmerkmal dieser
+  # Linie — ein Reaktor-POM mit v1-groupId wuerde beim Release v1-Koordinaten veroeffentlichen.
+  # Dazu Syntaxcheck und Auswahl-Selbsttest der Release-/Probe-Skripte (Sekunden).
+  koordinaten:
     image: maven:3.10-eclipse-temurin-25
     commands:
       - . .woodpecker/waechter.sh
-      - bash v2/umbenennen.sh --selbsttest
-      - bash -n v2/release.sh && bash -n v2/sync.sh && bash -n v2/transformation.sh && bash -n v2/lader-probe.sh && bash -n v2/test-lader-probe-auswahl.sh && bash -n v2/test-sync.sh && bash -n scripts/release-vollstaendig.sh
-      - bash v2/test-lader-probe-auswahl.sh
+      - bash -n scripts/release.sh && bash -n scripts/lader-probe.sh && bash -n scripts/test-lader-probe-auswahl.sh && bash -n scripts/release-vollstaendig.sh
+      - bash scripts/test-lader-probe-auswahl.sh
+      - >-
+        if grep -rq "<groupId>ch\.plaintext</groupId>" --include=pom.xml -- .; then
+          grep -rl "<groupId>ch\.plaintext</groupId>" --include=pom.xml -- . | sed 's/^/v1-groupId in /' >&2;
+          echo "FEHLER: Reaktor traegt v1-groupId ch.plaintext — Release wuerde v1-Koordinaten veroeffentlichen." >&2;
+          exit 1;
+        fi
       - 'echo "Wurzel-groupId: $(mvn -q -N help:evaluate -Dexpression=project.groupId -DforceStdout)"'
 
-  # Karte 1595: v1 (der zuletzt gemergte upstream-Stand) + v2/transformation.sh = dieser Stand,
-  # bis auf die handgepflegten (c)-Dateien. Rot = eine Abweichung ausserhalb von v2/, die weder
-  # die Transformation erzeugt noch die (c)-Liste deckt. Dazu Selbsttest und Sync-Szenarien.
-  v2-transformation:
-    image: maven:3.10-eclipse-temurin-25
-    commands:
-      - . .woodpecker/waechter.sh
-      - git config --global --add safe.directory "$(pwd)"
-      - git config --global user.email "woodpecker@plaintext.ch" && git config --global user.name "WoodpeckerCI"
-      - git fetch -q https://github.com/Plaintext-Gmbh/plaintext-root.git +refs/heads/master:refs/remotes/upstream/master
-      - 'BASIS="$(git merge-base HEAD upstream/master)" && echo "v1-Basis: $BASIS" && bash v2/transformation.sh --pruefen "$BASIS" && bash v2/transformation.sh --selbsttest "$BASIS"'
-      - bash v2/test-sync.sh
-
-  v2-purge-tests:
+  # ── Purge-Tests (Karte 1563): scripts/purge.py raeumt alte Releases beider Paket-Repos auf
+  # (Trockenlauf ist der Standard, --scharf loescht). Die Tests laufen auf jedem PR.
+  purge-tests:
     image: python:3.13-alpine
     commands:
       - . .woodpecker/waechter.sh
-      - python3 -I v2/test_purge.py
+      - python3 -I scripts/test_purge.py
 
   # ── Flyway-Dubletten (Karte 1120/1121, 08.09.2026) ───────────────────────────────────────
   # ZUERST, weil es Sekunden kostet und der Rest dieses Workflows Minuten.
@@ -302,7 +298,7 @@ steps:
         done;
         echo "FEHLER: Service-Container postgres-probe nicht erreichbar." >&2; exit 1'
       - mkdir -p "$PROBE_ARBEIT"
-      - bash v2/lader-probe.sh --modul-gav "ch.plaintext:plaintext-z-verrechnung:$PROBE_MODUL_VERSION"
+      - bash scripts/lader-probe.sh --modul-gav "ch.plaintext:plaintext-z-verrechnung:$PROBE_MODUL_VERSION"
       - mkdir -p target/lader-probe && cp "$PROBE_ARBEIT/modul-migrationen.txt" target/lader-probe/
 
   lader-probe-flyway:

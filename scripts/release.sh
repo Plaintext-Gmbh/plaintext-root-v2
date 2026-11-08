@@ -4,50 +4,42 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #
 # ══════════════════════════════════════════════════════════════════════════════
-#  v2/release.sh — v2-Release: Tag, mvn deploy in beide Paket-Repos, KEIN Versions-Commit
+#  scripts/release.sh — Release: Tag, mvn deploy in beide Paket-Repos, dann SNAPSHOT-Commit
 #
-#  WARUM NICHT ./build release (plaintext-scripts, do_release) WIE IN ROOT
-#    1. do_release committet die Versionsnummer in alle 33 pom.xml ("Release version X" und
-#       "Prepare next development iteration"). upstream tut das auch — beim naechsten Sync
-#       kollidierten beide Seiten auf derselben <version>-Zeile in jeder pom. v2 laesst die
-#       POM-Version deshalb unangetastet: sie ist immer die von upstream, und der Sync bleibt
-#       konfliktfrei (Messung in docs/v2/analyse.md).
-#    2. do_release taggt ohne Praefix (1.790.0) — in v2 kollidierte das mit den v1-Nummern,
-#       und versionsbasis() in tui-build-logic.sh liest nur solche Tags. v2-Tags heissen
-#       `v2-<version>` und sind fuer versionsbasis() unsichtbar; das ist gewollt.
-#    3. do_release braucht entweder .m3-jar-volume (dann SSH-Staging auf den NAS, fuer v2
-#       verboten) oder baut ein Docker-Image (dann Docker-Socket, in Woodpecker nicht vorhanden).
-#       Beides ist fuer ein reines Maven-Artefakt falsch.
+#  Karte 1621: plaintext-root-v2 IST seit dem Wegfall von v1 das Entwicklungsrepo. Der Sync ist
+#  abgebaut, Versions-Commits sind damit wieder unproblematisch — der Lauf committet nach dem
+#  Release die naechste SNAPSHOT-Version wie do_release in plaintext-scripts, aber ohne
+#  ./build (kein NAS-Staging/SSH, kein Docker-CLI in Woodpecker, reines Maven-Artefakt).
 #
-#  VERSIONSSCHEMA  v2 = (M+1).m.n  aus der upstream-POM-Version M.m.0
-#    upstream 1.789.0  ->  v2 2.789.1, 2.789.2, ... (n = laufende Nummer je upstream-Basis)
-#    upstream 1.790.0  ->  v2 2.790.1
-#    * Die Major M+1 sagt "v2", die Minor traegt den upstream-Stand, n zaehlt v2-Releases auf
-#      dieser Basis (auch v2-eigene Merges und Syncs ohne upstream-Release).
-#    * n kommt aus den vorhandenen Tags v2-(M+1).m.* (MAX + 1); ohne Tag 1. Das ist die v2-Fassung
-#      von versionsbasis(): der hoechste Tag ist die Untergrenze, nie die POM allein.
-#    * upstream-Patch != 0 (1.789.1) kommt in root nicht vor (alle Tags enden auf .0) und wird
-#      hier HART abgewiesen statt still umgedeutet.
+#  WARUM EIGENER LAUF STATT do_release: Tag-Praefix `v2-` (versionsbasis() in tui-build-logic.sh
+#  sieht nur unpraefixte Tags und wuerde aus den v2-Tags 1.0.0 rechnen) und kein ./build.
 #
-#  REIHENFOLGE (Karte 518 wie in do_release): Tag anlegen und pushen, BEVOR etwas veroeffentlicht
-#  wird. Scheitert der Tag-Push, ist nichts draussen. Scheitert mvn deploy danach, gibt es einen
-#  Tag mit halbem Artefakt — dann liefert scripts/release-nachliefern.sh --runden nach (Karte 1596,
-#  wie `./build nachliefern` in root); bleibt es halb, meldet es release-vollstaendig.sh im naechsten
-#  Lauf (TAG_PRAEFIX=v2-), genau wie in root.
+#  VERSIONSSCHEMA (Karte 1621, Entscheid Daniel: Schnitt auf 3.0.0)
+#    BASIS   = MAX(POM-Version ohne -SNAPSHOT, hoechster v2-Tag)  — der hoechste Tag ist die
+#              Untergrenze, nie die POM allein (Massnahme 11 in tui-build-logic.sh).
+#    Schnitt: ist die Major der POM groesser als die Major des hoechsten Tags (z. B. POM
+#              3.0.0-SNAPSHOT, Tags bis 2.821.1), wird die POM-Version GENAU so released —
+#              das ist der Versionsschnitt. Sonst: NEU = BASIS + 1 Minor.
+#    Danach: "Prepare next development iteration <NEU>-SNAPSHOT" — die SNAPSHOT-Version traegt
+#    bewusst die GERADE veroeffentlichte Nummer (Hauskonvention, siehe compute_release_versions
+#    in tui-build-logic.sh); hochgezaehlt wird erst beim naechsten Release.
 #
-#  SPERRE: Die Wurzel-groupId MUSS ch.plaintext.v2 sein. Sonst wuerde dieser Lauf v1-Koordinaten
-#  veroeffentlichen — der Grund, warum Woodpecker fuer v2 erst nach der Umbenennung aktiviert wurde.
+#  REIHENFOLGE (Karte 518): Tag anlegen und pushen, BEVOR etwas veroeffentlicht wird. Scheitert
+#  mvn deploy danach, liefert scripts/release-nachliefern.sh --runden nach (Karte 1596); bleibt
+#  es halb, meldet es release-vollstaendig.sh im naechsten Lauf (TAG_PRAEFIX=v2-).
+#
+#  SPERRE: Die Wurzel-groupId MUSS ch.plaintext.v2 sein, und kein Reaktor-POM darf eine
+#  v1-Koordinate (ch.plaintext) tragen — sonst wuerde dieser Lauf v1-Koordinaten veroeffentlichen.
 #
 #  AUFRUF
-#    v2/release.sh              Release (in Woodpecker: .woodpecker/deploy.yml)
-#    v2/release.sh --trocken    nur rechnen und melden; kein Tag, kein Push, kein Deploy
+#    scripts/release.sh              Release (in Woodpecker: .woodpecker/deploy.yml)
+#    scripts/release.sh --trocken    nur rechnen und melden; kein Tag, kein Push, kein Deploy
 #  UMGEBUNG
 #    MVN_TEST_FLAG       Standard "-DskipITs -DexcludedGroups=quality-gate"; "[fast]" im
 #                        Commit-Betreff -> -DskipTests (wie root)
 #    MAVEN_ARGS          z.B. "-s /tmp/ci/settings.xml" (Server-IDs plaintext + plaintext-nas)
 #    REPOSILITE_BASIS    Standard https://maven.plaintext.ch/releases (Kollisionspruefung)
-#    GITHUB_TOKEN        optional: GitHub-Release mit generierten Notes (gh), best effort;
-#                        ohne Token auch keine Spiegelung nach plaintext-mvn
+#    GITHUB_TOKEN        optional: GitHub-Release mit generierten Notes (gh), best effort
 #    RELEASE_ZWEIG       Standard master
 # ══════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
@@ -67,27 +59,45 @@ fehler() { echo "release: FEHLER: $*" >&2; exit 1; }
 # ── 0. Sperren und Stand ────────────────────────────────────────────────────
 [ -z "$(git status --porcelain)" ] || fehler "Arbeitsbaum nicht sauber"
 GRUPPE="$(awk '/<parent>/{p=1} /<\/parent>/{p=0; next} !p && /<groupId>/{gsub(/.*<groupId>|<\/groupId>.*/,""); print; exit}' pom.xml)"
-[ "$GRUPPE" = "$ERWARTETE_GRUPPE" ] || fehler "Wurzel-groupId ist '$GRUPPE', erwartet '$ERWARTETE_GRUPPE' — erst v2/umbenennen.sh, sonst wuerden v1-Koordinaten veroeffentlicht"
-v2/umbenennen.sh --pruefen >/dev/null || fehler "v2/umbenennen.sh --pruefen ist rot — Release verweigert"
+[ "$GRUPPE" = "$ERWARTETE_GRUPPE" ] || fehler "Wurzel-groupId ist '$GRUPPE', erwartet '$ERWARTETE_GRUPPE' — sonst wuerden v1-Koordinaten veroeffentlicht"
+if grep -rq "<groupId>ch\.plaintext</groupId>" --include=pom.xml -- . ; then
+    grep -rl "<groupId>ch\.plaintext</groupId>" --include=pom.xml -- . | sed 's/^/release: FEHLER: v1-groupId in /' >&2
+    fehler "Reaktor-POMs mit v1-groupId gefunden — Release verweigert"
+fi
 
 POM_VERSION="$(awk '/<parent>/{p=1} /<\/parent>/{p=0; next} !p && /<version>/{gsub(/.*<version>|<\/version>.*/,""); print; exit}' pom.xml)"
-BASIS="${POM_VERSION%-SNAPSHOT}"
-[[ "$BASIS" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || fehler "POM-Version '$POM_VERSION' ist nicht M.m.p"
-UP_MAJOR="${BASH_REMATCH[1]}"; UP_MINOR="${BASH_REMATCH[2]}"; UP_PATCH="${BASH_REMATCH[3]}"
-[ "$UP_PATCH" = "0" ] || fehler "upstream-Patch '$UP_PATCH' in $BASIS ist nicht 0 — das v2-Schema (M+1).m.n kann das nicht abbilden; Schema in v2/release.sh anpassen"
-V2_MAJOR=$((UP_MAJOR + 1))
+BASIS_POM="${POM_VERSION%-SNAPSHOT}"
+[[ "$BASIS_POM" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || fehler "POM-Version '$POM_VERSION' ist nicht M.m.p"
 
 git fetch -q --tags --force origin
-LETZTE_N="$(git tag --list "${TAG_PRAEFIX}${V2_MAJOR}.${UP_MINOR}.*" | sed "s/^${TAG_PRAEFIX}${V2_MAJOR}\.${UP_MINOR}\.//" | grep -E '^[0-9]+$' | sort -n | tail -1 || true)"
-N=$(( ${LETZTE_N:-0} + 1 ))
-NEU="${V2_MAJOR}.${UP_MINOR}.${N}"
-TAG="${TAG_PRAEFIX}${NEU}"
 HOECHSTER_V2="$(git tag --list "${TAG_PRAEFIX}[0-9]*" | sed "s/^${TAG_PRAEFIX}//" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 || true)"
-sag "upstream-Basis $BASIS (POM $POM_VERSION), bisher hoechster v2-Tag ${HOECHSTER_V2:-keiner}, auf dieser Basis ${LETZTE_N:-0} Release(s)"
-sag "neue Version $NEU, Tag $TAG"
 
-# Monoton steigend: die neue Nummer muss ueber JEDEM bisherigen v2-Tag liegen (sonst waere
-# upstream zurueckgesprungen, oder jemand hat von Hand getaggt).
+# BASIS = MAX(POM, hoechster Tag): bricht ein Lauf nach Tag+Push ab, rechnet der naechste trotzdem lueckenlos weiter.
+if [ -n "$HOECHSTER_V2" ]; then
+    BASIS="$(printf '%s\n%s\n' "$BASIS_POM" "$HOECHSTER_V2" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)"
+else
+    BASIS="$BASIS_POM"
+fi
+
+# Versionsschnitt: POM-Major ueber der Tag-Major (z. B. 3.0.0 ueber 2.821.1) -> die POM-Version
+# GENAU so releasen; sonst ein Minor-Schritt ab BASIS.
+POM_MAJOR="${BASIS_POM%%.*}"
+TAG_MAJOR=""
+[ -n "$HOECHSTER_V2" ] && TAG_MAJOR="${HOECHSTER_V2%%.*}"
+if [ -n "$TAG_MAJOR" ] && [ "$POM_MAJOR" -gt "$TAG_MAJOR" ]; then
+    NEU="$BASIS_POM"
+    sag "Versionsschnitt: POM-Major $POM_MAJOR liegt vor Tag-Major $TAG_MAJOR — release $NEU genau wie in der POM"
+else
+    IFS='.' read -r MAJOR MINOR PATCH <<< "$BASIS"
+    NEU="${MAJOR}.$((MINOR + 1)).0"
+fi
+NEXT_SNAPSHOT="${NEU}-SNAPSHOT"
+TAG="${TAG_PRAEFIX}${NEU}"
+sag "POM $POM_VERSION, hoechster v2-Tag ${HOECHSTER_V2:-keiner}, Basis $BASIS"
+sag "neue Version $NEU, Tag $TAG, danach SNAPSHOT-Commit $NEXT_SNAPSHOT"
+
+# Monoton steigend: die neue Nummer muss ueber JEDEM bisherigen v2-Tag liegen (sonst waere die
+# Linie zurueckgesprungen, oder jemand hat von Hand getaggt).
 if [ -n "$HOECHSTER_V2" ] && [ "$(printf '%s\n%s\n' "$HOECHSTER_V2" "$NEU" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)" != "$NEU" ]; then
     fehler "$NEU liegt nicht ueber dem hoechsten v2-Tag $HOECHSTER_V2 — Versionsfolge waere nicht mehr steigend"
 fi
@@ -109,14 +119,14 @@ esac
 sag "Tests: $MVN_TEST_FLAG"
 
 if [ "$TROCKEN" = "1" ]; then
-    sag "TROCKEN: wuerde taggen ($TAG), pushen und 'mvn clean deploy' mit Version $NEU ausfuehren. Nichts getan."
+    sag "TROCKEN: wuerde taggen ($TAG), 'mvn clean deploy' mit Version $NEU ausfuehren und danach $NEXT_SNAPSHOT committen. Nichts getan."
     exit 0
 fi
 
 # ── 1. Tag ZUERST raus (Karte 518) ──────────────────────────────────────────
-git tag -a "$TAG" -m "Release v2 $NEU
+git tag -a "$TAG" -m "Release $NEU
 
-upstream-Basis: plaintext-root $BASIS
+Direct development on plaintext-root-v2 (Karte 1621, v1 archived).
 Commit: $(git rev-parse HEAD)
 Koordinaten: $ERWARTETE_GRUPPE (GitHub Packages plaintext-mvn + Reposilite maven.plaintext.ch)"
 if ! git push origin "refs/tags/$TAG"; then
@@ -126,7 +136,9 @@ fi
 sag "Tag $TAG gepusht."
 
 # ── 2. Version nur im Arbeitsbaum setzen, bauen, veroeffentlichen ───────────
-# versions:set schreibt alle 33 pom.xml; sie werden am Ende zurueckgesetzt, nie committet.
+# versions:set schreibt alle 33 pom.xml. Misslingt der Lauf vor dem SNAPSHOT-Commit, stellt der
+# Trap die POMs wieder her; nach dem SNAPSHOT-Commit ist die neue Version draussen (Karte 518:
+# ein abgelehnter SNAPSHOT-Push ist nur eine Warnung, der naechste Lauf rechnet ab dem Tag weiter).
 wiederherstellen() { git checkout -q -- pom.xml '*/pom.xml' 2>/dev/null || git checkout -q -- . ; }
 trap wiederherstellen EXIT
 mvn -q -B versions:set -DnewVersion="$NEU" -DgenerateBackupPoms=false
@@ -171,13 +183,29 @@ else
     sag "kein gh/GITHUB_TOKEN — GitHub-Release entfaellt (Tag und Artefakte sind unberuehrt)."
 fi
 
+# ── 3b. Naechste SNAPSHOT-Version committen (Karte 1621) ────────────────────
+# Der Sync ist abgebaut, Versions-Commits sind wieder unproblematisch. Der Commit traegt das
+# native "[skip ci]" (mit Leerzeichen): GitHub und Woodpecker starten dafuer keinen Lauf, es
+# gibt keinen Release-Loop. Scheitert der Push, weil master sich bewegt hat: Warnung, kein
+# Fehler — der naechste Lauf rechnet ab dem gerade gesetzten Tag weiter (Massnahme 11).
+trap - EXIT
+mvn -q -B versions:set -DnewVersion="$NEXT_SNAPSHOT" -DgenerateBackupPoms=false
+git add -u
+git commit -q -m "Prepare next development iteration $NEXT_SNAPSHOT [skip ci]"
+if git push origin "HEAD:$ZWEIG"; then
+    sag "SNAPSHOT-Commit $NEXT_SNAPSHOT nach $ZWEIG gepusht."
+else
+    sag "WARNUNG: SNAPSHOT-Push abgelehnt (master bewegt?) — Release $NEU ist vollstaendig; der naechste Lauf rechnet ab Tag $TAG weiter."
+    git reset -q --hard HEAD~1
+fi
+
 # ── 4. Zusammenfassung ──────────────────────────────────────────────────────
 echo "────────────────────────────────────────────────────────────────"
-echo "v2-RELEASE $NEU"
+echo "RELEASE $NEU (plaintext-root-v2)"
 echo "  Tag:             $TAG"
-echo "  upstream-Basis:  $BASIS"
 echo "  Commit:          $(git rev-parse --short HEAD)"
 echo "  groupId:         $ERWARTETE_GRUPPE"
 echo "  Module:          $(grep -c '<module>' pom.xml) + Parent"
+echo "  naechster Snap:  $NEXT_SNAPSHOT"
 echo "  Repos:           $REPOSILITE_BASIS/ch/plaintext/v2/  und  https://maven.pkg.github.com/Plaintext-Gmbh/plaintext-mvn"
 echo "────────────────────────────────────────────────────────────────"

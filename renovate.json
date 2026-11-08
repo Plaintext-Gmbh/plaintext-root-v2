@@ -1,5 +1,4 @@
 {
-  "enabled": false,
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": [
     "HIER STAND 'ignorePaths': ['Dockerfile'] (Karte 1302, 22.09.2026). Der Eintrag ist am",
