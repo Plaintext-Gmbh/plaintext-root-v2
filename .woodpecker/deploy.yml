@@ -10,7 +10,7 @@
 #    * KEIN NAS-Staging, KEIN SSH-Schluessel, KEIN Docker-CLI (.m3-jar-volume liest nur ./build).
 #    * KEIN git-Spiegel nach Plaintext-Gmbh/plaintext-mvn: die Spiegelung laeuft IN
 #      scripts/release.sh aus dem lokalen Maven-Repo (Karte 1653, Pfad ch/plaintext/v2).
-#    * Vollstaendigkeitspruefung (Karte 1281) mit TAG_PRAEFIX=v2- und Gruppenpfad ch/plaintext/v2.
+#    * Vollstaendigkeitspruefung (Karte 1281) mit TAG_PRAEFIX= und Gruppenpfad ch/plaintext/v2.
 #
 #  Veroeffentlicht wird unter groupId ch.plaintext.v2 — scripts/release.sh verweigert jede andere.
 #  Reihenfolge wie in root (Karte 518): Tag raus, dann deploy; kein deployAtEnd (pom.xml).
@@ -62,7 +62,7 @@ steps:
       MAVEN_OPTS: "-Xmx2g -XX:MaxMetaspaceSize=512m"
       JAVA_TOOL_OPTIONS: "-XX:MaxRAM=4g -XX:ActiveProcessorCount=2"
       REPOSILITE_BASIS: https://maven.plaintext.ch/releases
-      TAG_PRAEFIX: "v2-"
+      TAG_PRAEFIX: ""
     commands:
       - . .woodpecker/waechter.sh
 
@@ -168,7 +168,7 @@ steps:
       - status: [success, failure]
     environment:
       PRUEFE_GITHUB: "1"
-      TAG_PRAEFIX: "v2-"
+      TAG_PRAEFIX: ""
       GITHUB_TOKEN:
         from_secret: mvn_deploy_token
     commands:
