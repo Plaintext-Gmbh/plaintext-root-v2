@@ -191,12 +191,18 @@ fi
 trap - EXIT
 mvn -q -B versions:set -DnewVersion="$NEXT_SNAPSHOT" -DgenerateBackupPoms=false
 git add -u
-git commit -q -m "Prepare next development iteration $NEXT_SNAPSHOT [skip ci]"
-if git push origin "HEAD:$ZWEIG"; then
-    sag "SNAPSHOT-Commit $NEXT_SNAPSHOT nach $ZWEIG gepusht."
+if git diff --cached --quiet; then
+    # Schnitt-Release (POM-Major vor Tag-Major): die POM-Version nach dem Release ist die der
+    # HEAD-Revision (3.0.0-SNAPSHOT -> 3.0.0 -> 3.0.0-SNAPSHOT) — es gibt nichts zu committen.
+    sag "SNAPSHOT-Commit entfaellt: POMs nach dem Release identisch mit $ZWEIG (Schnitt-Release $NEU)."
 else
-    sag "WARNUNG: SNAPSHOT-Push abgelehnt (master bewegt?) — Release $NEU ist vollstaendig; der naechste Lauf rechnet ab Tag $TAG weiter."
-    git reset -q --hard HEAD~1
+    git commit -q -m "Prepare next development iteration $NEXT_SNAPSHOT [skip ci]"
+    if git push origin "HEAD:$ZWEIG"; then
+        sag "SNAPSHOT-Commit $NEXT_SNAPSHOT nach $ZWEIG gepusht."
+    else
+        sag "WARNUNG: SNAPSHOT-Push abgelehnt (master bewegt?) — Release $NEU ist vollstaendig; der naechste Lauf rechnet ab Tag $TAG weiter."
+        git reset -q --hard HEAD~1
+    fi
 fi
 
 # ── 4. Zusammenfassung ──────────────────────────────────────────────────────
