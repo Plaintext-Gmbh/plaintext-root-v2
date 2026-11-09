@@ -92,7 +92,10 @@ public class SchnittstellenKatalogProzessor extends AbstractProcessor {
             // Ohne Option (Karte 1422: Testkompilieren) still; Fachmodul ohne @ModulApi: keine leere Datei ins Jar.
             schreibeKatalog(modul);
         }
-        return false;   // Annotationen nie beanspruchen: andere Prozessoren sollen sie auch sehen
+        // NOSONAR (java:S3516) — der Wert ist der Sinn der Methode: false heisst "Annotationen NICHT
+        // beanspruchen", damit sie auch andere Prozessoren sehen (siehe Javadoc oben). Ein abwechselnder
+        // Rueckgabewert waere hier falsch, kein besserer Code.
+        return false;
     }
 
     /** Schreibt {@code META-INF/plaintext-katalog/<modul>.json} mit allen gesammelten Typen. */

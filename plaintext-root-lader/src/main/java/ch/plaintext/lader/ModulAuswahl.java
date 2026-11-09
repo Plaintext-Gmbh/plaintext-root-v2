@@ -68,7 +68,13 @@ public final class ModulAuswahl {
     /** System-Property, die der Lader setzt, wenn er unsignierte Module geladen hat (name:version,...). */
     public static final String UNSIGNIERT_GELADEN = "plaintext.module.unsigniert-geladen";
 
-    private static final Set<String> ZEILEN_SCHLUESSEL = Set.of("root-min", "sha256", "braucht", "bibliotheken", "datei", "signatur");
+    /** Karte 1743 (Sonar java:S1192): Schluessel der Indexzeilen als Konstanten, nie als Literal.
+     *  Kommt einer dazu, gehoert er hierher — Parser, Indexformat und Fehlermeldung nutzen denselben Wert. */
+    static final String SCHLUESSEL_ROOT_MIN = "root-min";
+    static final String SCHLUESSEL_SHA256 = "sha256";
+    static final String SCHLUESSEL_SIGNATUR = "signatur";
+    private static final Set<String> ZEILEN_SCHLUESSEL = Set.of(SCHLUESSEL_ROOT_MIN, SCHLUESSEL_SHA256,
+            "braucht", "bibliotheken", "datei", SCHLUESSEL_SIGNATUR);
     private static final Pattern BIBLIOTHEK = Pattern.compile("([a-z][a-z0-9_-]*(?:\\.[a-z0-9_-]+)*):([A-Za-z0-9][A-Za-z0-9_.-]*):([0-9][A-Za-z0-9_.-]*)@([0-9a-f]{64})");
     private static final Pattern BASE64 = Pattern.compile("[A-Za-z0-9+/=]+");
 
@@ -174,29 +180,41 @@ public final class ModulAuswahl {
             String[] t = z.split("\\s+");
             if (t.length == 3 && t[0].equals("schluessel") && t[1].equals("ed25519")) {
                 schluessel.add(schluessel(t[2], datei + ":" + nr));
-            } else if ((t.length == 3 || t.length == 4 && ANMELDUNG.matcher(t[3]).matches())
-                    && t[0].equals("registry") && ModulKonfig.NAME.matcher(t[1]).matches()) {
-                URI u = URI.create(t[2]);
-                String anmeldung = t.length == 4 ? t[3].substring(ANMELDUNG_PRAEFIX.length()) : null;
-                if (anmeldung != null && !"https".equals(u.getScheme())) {
-                    throw new IllegalArgumentException(datei + ":" + nr + ": Anmeldung nur mit einer https-Adresse");
-                }
-                boolean netz = ("https".equals(u.getScheme()) || "http".equals(u.getScheme())) && u.getHost() != null;
-                if (!netz && !"file".equals(u.getScheme())) {
-                    throw new IllegalArgumentException(datei + ":" + nr + ": Registry braucht eine http(s)- oder file-Adresse");
-                }
-                if (registries.stream().anyMatch(r -> r.name().equals(t[1]))) {
-                    throw new IllegalArgumentException(datei + ":" + nr + ": Registry '" + t[1] + "' doppelt");
-                }
-                registries.add(new Registry(t[1], u, anmeldung));
             } else if (t.length == 2 && t[0].equals("eingebettet") && t[1].equals("ueberschreibbar")) {
                 ueberschreibbar = true;
+            } else if (t.length >= 3 && t[0].equals("registry")) {
+                registries.add(registryParsen(t, registries, datei, nr));
             } else {
-                throw new IllegalArgumentException(datei + ":" + nr + ": unbekannte Zeile (erlaubt: 'schluessel ed25519 <base64>', "
-                        + "'registry <name> <url> [anmeldung-env=<VARIABLE>]', 'eingebettet ueberschreibbar')");
+                throw unbekannteZeile(datei, nr);
             }
         }
         return new Quellen(List.copyOf(schluessel), List.copyOf(registries), ueberschreibbar);
+    }
+
+    /** Eine {@code registry}-Zeile mit Format-, Adress- und Doppelungspruefung ({@code t[0]} ist "registry"). */
+    private static Registry registryParsen(String[] t, List<Registry> registries, Path datei, int nr) {
+        if (!(t.length == 3 || t.length == 4 && ANMELDUNG.matcher(t[3]).matches())
+                || !ModulKonfig.NAME.matcher(t[1]).matches()) {
+            throw unbekannteZeile(datei, nr);
+        }
+        URI u = URI.create(t[2]);
+        String anmeldung = t.length == 4 ? t[3].substring(ANMELDUNG_PRAEFIX.length()) : null;
+        if (anmeldung != null && !"https".equals(u.getScheme())) {
+            throw new IllegalArgumentException(datei + ":" + nr + ": Anmeldung nur mit einer https-Adresse");
+        }
+        boolean netz = ("https".equals(u.getScheme()) || "http".equals(u.getScheme())) && u.getHost() != null;
+        if (!netz && !"file".equals(u.getScheme())) {
+            throw new IllegalArgumentException(datei + ":" + nr + ": Registry braucht eine http(s)- oder file-Adresse");
+        }
+        if (registries.stream().anyMatch(r -> r.name().equals(t[1]))) {
+            throw new IllegalArgumentException(datei + ":" + nr + ": Registry '" + t[1] + "' doppelt");
+        }
+        return new Registry(t[1], u, anmeldung);
+    }
+
+    private static IllegalArgumentException unbekannteZeile(Path datei, int nr) {
+        return new IllegalArgumentException(datei + ":" + nr + ": unbekannte Zeile (erlaubt: 'schluessel ed25519 <base64>', "
+                + "'registry <name> <url> [anmeldung-env=<VARIABLE>]', 'eingebettet ueberschreibbar')");
     }
 
     static PublicKey schluessel(String base64, String wo) {
@@ -210,8 +228,6 @@ public final class ModulAuswahl {
 
     /** Parser fuer {@code auswahl.yaml}; gleiche enge YAML-Teilmenge wie {@link ModulKonfig}. */
     public static List<Wahl> auswahlParsen(String text, String quelle) {
-        List<Wahl> out = new ArrayList<>();
-        Map<String, String> aktuell = null;
         List<Map<String, String>> roh = new ArrayList<>();
         boolean kopf = false;
         int nr = 0;
@@ -231,41 +247,53 @@ public final class ModulAuswahl {
                 kopf = true;
                 continue;
             }
-            String rest;
-            if (z.startsWith("  - ")) {
-                aktuell = new LinkedHashMap<>();
-                roh.add(aktuell);
-                rest = z.substring(4);
-            } else if (z.startsWith("    ") && !z.startsWith("     ") && aktuell != null) {
-                rest = z.substring(4);
-            } else {
-                throw new IllegalArgumentException(quelle + ":" + nr + ": Einrueckung passt nicht");
-            }
-            int dp = rest.indexOf(':');
-            String k = dp > 0 ? rest.substring(0, dp).strip() : "";
-            if (!(k.equals("name") || k.equals("version")) || aktuell.put(k, rest.substring(dp + 1).strip()) != null) {
-                throw new IllegalArgumentException(quelle + ":" + nr + ": erwartet je Eintrag genau 'name' und 'version'");
-            }
+            eintragZeile(z, quelle, nr, roh);
         }
         if (!kopf) {
             throw new IllegalArgumentException(quelle + ": leer, erwartet 'auswahl:'");
         }
         Set<String> namen = new LinkedHashSet<>();
+        List<Wahl> out = new ArrayList<>();
         for (Map<String, String> m : roh) {
-            String n = m.get("name");
-            String v = m.get("version");
-            if (n == null || !ModulKonfig.NAME.matcher(n).matches()) {
-                throw new IllegalArgumentException(quelle + ": ungueltiger Name '" + n + "'");
-            }
-            if (v == null || !(v.equals(LATEST) || ModulKonfig.VERSION.matcher(v).matches())) {
-                throw new IllegalArgumentException(quelle + ": Modul '" + n + "', ungueltige Version '" + v + "'");
-            }
-            if (!namen.add(n)) {
-                throw new IllegalArgumentException(quelle + ": Modul '" + n + "' doppelt");
-            }
-            out.add(new Wahl(n, v));
+            out.add(wahlAus(m, quelle, namen));
         }
         return List.copyOf(out);
+    }
+
+    /** Eine Eintragszeile ({@code "  - name: x"} beginnt einen Eintrag, {@code "    version: y"} fuellt ihn); genau 'name' und 'version' je Eintrag. */
+    private static void eintragZeile(String z, String quelle, int nr, List<Map<String, String>> roh) {
+        Map<String, String> aktuell;
+        String rest;
+        if (z.startsWith("  - ")) {
+            aktuell = new LinkedHashMap<>();
+            roh.add(aktuell);
+            rest = z.substring(4);
+        } else if (z.startsWith("    ") && !z.startsWith("     ") && !roh.isEmpty()) {
+            aktuell = roh.get(roh.size() - 1);
+            rest = z.substring(4);
+        } else {
+            throw new IllegalArgumentException(quelle + ":" + nr + ": Einrueckung passt nicht");
+        }
+        int dp = rest.indexOf(':');
+        String k = dp > 0 ? rest.substring(0, dp).strip() : "";
+        if (!(k.equals("name") || k.equals("version")) || aktuell.put(k, rest.substring(dp + 1).strip()) != null) {
+            throw new IllegalArgumentException(quelle + ":" + nr + ": erwartet je Eintrag genau 'name' und 'version'");
+        }
+    }
+
+    private static Wahl wahlAus(Map<String, String> m, String quelle, Set<String> namen) {
+        String n = m.get("name");
+        String v = m.get("version");
+        if (n == null || !ModulKonfig.NAME.matcher(n).matches()) {
+            throw new IllegalArgumentException(quelle + ": ungueltiger Name '" + n + "'");
+        }
+        if (v == null || !(v.equals(LATEST) || ModulKonfig.VERSION.matcher(v).matches())) {
+            throw new IllegalArgumentException(quelle + ": Modul '" + n + "', ungueltige Version '" + v + "'");
+        }
+        if (!namen.add(n)) {
+            throw new IllegalArgumentException(quelle + ": Modul '" + n + "' doppelt");
+        }
+        return new Wahl(n, v);
     }
 
     /** Text fuer {@code auswahl.yaml}; wird vor dem Schreiben mit {@link #auswahlParsen} geprueft. */
@@ -300,58 +328,90 @@ public final class ModulAuswahl {
                 kopf = true;
                 continue;
             }
-            String[] t = z.split("\\s+");
-            if (t.length < 4 || !(t[0].equals("modul") || t[0].equals("api") || t[0].equals("bib"))) {
-                throw new IllegalArgumentException(wo + ": erwartet '<modul|api|bib> <name> <version> schluessel=wert ...'");
-            }
-            Map<String, String> w = new LinkedHashMap<>();
-            for (int i = 3; i < t.length; i++) {
-                int gl = t[i].indexOf('=');
-                String k = gl > 0 ? t[i].substring(0, gl) : t[i];
-                if (!ZEILEN_SCHLUESSEL.contains(k) || w.put(k, t[i].substring(gl + 1)) != null) {
-                    throw new IllegalArgumentException(wo + ": Schluessel '" + k + "' unbekannt oder doppelt");
-                }
-            }
-            String datei = w.get("datei");
-            if (datei == null || datei.isEmpty() || datei.contains("://") || datei.startsWith("/") || datei.contains("\\")) {
-                throw new IllegalArgumentException(wo + ": 'datei' muss ein relativer Pfad sein");
-            }
-            String version = pruefe(t[2], ModulKonfig.VERSION, "Version", wo);
-            if (t[0].equals("bib")) {
-                if (w.size() != 1 || !BIBLIOTHEK.matcher(t[1] + ":" + version + "@" + "0".repeat(64)).matches()) {
-                    throw new IllegalArgumentException(wo + ": erwartet 'bib <gruppe:artifact> <version> datei=<relativ>'");
-                }
-                out.add(new Zeile("bib", t[1], version, null, null, List.of(), List.of(), datei, null, registry, index));
-                continue;
-            }
-            String name = pruefe(t[1], ModulKonfig.NAME, "Name", wo);
-            String rootMin = pruefe(w.get("root-min"), ModulKonfig.ROOT_VERSION, "root-min", wo);
-            String sha = pruefe(w.get("sha256"), ModulKonfig.SHA256, "sha256", wo);
-            String sig = pruefe(w.get("signatur"), BASE64, "signatur", wo);
-            List<String> bibs = new ArrayList<>();
-            String bw = w.getOrDefault("bibliotheken", "");
-            for (String teil : bw.isEmpty() ? new String[0] : bw.split(",")) {
-                if (!BIBLIOTHEK.matcher(teil).matches()) {
-                    throw new IllegalArgumentException(wo + ": 'bibliotheken' erwartet gruppe:artifact:version@sha256[,...]");
-                }
-                bibs.add(teil);
-            }
-            List<String> braucht = new ArrayList<>();
-            String b = w.getOrDefault("braucht", "");
-            for (String teil : b.isEmpty() ? new String[0] : b.split(",")) {
-                String[] nv = teil.split(":", -1);
-                if (nv.length != 2 || !ModulKonfig.NAME.matcher(nv[0]).matches() || !ModulKonfig.VERSION.matcher(nv[1]).matches()) {
-                    throw new IllegalArgumentException(wo + ": 'braucht' erwartet name:version[,name:version]");
-                }
-                braucht.add(teil);
-            }
-            out.add(new Zeile(t[0], name, version, rootMin, sha, List.copyOf(braucht), List.copyOf(bibs), datei, sig,
-                    registry, index));
+            out.add(indexZeileParsen(z, wo, registry, index));
         }
         if (!kopf) {
             throw new IllegalArgumentException(registry + ": leer, erwartet '" + INDEX_KOPF + "'");
         }
         return List.copyOf(out);
+    }
+
+    /** Eine Indexzeile: {@code bib} (nur Ort einer Fremd-Bibliothek) oder {@code modul}/{@code api} (signiert). */
+    private static Zeile indexZeileParsen(String z, String wo, String registry, URI index) {
+        String[] t = z.split("\\s+");
+        if (t.length < 4 || !(t[0].equals("modul") || t[0].equals("api") || t[0].equals("bib"))) {
+            throw new IllegalArgumentException(wo + ": erwartet '<modul|api|bib> <name> <version> schluessel=wert ...'");
+        }
+        Map<String, String> w = schluesselWerte(t, wo);
+        String datei = dateiPruefen(w.get("datei"), wo);
+        String version = pruefe(t[2], ModulKonfig.VERSION, "Version", wo);
+        if (t[0].equals("bib")) {
+            return bibZeile(t, w, version, datei, wo, registry, index);
+        }
+        return modulZeile(t, w, version, datei, wo, registry, index);
+    }
+
+    /** Die {@code schluessel=wert}-Paare ab Token 3; unbekannter oder doppelter Schluessel ist ein Fehler. */
+    private static Map<String, String> schluesselWerte(String[] t, String wo) {
+        Map<String, String> w = new LinkedHashMap<>();
+        for (int i = 3; i < t.length; i++) {
+            int gl = t[i].indexOf('=');
+            String k = gl > 0 ? t[i].substring(0, gl) : t[i];
+            if (!ZEILEN_SCHLUESSEL.contains(k) || w.put(k, t[i].substring(gl + 1)) != null) {
+                throw new IllegalArgumentException(wo + ": Schluessel '" + k + "' unbekannt oder doppelt");
+            }
+        }
+        return w;
+    }
+
+    private static String dateiPruefen(String datei, String wo) {
+        if (datei == null || datei.isEmpty() || datei.contains("://") || datei.startsWith("/") || datei.contains("\\")) {
+            throw new IllegalArgumentException(wo + ": 'datei' muss ein relativer Pfad sein");
+        }
+        return datei;
+    }
+
+    private static Zeile bibZeile(String[] t, Map<String, String> w, String version, String datei, String wo,
+                                  String registry, URI index) {
+        if (w.size() != 1 || !BIBLIOTHEK.matcher(t[1] + ":" + version + "@" + "0".repeat(64)).matches()) {
+            throw new IllegalArgumentException(wo + ": erwartet 'bib <gruppe:artifact> <version> datei=<relativ>'");
+        }
+        return new Zeile("bib", t[1], version, null, null, List.of(), List.of(), datei, null, registry, index);
+    }
+
+    private static Zeile modulZeile(String[] t, Map<String, String> w, String version, String datei, String wo,
+                                    String registry, URI index) {
+        String name = pruefe(t[1], ModulKonfig.NAME, "Name", wo);
+        String rootMin = pruefe(w.get(SCHLUESSEL_ROOT_MIN), ModulKonfig.ROOT_VERSION, SCHLUESSEL_ROOT_MIN, wo);
+        String sha = pruefe(w.get(SCHLUESSEL_SHA256), ModulKonfig.SHA256, SCHLUESSEL_SHA256, wo);
+        String sig = pruefe(w.get(SCHLUESSEL_SIGNATUR), BASE64, SCHLUESSEL_SIGNATUR, wo);
+        List<String> bibs = bibliothekenWerte(w.getOrDefault("bibliotheken", ""), wo);
+        List<String> braucht = brauchtWerte(w.getOrDefault("braucht", ""), wo);
+        return new Zeile(t[0], name, version, rootMin, sha, List.copyOf(braucht), List.copyOf(bibs), datei, sig,
+                registry, index);
+    }
+
+    private static List<String> bibliothekenWerte(String roh, String wo) {
+        List<String> bibs = new ArrayList<>();
+        for (String teil : roh.isEmpty() ? new String[0] : roh.split(",")) {
+            if (!BIBLIOTHEK.matcher(teil).matches()) {
+                throw new IllegalArgumentException(wo + ": 'bibliotheken' erwartet gruppe:artifact:version@sha256[,...]");
+            }
+            bibs.add(teil);
+        }
+        return bibs;
+    }
+
+    private static List<String> brauchtWerte(String roh, String wo) {
+        List<String> braucht = new ArrayList<>();
+        for (String teil : roh.isEmpty() ? new String[0] : roh.split(",")) {
+            String[] nv = teil.split(":", -1);
+            if (nv.length != 2 || !ModulKonfig.NAME.matcher(nv[0]).matches() || !ModulKonfig.VERSION.matcher(nv[1]).matches()) {
+                throw new IllegalArgumentException(wo + ": 'braucht' erwartet name:version[,name:version]");
+            }
+            braucht.add(teil);
+        }
+        return braucht;
     }
 
     /** Liest alle Registries; eine nicht erreichbare oder kaputte Registry steht in {@link Angebot#fehler()}. */
@@ -610,17 +670,17 @@ public final class ModulAuswahl {
         int[] h = zahlen(huelle.version());
         if (r[0] == 1 && h[0] == 2) {
             if (ModulKonfig.vergleiche(rootMin, "1." + h[1] + ".0") > 0) {
-                return "root-min " + rootMin + " > v1-Basis 1." + h[1] + ".0 der Huelle " + huelle.version();
+                return SCHLUESSEL_ROOT_MIN + " " + rootMin + " > v1-Basis 1." + h[1] + ".0 der Huelle " + huelle.version();
             }
         } else if (r[0] == h[0]) {
             if (ModulKonfig.vergleiche(rootMin, huelle.version()) > 0) {
-                return "root-min " + rootMin + " > Huelle " + huelle.version();
+                return SCHLUESSEL_ROOT_MIN + " " + rootMin + " > Huelle " + huelle.version();
             }
         } else {
-            return "root-min " + rootMin + " passt zu keiner Linie der Huelle " + huelle.version();
+            return SCHLUESSEL_ROOT_MIN + " " + rootMin + " passt zu keiner Linie der Huelle " + huelle.version();
         }
         if (ModulKonfig.vergleiche(rootMin, huelle.kompatibelAb()) < 0) {
-            return "root-min " + rootMin + " < Kompatibel-Ab " + huelle.kompatibelAb();
+            return SCHLUESSEL_ROOT_MIN + " " + rootMin + " < Kompatibel-Ab " + huelle.kompatibelAb();
         }
         return null;
     }

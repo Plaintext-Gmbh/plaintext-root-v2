@@ -56,6 +56,8 @@ public final class ModulLader {
 
     static final String JAR_LAUNCHER = "org.springframework.boot.loader.launch.JarLauncher";
     static final String PROPERTIES_LAUNCHER = "org.springframework.boot.loader.launch.PropertiesLauncher";
+    /** Karte 1743 (Sonar java:S1192): Log-Bestandteil vor der Modulnamensliste, an vier Stellen gleich. */
+    private static final String BEREIT_LOG = " Module bereit: ";
 
     /**
      * Version der Huelle, aelteste root-Version, gegen die ein Modul gebaut sein darf, und das Exec-Jar
@@ -193,7 +195,7 @@ public final class ModulLader {
         }
         ModulPruefung.pruefen(soll, jars, huelle.archiv());
         aufraeumen(cache, soll);
-        log(jars.size() + " Module bereit: "
+        log(jars.size() + BEREIT_LOG
                 + soll.stream().map(e -> e.name() + ":" + e.version()).collect(Collectors.joining(", ")));
         return jars;
     }
@@ -203,7 +205,7 @@ public final class ModulLader {
         Path index = eingebettet.resolve(ModulAuswahl.EINGEBETTET_INDEX);
         List<ModulAuswahl.Zeile> zeilen = ModulAuswahl.indexParsen(Files.readString(index), index.toString(), index.toUri());
         List<Path> jars = pruefenUndBereitstellen(zeilen, q, eingebettet, false);
-        log("eingebettete Module (" + eingebettet + "): " + jars.size() + " Module bereit: " + namen(zeilen));
+        log("eingebettete Module (" + eingebettet + "): " + jars.size() + BEREIT_LOG + namen(zeilen));
         return jars;
     }
 
@@ -230,51 +232,73 @@ public final class ModulLader {
             cacheAufraeumen(cache, behalten);
             ModulAuswahl.statusSchreiben(verzeichnis, "OK", angebot.fehler().isEmpty() ? null
                     : "Registry-Fehler (Auswahl trotzdem aufgeloest): " + angebot.fehler(), zeilen);
-            log("Auswahl: " + jars.size() + " Module bereit: " + namen(zeilen));
+            log("Auswahl: " + jars.size() + BEREIT_LOG + namen(zeilen));
             return jars;
         } catch (InterruptedException ex) {
             throw ex;
         } catch (Exception ex) {
             String grund = ex.getMessage();
             log("AUSWAHL NICHT ANWENDBAR: " + grund + " - starte mit dem letzten guten Stand");
-            try {
-                java.util.Optional<String> text = ModulAuswahl.lesen(stand);
-                if (text.isPresent() && !ausgerollt.isEmpty()) {
-                    String abweichung = abweichung(ModulAuswahl.indexParsen(text.get(), stand.toString(), stand.toUri()), ausgerollt);
-                    if (abweichung != null) {
-                        // Karte 1618: der Stand stammt aus einem frueheren Deploy dieses Slots; alte Module zum neuen
-                        // App-Jar waeren schlimmer als der module.yaml-Weg mit genau den ausgerollten Modulen.
-                        log("letzter guter Stand passt nicht zum ausgerollten App-Jar (" + abweichung + ")");
-                        text = java.util.Optional.empty();
-                    }
-                }
-                if (text.isEmpty()) {
-                    if (Files.isRegularFile(verzeichnis.resolve(KONFIG))) {
-                        // Karte 1618 (Entscheid Daniel): erster Start mit Auswahl, noch kein letzter guter Stand ->
-                        // die Module wie vor der Umstellung aus module.yaml statt einer Instanz ohne Fachseiten.
-                        log("kein letzter guter Stand (" + stand + "): Rueckfall auf " + KONFIG);
-                        List<Path> jars = konfigLaden();
-                        ModulAuswahl.statusSchreiben(verzeichnis, "RUECKFALL-MODULE-YAML", grund, List.of());
-                        return jars;
-                    }
-                    log("kein letzter guter Stand (" + stand + "), keine " + KONFIG + ": Start ohne Module");
-                    ModulAuswahl.statusSchreiben(verzeichnis, "OHNE-MODULE", grund, List.of());
-                    return List.of();
-                }
-                List<ModulAuswahl.Zeile> zeilen = ModulAuswahl.indexParsen(text.get(), stand.toString(), stand.toUri());
-                List<Path> jars = pruefenUndBereitstellen(zeilen, q, cache, false);
-                ModulAuswahl.statusSchreiben(verzeichnis, "LETZTER-GUTER-STAND", grund, zeilen);
-                log("letzter guter Stand: " + jars.size() + " Module bereit: " + namen(zeilen));
-                return jars;
-            } catch (InterruptedException ex2) {
-                throw ex2;
-            } catch (Exception ex2) {
-                log("letzter guter Stand ungueltig (" + ex2.getMessage() + "): Start ohne Module");
-                ModulAuswahl.statusSchreiben(verzeichnis, "OHNE-MODULE",
-                        grund + "; letzter guter Stand ungueltig: " + ex2.getMessage(), List.of());
-                return List.of();
+            return letzterGuterStandOderRueckfall(q, cache, stand, grund, ausgerollt);
+        }
+    }
+
+    /**
+     * Karte 1743 (Sonar java:S3776): der Fallback von {@link #auswahlLaden}, in drei kleine
+     * Schritte zerlegt. Scheitert die Auswahl, gilt der letzte gute Stand ({@code stand.txt}),
+     * erneut gegen Signatur und sha256 geprueft. Passt der Stand nicht zum ausgerollten App-Jar
+     * oder fehlt er, Rueckfall auf {@code module.yaml}; ist auch die ungueltig: Start ohne Module.
+     */
+    private List<Path> letzterGuterStandOderRueckfall(ModulAuswahl.Quellen q, Path cache, Path stand, String grund,
+                                                       java.util.Map<String, String> ausgerollt)
+            throws IOException, InterruptedException {
+        try {
+            java.util.Optional<String> text = standLesenGeeignet(stand, ausgerollt);
+            if (text.isEmpty()) {
+                return rueckfallOhneStand(stand, grund);
+            }
+            List<ModulAuswahl.Zeile> zeilen = ModulAuswahl.indexParsen(text.get(), stand.toString(), stand.toUri());
+            List<Path> jars = pruefenUndBereitstellen(zeilen, q, cache, false);
+            ModulAuswahl.statusSchreiben(verzeichnis, "LETZTER-GUTER-STAND", grund, zeilen);
+            log("letzter guter Stand: " + jars.size() + BEREIT_LOG + namen(zeilen));
+            return jars;
+        } catch (InterruptedException ex2) {
+            throw ex2;
+        } catch (Exception ex2) {
+            log("letzter guter Stand ungueltig (" + ex2.getMessage() + "): Start ohne Module");
+            ModulAuswahl.statusSchreiben(verzeichnis, "OHNE-MODULE",
+                    grund + "; letzter guter Stand ungueltig: " + ex2.getMessage(), List.of());
+            return List.of();
+        }
+    }
+
+    /** Der letzte gute Stand, wenn er passt; leer bei Abweichung vom ausgerollten App-Jar oder Fehlen. */
+    private java.util.Optional<String> standLesenGeeignet(Path stand, java.util.Map<String, String> ausgerollt)
+            throws IOException {
+        java.util.Optional<String> text = ModulAuswahl.lesen(stand);
+        if (text.isPresent() && !ausgerollt.isEmpty()) {
+            String abweichung = abweichung(ModulAuswahl.indexParsen(text.get(), stand.toString(), stand.toUri()), ausgerollt);
+            if (abweichung != null) {
+                // Karte 1618: der Stand stammt aus einem frueheren Deploy dieses Slots; alte Module zum neuen
+                // App-Jar waeren schlimmer als der module.yaml-Weg mit genau den ausgerollten Modulen.
+                log("letzter guter Stand passt nicht zum ausgerollten App-Jar (" + abweichung + ")");
+                return java.util.Optional.empty();
             }
         }
+        return text;
+    }
+
+    /** Karte 1618 (Entscheid Daniel): erster Start mit Auswahl ohne letzten guten Stand -> Module wie vor der Umstellung aus module.yaml. */
+    private List<Path> rueckfallOhneStand(Path stand, String grund) throws IOException, InterruptedException {
+        if (Files.isRegularFile(verzeichnis.resolve(KONFIG))) {
+            log("kein letzter guter Stand (" + stand + "): Rueckfall auf " + KONFIG);
+            List<Path> jars = konfigLaden();
+            ModulAuswahl.statusSchreiben(verzeichnis, "RUECKFALL-MODULE-YAML", grund, List.of());
+            return jars;
+        }
+        log("kein letzter guter Stand (" + stand + "), keine " + KONFIG + ": Start ohne Module");
+        ModulAuswahl.statusSchreiben(verzeichnis, "OHNE-MODULE", grund, List.of());
+        return List.of();
     }
 
     /**
