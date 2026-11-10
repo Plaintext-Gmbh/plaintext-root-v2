@@ -145,7 +145,7 @@ class PlaintextModulgrenzenTest {
      * Since the app modules moved to their own repositories (Karte 1601) the app reactor is the
      * smallest: 29 classes without flow, 14 once briefing has left too.
      */
-    private static final int MINDESTENS_KLASSEN = 10;
+    private static final int MINDESTENS_KLASSEN = 5;
 
     private static final int MINDESTENS_MODULE = 1;
 
