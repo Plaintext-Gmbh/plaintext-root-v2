@@ -42,7 +42,18 @@ public class TableColumn implements Serializable {
     /** Startet die Spalte sichtbar, solange der Benutzer nichts verstellt hat? */
     private boolean defaultVisible;
 
+    /**
+     * Pflichtspalte (Karte 1853): bleibt auch bei «Alle aus» sichtbar und laesst sich im
+     * Spalten-Panel nicht abschalten. Der Griff zum Verschieben bleibt — ihre Position
+     * darf der Benutzer weiterhin waehlen.
+     */
+    private boolean required;
+
     public TableColumn(String key, String label, int defaultWidth) {
         this(key, label, defaultWidth, true);
+    }
+
+    public TableColumn(String key, String label, int defaultWidth, boolean defaultVisible) {
+        this(key, label, defaultWidth, defaultVisible, false);
     }
 }
