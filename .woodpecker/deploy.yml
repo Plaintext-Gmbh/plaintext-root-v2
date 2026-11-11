@@ -18,10 +18,12 @@
 #  Runs ONLY if `.ci-engine` contains the word `woodpecker` (waechter.sh).
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# KEIN `event: manual` (Karte 1919): Ein Restart/"Run pipeline" erzeugt ein manual-Event UND
+# erbt die Lauf-Variablen des Ausgangslaufs — ein rettriggerter Deploy-Workflow deployt sofort
+# (Zwischenfall 11.11., Pipeline 1016). PROD-Rollout nur per Push auf master.
 when:
   - event: push
     branch: master
-  - event: manual
 
 clone:
   git:
