@@ -2,6 +2,7 @@
                 xmlns:ui="http://java.sun.com/jsf/facelets"
                 xmlns:p="http://primefaces.org/ui"
                 xmlns:f="http://xmlns.jcp.org/jsf/core"
+                xmlns:pt="http://plaintext.ch/ui"
                 xmlns="http://www.w3.org/1999/xhtml" template="/includes/template.xhtml">
 
     <f:metadata>
@@ -101,30 +102,18 @@
                                  update="fm"
                                  process="@this"/>
 
-                <!--
-                    Per user column selection (request from Daniel, 25 August 2026). Saving happens
-                    on the change event, so on EVERY change in the opened menu - no
-                    save button that can be forgotten. The "Bearbeiten" column is
-                    deliberately not offered for selection: it is the only way to open a user.
-                -->
-                <p:selectCheckboxMenu id="spalten"
-                                      value="#{myUserBackingBean.sichtbareSpalten}"
-                                      label="#{i18n.t('Spalten')}"
-                                      filter="true"
-                                      filterMatchMode="contains"
-                                      multiple="true"
-                                      panelStyle="width: 16rem"
-                                      style="margin-left: .5rem;">
-                    <f:selectItems value="#{myUserBackingBean.spaltenAuswahl}"/>
-                    <p:ajax event="change"
-                            listener="#{myUserBackingBean.spaltenGeaendert()}"
-                            update="fm:tbl"/>
-                </p:selectCheckboxMenu>
             </div>
+
+            <!--
+                Karte 1904: the column setting is the root building block pt:tableSettings (panel
+                with Ansicht / Spalten / Breiten), like every other table. It replaces the
+                checkbox menu of 25.08.2026; the stored state (key "useradmin") stays the same.
+                Every change is saved immediately, there is no save button to forget.
+            -->
+            <pt:tableSettings anzeige="#{myUserBackingBean.anzeige}" tabelle=":fm:tbl"/>
 
             <p:dataTable emptyMessage="-"
                          widgetVar="tbl"
-                         multiViewState="true"
                          id="tbl"
                          selectionMode="single"
                          selection="#{myUserBackingBean.selected}"
@@ -134,25 +123,40 @@
                          value="#{myUserBackingBean.users}"
                          filteredValue="#{myUserBackingBean.gefilterteUsers}"
                          sortBy="#{myUserBackingBean.anzeige.sortMeta}"
+                         paginator="#{myUserBackingBean.anzeige.paginator}"
+                         paginatorPosition="#{myUserBackingBean.anzeige.paginatorPosition}"
+                         rows="#{myUserBackingBean.anzeige.rows}"
+                         rowsPerPageTemplate="#{myUserBackingBean.anzeige.rowsPerPageTemplate}"
+                         draggableColumns="#{myUserBackingBean.anzeige.verschiebenAktiv}"
+                         resizableColumns="#{myUserBackingBean.anzeige.groesseAendernAktiv}"
+                         resizeMode="expand"
+                         tableStyle="#{myUserBackingBean.anzeige.tabellenBreite}"
                          rowIndexVar="ri">
 
                 <!--
                     Karte 1346: the sorting belongs to the person like the column selection. sortBy
                     is read when the table is built (every page load); the sort event stores each
-                    change. Within one session multiViewState keeps the last sorting anyway.
+                    change. Karte 1904: no multiViewState any more - PrimeFaces keeps resized widths
+                    in its session ColumnMeta and lets them win over the stored state, so
+                    "Standard setzen" would not show until the next login (as on member.xhtml).
                 -->
                 <p:ajax event="sort" listener="#{myUserBackingBean.anzeige.onSort}"/>
+                <p:ajax event="page" listener="#{myUserBackingBean.anzeige.onPage}"/>
+                <p:ajax event="colResize" listener="#{myUserBackingBean.anzeige.onColumnResize}"/>
+                <p:ajax event="colReorder" listener="#{myUserBackingBean.anzeige.onColReorder(event, ':fm:tbl')}" update="fm:anz-bereich :fm:tbl"/>
                 <p:ajax event="rowSelect" listener="#{myUserBackingBean.select()}" update="fm"/>
                 <p:ajax event="rowUnselect" listener="#{myUserBackingBean.clearSelection()}" update="fm"/>
 
                 <p:column headerText="ID" priority="5"
                           visible="#{myUserBackingBean.spalteSichtbar('id')}"
+                          width="#{myUserBackingBean.anzeige.breite('id')}"
                           sortBy="#{obj.id}">
                     <h:outputText value=" #{obj.id}"/>
                 </p:column>
 
                 <p:column headerText="#{i18n.t('Benutzername')}" priority="1"
                           visible="#{myUserBackingBean.spalteSichtbar('username')}"
+                          width="#{myUserBackingBean.anzeige.breite('username')}"
                           sortBy="#{obj.username}"
                           filterBy="#{obj.username}"
                           filterMatchMode="contains">
@@ -161,6 +165,7 @@
 
                 <p:column headerText="#{i18n.t('Vorname')}" priority="2"
                           visible="#{myUserBackingBean.spalteSichtbar('vorname')}"
+                          width="#{myUserBackingBean.anzeige.breite('vorname')}"
                           sortBy="#{obj.vorname}"
                           filterBy="#{obj.vorname}"
                           filterMatchMode="contains">
@@ -169,6 +174,7 @@
 
                 <p:column headerText="#{i18n.t('Nachname')}" priority="2"
                           visible="#{myUserBackingBean.spalteSichtbar('nachname')}"
+                          width="#{myUserBackingBean.anzeige.breite('nachname')}"
                           sortBy="#{obj.nachname}"
                           filterBy="#{obj.nachname}"
                           filterMatchMode="contains">
@@ -184,6 +190,7 @@
                 -->
                 <p:column headerText="Mandat" priority="2"
                           visible="#{myUserBackingBean.spalteSichtbar('mandat')}"
+                          width="#{myUserBackingBean.anzeige.breite('mandat')}"
                           sortBy="#{obj.mandat}"
                           filterBy="#{obj.mandat}"
                           filterMatchMode="in">
@@ -203,13 +210,15 @@
 
                 <p:column headerText="#{i18n.t('Startseite')}" priority="3"
                           visible="#{myUserBackingBean.spalteSichtbar('startpage')}"
+                          width="#{myUserBackingBean.anzeige.breite('startpage')}"
                           sortBy="#{obj.startpage}"
                           filterBy="#{obj.startpage}"
                           filterMatchMode="contains">
                     <h:outputText value=" #{obj.startpage}"/>
                 </p:column>
 
-                <p:column headerText="#{i18n.t('Bearbeiten')}" priority="1" style="width: 80px;">
+                <p:column headerText="#{i18n.t('Bearbeiten')}" priority="1"
+                          width="#{myUserBackingBean.anzeige.breite('bearbeiten')}">
                     <p:commandButton icon="pi pi-pencil"
                                      actionListener="#{myUserBackingBean.edit(obj)}"
                                      oncomplete="PF('dlg').show()"
@@ -219,7 +228,8 @@
                 </p:column>
 
                 <p:column headerText="Rem.Me" priority="4"
-                          visible="#{myUserBackingBean.spalteSichtbar('remember')}">
+                          visible="#{myUserBackingBean.spalteSichtbar('remember')}"
+                          width="#{myUserBackingBean.anzeige.breite('remember')}">
                     <p:commandButton icon="pi pi-trash"
                                      styleClass="ui-button-danger"
                                      actionListener="#{myUserBackingBean.deleteRememberMeForUser(obj.username)}"
@@ -230,7 +240,8 @@
                 </p:column>
 
                 <p:column headerText="Impersonate" priority="5" rendered="#{myUserBackingBean.root}"
-                          visible="#{myUserBackingBean.spalteSichtbar('impersonate')}">
+                          visible="#{myUserBackingBean.spalteSichtbar('impersonate')}"
+                          width="#{myUserBackingBean.anzeige.breite('impersonate')}">
                     <p:commandButton icon="pi pi-user-edit"
                                      styleClass="ui-button-warning"
                                      actionListener="#{myUserBackingBean.impersonateUser(obj)}"

@@ -71,6 +71,8 @@ class TableSettingsTest {
 
         anzeige.getState().getColumnWidths().put("name", "300px");
         assertThat(anzeige.widthStyle("name")).isEqualTo("width:300px;");
+        assertThat(anzeige.breite("name")).isEqualTo("300px");
+        assertThat(anzeige.breite("team")).isEqualTo("110px");
         assertThat(anzeige.spaltenSumme()).isEqualTo(410);
         assertThat(anzeige.getTabellenBreite()).isEqualTo("width: 410px;");
 
@@ -84,6 +86,7 @@ class TableSettingsTest {
         TableSettings ohne = new TableSettings("andereseite", false);
         ohne.init(store, COLUMNS);
         assertThat(ohne.widthStyle("name")).isEmpty();
+        assertThat(ohne.breite("name")).isNull();
         assertThat(ohne.getTabellenBreite()).isEmpty();
     }
 

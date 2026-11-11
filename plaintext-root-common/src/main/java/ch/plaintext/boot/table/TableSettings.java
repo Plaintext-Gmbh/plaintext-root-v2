@@ -25,7 +25,6 @@ import org.primefaces.model.SortOrder;
 import org.primefaces.model.Visibility;
 
 import java.io.Serializable;
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -302,39 +301,6 @@ public class TableSettings implements Serializable {
         return isPflichtspalte(key);
     }
 
-    /**
-     * Sichtbarkeit einzelner Spalten fuer die Schalter in der Reihenfolge-Liste des Spalten-Panels.
-     * Lesend mit Vorgabe-Fallback ({@link #isVisible(String)}), schreibend direkt in den Stand —
-     * der Listener {@link #onSichtbarkeitGeaendert()} sichert danach und hebt Pflichtspalten
-     * wieder an, falls ein manipulierter Request sie ausgeschaltet hat.
-     */
-    public Map<String, Boolean> getSpaltenSichtbarkeit() {
-        return new AbstractMap<>() {
-            @Override
-            public Set<Entry<String, Boolean>> entrySet() {
-                Map<String, Boolean> alle = new LinkedHashMap<>();
-                for (TableColumn column : getOrderedColumns()) {
-                    alle.put(column.getKey(), isVisible(column.getKey()));
-                }
-                return alle.entrySet();
-            }
-
-            @Override
-            public Boolean get(Object key) {
-                return key instanceof String k ? isVisible(k) : null;
-            }
-
-            @Override
-            public Boolean put(String key, Boolean value) {
-                Boolean alt = isVisible(key);
-                if (value != null) {
-                    state.getColumnVisible().put(key, value);
-                }
-                return alt;
-            }
-        };
-    }
-
     /** Nach dem Kippen eines Sichtbarkeits-Schalters: sichern, Pflichtspalten absichern. */
     public void onSichtbarkeitGeaendert() {
         for (TableColumn column : columns) {
@@ -343,6 +309,28 @@ public class TableSettings implements Serializable {
             }
         }
         persist();
+    }
+
+    /**
+     * Schalter einer Spalte im Spalten-Panel (Karte 1904). Die Liste ist eine {@code p:orderList},
+     * keine Iterationskomponente: ein Eingabefeld darin bekommt keine Id je Zeile, und beim
+     * Dekodieren fehlt die Zeilenvariable. Deshalb meldet eine schlichte Checkbox Schluessel und
+     * Zustand per {@code p:remoteCommand} ({@code spalte}, {@code sichtbar}).
+     */
+    public void onSpalteSichtbarGemeldet() {
+        Map<String, String> params = FacesContext.getCurrentInstance()
+                .getExternalContext().getRequestParameterMap();
+        spalteSichtbarSetzen(params.get("spalte"), params.get("sichtbar"));
+    }
+
+    /** Kern von {@link #onSpalteSichtbarGemeldet()}, ohne Faces testbar. Unbekannte Schluessel werden verworfen. */
+    void spalteSichtbarSetzen(String key, String sichtbar) {
+        if (key == null || columns.stream().noneMatch(c -> c.getKey().equals(key))) {
+            log.debug("[TableSettings:{}] onSpalteSichtbarGemeldet | verworfen | spalte={}", page, key);
+            return;
+        }
+        state.getColumnVisible().put(key, Boolean.parseBoolean(sichtbar));
+        onSichtbarkeitGeaendert();
     }
 
     /** Kopftext einer Spalte — fuer die Reihenfolge-Liste im Spalten-Panel. */
@@ -624,15 +612,25 @@ public class TableSettings implements Serializable {
      * Leer, wenn die Seite ohne Breiten arbeitet oder die Spalte keine Vorgabe hat.
      */
     public String widthStyle(String key) {
+        String breite = breite(key);
+        return breite == null ? "" : "width:" + breite + ";";
+    }
+
+    /**
+     * Dieselbe Breite fuer das {@code width}-Attribut von {@code p:column}, z.B. {@code "180px"};
+     * {@code null} ohne Breiten oder Vorgabe (dann setzt PrimeFaces keine Breite). Karte 1904:
+     * so braucht eine Seite fuer die Breiten kein {@code style}-Attribut (UI-Grundlage, Karte 1548).
+     */
+    public String breite(String key) {
         if (!mitBreiten) {
-            return "";
+            return null;
         }
         String stored = state.getColumnWidths().get(key);
         if (stored != null && !stored.isBlank()) {
-            return "width:" + stored + ";";
+            return stored;
         }
         int fallback = defaultWidth(key);
-        return fallback > 0 ? "width:" + fallback + "px;" : "";
+        return fallback > 0 ? fallback + "px" : null;
     }
 
     /**

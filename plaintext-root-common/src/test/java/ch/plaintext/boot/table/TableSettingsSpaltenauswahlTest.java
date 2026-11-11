@@ -15,7 +15,6 @@ import org.primefaces.event.ReorderEvent;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -64,22 +63,24 @@ class TableSettingsSpaltenauswahlTest {
     @Test
     @DisplayName("Der Schalter-Guard hebt eine ausgeschaltete Pflichtspalte wieder an")
     void guardHebtPflichtspalteWiederAn() {
-        anzeige.getSpaltenSichtbarkeit().put("name", false);
-        anzeige.onSichtbarkeitGeaendert();
+        anzeige.spalteSichtbarSetzen("name", "false");
 
         assertThat(anzeige.isVisible("name")).isTrue();
     }
 
+    /** Karte 1904: der Weg der Checkbox im Spalten-Panel (remoteCommand mit spalte/sichtbar). */
     @Test
-    @DisplayName("Sichtbarkeits-Map liest mit Vorgabe-Fallback und schreibt in den Stand")
-    void sichtbarkeitsMapMitVorgabe() {
-        Map<String, Boolean> schalter = anzeige.getSpaltenSichtbarkeit();
-
-        assertThat(schalter.get("typ")).isTrue();          // defaultVisible
-        assertThat(schalter.get("unbekannt")).isTrue();    // ohne Vorgabe gilt isVisible: sichtbar
-
-        schalter.put("typ", false);
+    @DisplayName("Gemeldeter Schalter setzt die Spalte; unbekannte Schluessel werden verworfen")
+    void gemeldeterSchalter() {
+        anzeige.spalteSichtbarSetzen("typ", "false");
         assertThat(anzeige.isVisible("typ")).isFalse();
+
+        anzeige.spalteSichtbarSetzen("typ", "true");
+        assertThat(anzeige.isVisible("typ")).isTrue();
+
+        anzeige.spalteSichtbarSetzen("erfunden", "false");
+        anzeige.spalteSichtbarSetzen(null, "false");
+        assertThat(anzeige.getState().getColumnVisible()).doesNotContainKeys("erfunden").doesNotContainKey(null);
     }
 
     @Test
