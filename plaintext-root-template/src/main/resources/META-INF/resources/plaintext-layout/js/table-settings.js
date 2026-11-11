@@ -177,6 +177,44 @@
         for (var i = 0; i < rahmen.length; i++) {
             var r = rahmen[i];
             var remoteName = r.getAttribute('data-pt-remote');
+            // Karte 1853 (Runde 4): das Regler-Symbol wohnt im Spaltenkopf, angeklebt an der
+            // rechtesten Spalte (Mockup). Es ist ein Klon: der echte Öffner bleibt in der
+            // Kopfleiste, wo PrimeFaces ihn bei Teilupdates erwartet — sonst waere er weg,
+            // sobald die Tabelle neu rendert, bevor die Toolbar es tut. Der Klon oeffnet das
+            // Panel per Widget-Referenz an sich selbst (OverlayPanel.show(target) nimmt das
+            // Element, nicht das for-Attribut). Ohne Kopfzeile bleibt der echte Button sichtbar.
+            // Läuft auch ohne Spaltenbreiten, deshalb vor dem Abbruch weiter unten.
+            var tabelleFrueh = document.getElementById(r.getAttribute('data-pt-tablesettings'));
+            if (tabelleFrueh) {
+                var zeile = tabelleFrueh.querySelector('thead tr');
+                var letzteZelle = zeile ? zeile.querySelector('th:last-child') : null;
+                var oeffner = r.querySelector('.pt-ts-oeffner');
+                if (oeffner && letzteZelle) {
+                    var settingsId = r.getAttribute('data-pt-settings-id');
+                    letzteZelle.classList.add('pt-ts-regler-anker');
+                    if (!letzteZelle.querySelector('.pt-ts-regler')) {
+                        var klon = document.createElement('span');
+                        klon.className = 'pt-ts-regler pi pi-sliders-h';
+                        klon.title = oeffner.title;
+                        klon.setAttribute('role', 'button');
+                        klon.setAttribute('tabindex', '0');
+                        klon.setAttribute('aria-label',
+                            oeffner.getAttribute('title') || 'Anzeige einrichten');
+                        klon.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            var w = window.PF ? PF(settingsId + 'PanelWv') : null;
+                            if (w && w.show) {
+                                w.show(klon);
+                            } else {
+                                oeffner.click();
+                            }
+                        });
+                        letzteZelle.appendChild(klon);
+                    }
+                    r.classList.add('pt-ts-regler-im-kopf');
+                }
+            }
             if (!remoteName) {
                 continue;   // Seite ohne Spaltenbreiten - dann gibt es nichts zu setzen.
             }

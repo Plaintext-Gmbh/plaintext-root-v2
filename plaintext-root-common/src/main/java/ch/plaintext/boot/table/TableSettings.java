@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.boot.table;
 
+import jakarta.faces.application.FacesMessage;
 import jakarta.faces.component.UIComponent;
 import jakarta.faces.component.UIData;
 import jakarta.faces.context.FacesContext;
@@ -444,6 +445,7 @@ public class TableSettings implements Serializable {
         sichtbar.add(to, gezogen);
         state.setColumnOrder(mergeSichtbar(sichtbar));
         persist();
+        growl("Spaltenreihenfolge wurde geändert.");
         reihenfolgeAnwenden(tabelle);
         log.debug("[TableSettings:{}] onColReorder | from={} | to={}", page, from, to);
     }
@@ -630,6 +632,13 @@ public class TableSettings implements Serializable {
         persist();
     }
 
+    /** Der «Fertig»-Knopf im Panel (Runde 4, Karte 1853): beendet den Zieh-Modus nach dem Verschieben. */
+    public void verschiebenBeenden() {
+        state.setMoveEnabled(false);
+        meldung = "Verschieben beendet — die Reihenfolge ist gespeichert.";
+        persist();
+    }
+
     /** Schalter «Grösse aendern»: duerfen Spaltenbreiten gezogen werden? Vorgabe: an (bisheriges Verhalten). */
     public boolean isGroesseAendernAktiv() {
         return !Boolean.FALSE.equals(state.getResizeEnabled());
@@ -704,6 +713,7 @@ public class TableSettings implements Serializable {
         }
         state.getColumnWidths().put(key, event.getWidth() + "px");
         persist();
+        growl("Spaltenbreite wurde geändert.");
         log.debug("[TableSettings:{}] onColumnResize | column={} | width={}px", page, key, event.getWidth());
     }
 
@@ -726,6 +736,17 @@ public class TableSettings implements Serializable {
         // wieder der Summe ihrer Spalten.
         state.setTotalWidth(null);
         persist();
+        growl("Spaltenbreite wurde gespeichert.");
+    }
+
+    /** Kurzes Growl-Overlay fuer gelungene Aenderungen (Runde 4, Karte 1853) — global, damit
+     *  es das Growl des Tags mit autoUpdate uebernimmt, ohne dass die Seite etwas verdrahten
+     *  muss. Ohne FacesContext (Rein-Java-Tests) still weglassen. */
+    private void growl(String text) {
+        FacesContext faces = FacesContext.getCurrentInstance();
+        if (faces != null) {
+            faces.addMessage(null, new FacesMessage(FacesMessage.SEVERITY_INFO, text, null));
+        }
     }
 
     /** Gesamtbreite fuer das Eingabefeld; ohne eigene Angabe die aktuelle Summe als Vorschlag. */

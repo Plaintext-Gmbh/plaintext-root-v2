@@ -308,3 +308,163 @@
         display: none !important;
     }
 }
+
+/* ── Runde 4 (Karte 1853, Abnahme-Feedback Daniel 11.11.) ─────────────────── */
+
+/* (1) Das Regler-Symbol wohnt im Spaltenkopf, angeklebt an der rechtesten Spalte.
+   table-settings.js hängt einen Klon in die letzte Kopfzelle; der echte Öffner bleibt in
+   der Toolbar (PrimeFaces rendert ihn bei Teilupdates) und wird nur visuell versteckt,
+   solange der Klon im Kopf sitzt. Die Kopfzelle bekommt Platz rechts, damit der Titel
+   nicht unter dem Symbol verschwindet. */
+.pt-ts-regler-anker {
+    position: relative;
+    padding-right: 2.2rem !important;
+}
+
+.pt-ts-regler {
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.55rem;
+    height: 1.55rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    background: var(--pt-tablesettings-bg, #f8fafc);
+    border: 1px solid var(--pt-tablesettings-rand, #94a3b8);
+    color: var(--pt-tablesettings-hint, #64748b);
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.pt-ts-regler:hover,
+.pt-ts-regler:focus-visible {
+    background: var(--pt-tablesettings-akzent-bg, #dbeafe);
+    border-color: var(--pt-tablesettings-akzent-hell, #60a5fa);
+    color: var(--pt-tablesettings-akzent, #2563eb);
+    outline: none;
+}
+
+/* Der echte Öffner ist hinter dem Klon im Kopf nicht mehr sichtbar — aber im DOM, damit
+   PrimeFaces ihn bei Teilupdates rendert und das overlayPanel sein for-Attribut behält. */
+.pt-tablesettings-wrap.pt-ts-regler-im-kopf .pt-ts-toolbar .pt-ts-oeffner {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+/* Die Kopfleiste ueber der Tabelle traegt jetzt nur noch die Meldung — ohne Button
+   wird sie zum schlanken Einzeiler. */
+.pt-ts-toolbar {
+    margin-bottom: 2px;
+    min-height: 0;
+}
+
+/* (2) Schalter und Profil nebeneinander in EINER Kopfzeile des Panels; bei Platzmangel
+   wickelt die Profilzeile unter die Schalter, statt jedes Element auf eine eigene Zeile. */
+.pt-ts-kopfzeile {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 18px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--content-border-color, #e2e8f0);
+    margin-bottom: 8px;
+}
+
+.pt-ts-kopfzeile .pt-ts-schalterzeile,
+.pt-ts-kopfzeile .pt-ts-profilzeile {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding-bottom: 0;
+    border-bottom: none;
+    margin-bottom: 0;
+    flex: 0 1 auto;
+}
+
+.pt-ts-kopfzeile .pt-ts-profilzeile {
+    margin-left: auto;
+}
+
+.pt-ts-kopfzeile .ui-selectonemenu {
+    min-width: 9rem;
+}
+
+/* (3) «Grösse ändern»: nur das Symbol auf dem Button, quadratisch wie die anderen. */
+.pt-ts-schalter-icon .ui-button-text {
+    display: none;
+}
+
+.pt-ts-schalter-icon {
+    width: 2.2rem;
+}
+
+.pt-ts-schalter-icon .ui-button-icon-left {
+    position: static;
+    margin: 0;
+}
+
+/* (5) Ansicht-Reiter: eine Zeile, kein Umbruch vor «Zeilen pro Seite». */
+.pt-tablesettings-paginator {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.pt-tablesettings-paginator .pt-tablesettings-hint {
+    margin-left: 4px;
+}
+
+/* (6) Spalten-Reiter: Pfeil-Buttons der Liste weg, dafuer laenger und von Hand
+   vergroesserbar (Ziehen an der rechten unteren Ecke des Listenfelds). */
+.pt-ts-reihenfolge .ui-orderlist-controls {
+    display: none;
+}
+
+.pt-ts-reihenfolge .ui-orderlist-list {
+    min-height: 220px;
+    max-height: 55vh;
+    overflow-y: auto;
+    resize: vertical;
+    border: 1px solid var(--content-border-color, #e2e8f0);
+    border-radius: 4px;
+}
+
+/* (7) Panel und Reiter ruhiger: etwas mehr Luft, klarere Trennung der Reiter. */
+.pt-ts-panel .ui-overlaypanel-content {
+    padding: 14px 16px;
+}
+
+.pt-ts-panel .pt-ts-tabs > .ui-tabs-nav {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--content-border-color, #e2e8f0);
+    margin-bottom: 10px;
+}
+
+.pt-ts-panel .pt-ts-tabs > .ui-tabs-nav > li {
+    float: none;
+    top: 0;
+    margin: 0;
+}
+
+.pt-ts-panel .pt-ts-tabs > .ui-tabs-nav > li > a {
+    padding: 8px 12px;
+}
+
+/* Unter dem Mobil-Umbruch bleibt das Regler-Symbol klebrig-rechts; die Breitenregel
+   oben (padding-right 1rem) greift nicht — das Symbol braucht seinen Platz. */
+@media (max-width: 768px) {
+    .pt-ts-regler-anker {
+        padding-right: 2.2rem !important;
+    }
+}
