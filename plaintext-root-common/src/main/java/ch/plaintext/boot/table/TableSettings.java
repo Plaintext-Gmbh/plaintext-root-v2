@@ -296,6 +296,11 @@ public class TableSettings implements Serializable {
         return columns.stream().anyMatch(c -> c.getKey().equals(key) && c.isRequired());
     }
 
+    /** EL-Methode fuer das Tag ({@code anzeige.pflichtspalte(key)}): Alias von {@link #isPflichtspalte}. */
+    public boolean pflichtspalte(String key) {
+        return isPflichtspalte(key);
+    }
+
     /**
      * Sichtbarkeit einzelner Spalten fuer die Schalter in der Reihenfolge-Liste des Spalten-Panels.
      * Lesend mit Vorgabe-Fallback ({@link #isVisible(String)}), schreibend direkt in den Stand —
