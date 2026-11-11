@@ -187,7 +187,11 @@
             var tabelleFrueh = document.getElementById(r.getAttribute('data-pt-tablesettings'));
             if (tabelleFrueh) {
                 var zeile = tabelleFrueh.querySelector('thead tr');
-                var letzteZelle = zeile ? zeile.querySelector('th:last-child') : null;
+                // Nicht th:last-child — PrimeFaces haengt der Kopfzeile ein <script> ans Ende;
+                // das letzte th waere dann nicht mehr :last-child und der Regler bliebe weg
+                // (gemessen: breitenKlasse+anfasser da, regler=0).
+                var zellen = zeile ? zeile.querySelectorAll('th') : [];
+                var letzteZelle = zellen.length ? zellen[zellen.length - 1] : null;
                 var oeffner = r.querySelector('.pt-ts-oeffner');
                 if (oeffner && letzteZelle) {
                     var settingsId = r.getAttribute('data-pt-settings-id');
