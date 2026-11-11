@@ -199,6 +199,12 @@ Three properties worth knowing:
 
 ### The build cache used to hide the test output
 
+**Since card 1864 (11 November 2026) `build.yml` runs with `-Dmaven.build.cache.enabled=false`**
+in `build-und-test` and `coverage-uebersicht`: every run builds and tests every module, so
+the reports are always fresh. Restored reports had shown an old result as the current one,
+and a run with `-DexcludedGroups` was later reused as a full run. The rest of this section
+describes the state before.
+
 A pull request that touches no Java file rebuilds no module: the Maven build cache
 restores all 24 of them, `mvn install` goes green in three minutes, and
 `*/target/surefire-reports/` does not exist at all. Measured on 31 August 2026 in
