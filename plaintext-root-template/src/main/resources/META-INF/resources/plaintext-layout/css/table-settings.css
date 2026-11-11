@@ -41,6 +41,130 @@
     margin-bottom: 10px;
 }
 
+/* ── Kopfleiste und Panel (Karte 1853, Mockup Variante A) ───────────────────
+   Leichter Stil: weisse Karte mit feinem Schatten und runden Ecken, Outline-Knoepfe
+   (ui-button-outlined im Tag), Hinweise klein. Farben als Theme-Variablen mit
+   --pt-tablesettings-*-Rueckfall, damit ein eigenes Theme alles auf einmal setzt. */
+
+.pt-ts-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.pt-ts-meldung {
+    flex-basis: 100%;
+    min-height: 0;
+    color: var(--pt-tablesettings-ok, #1a7f37);
+    font-size: 0.85em;
+}
+
+.pt-ts-meldung:empty {
+    display: none;
+}
+
+/* Das Panel haengt per JavaScript am body — deshalb eigene Breite und Karte statt
+   Vererbung aus dem Formular. */
+.pt-ts-panel {
+    width: min(34rem, calc(100vw - 24px));
+    background: var(--surface-card, #fff);
+    border: 1px solid var(--content-border-color, #e2e8f0);
+    border-radius: var(--border-radius, 6px);
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.14);
+}
+
+.pt-ts-panel .ui-overlaypanel-content {
+    padding: 12px 14px;
+}
+
+.pt-ts-profilzeile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--content-border-color, #e2e8f0);
+    margin-bottom: 8px;
+}
+
+.pt-ts-spaltenknoepfe {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+/* Schalterzeile im Panel: «Verschieben», «Grösse ändern», «Standard setzen» (Nachtrag Daniel:
+   sie wohnen im Panel, die Kopfleiste der Tabelle traegt nur das Regler-Symbol). */
+.pt-ts-schalterzeile {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--content-border-color, #e2e8f0);
+    margin-bottom: 8px;
+}
+
+/* Der Punkte-Griff am Anfang jeder Zeile der Reihenfolge-Liste (Punkt 3 des Nachtrags). */
+.pt-ts-griff {
+    color: var(--text-color-secondary, #64748b);
+    cursor: grab;
+    vertical-align: middle;
+}
+
+/* Reihenfolge-Liste: Spalten statt style-Attributen am Tag (UI-Grundlage, Karte 1548). */
+.pt-ts-reihenfolge .pt-ts-spalte-griff {
+    width: 62%;
+}
+
+.pt-ts-reihenfolge .pt-ts-spaltenlabel {
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
+.pt-ts-reihenfolge .pt-ts-pflicht {
+    margin-left: 6px;
+}
+
+.pt-ts-reihenfolge .pt-ts-spalte-schalter {
+    width: 38%;
+    text-align: right;
+}
+
+/* Reihenfolge-Liste: schmale Zeilen, Griff links (per Drag), Pfeile rechts. */
+.pt-ts-reihenfolge {
+    width: 100%;
+}
+
+.pt-ts-reihenfolge .ui-orderlist-list {
+    width: 100%;
+    min-height: 0;
+}
+
+.pt-ts-reihenfolge .ui-orderlist-item {
+    padding: 6px 8px;
+}
+
+.pt-ts-tabs {
+    border: none;
+}
+
+/* Auf schmalen Fenstern Toolbar umbrechen und das Panel randnah halten. */
+@media (max-width: 768px) {
+    .pt-ts-toolbar {
+        gap: 6px;
+    }
+
+    .pt-ts-panel {
+        width: calc(100vw - 16px);
+    }
+}
+
 /* EIN Viereck im Spaltenkopf (Karte 1336). Bis dahin standen dort zwei kleine: der Zieh-Anfasser
    (als zwei Striche gemalt, 18 px am rechten Rand) und daneben der eigene Setzen-Knopf. Jetzt ist
    der PrimeFaces-Anfasser selbst das Viereck - ziehen aendert die Breite, ein Klick setzt die

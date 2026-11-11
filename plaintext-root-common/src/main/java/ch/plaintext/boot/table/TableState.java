@@ -95,4 +95,24 @@ public class TableState implements Serializable {
      * ergibt die Vorgabe der Seite; eine leere Liste heisst "ausdruecklich unsortiert".
      */
     private List<TableSort> sortBy;
+
+    /**
+     * Reihenfolge der Spalten, wie der Benutzer sie zuletzt per Ziehen im Kopf oder im
+     * Spalten-Panel angeordnet hat (Karte 1853) — eine Permutation der Spaltenschluessel.
+     * {@code null} heisst "nie verschoben" und ergibt die Markup-Reihenfolge der Seite.
+     */
+    private List<String> columnOrder;
+
+    /**
+     * Schalter «Verschieben» (draggableColumns): duerfen die Spaltenkoepfe per Ziehen
+     * umgeordnet werden? {@code null} = aus — damit startet die Tabelle ohne versehentliches
+     * Verschieben, wie der Schalter es will (Karte 1853).
+     */
+    private Boolean moveEnabled;
+
+    /**
+     * Schalter «Groesse aendern» (resizableColumns): duerfen die Spaltenbreiten gezogen werden?
+     * {@code null} = an — so verhaelt sich der Bestand vor dem Schalter (Karte 1853).
+     */
+    private Boolean resizeEnabled;
 }

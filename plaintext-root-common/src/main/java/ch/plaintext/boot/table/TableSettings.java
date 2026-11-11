@@ -14,6 +14,7 @@ import org.primefaces.component.api.ColumnAware;
 import org.primefaces.component.api.UIColumn;
 import org.primefaces.component.api.UITable;
 import org.primefaces.event.ColumnResizeEvent;
+import org.primefaces.event.ReorderEvent;
 import org.primefaces.event.ToggleEvent;
 import org.primefaces.event.data.PageEvent;
 import org.primefaces.event.data.SortEvent;
@@ -23,9 +24,13 @@ import org.primefaces.model.SortOrder;
 import org.primefaces.model.Visibility;
 
 import java.io.Serializable;
+import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -274,11 +279,261 @@ public class TableSettings implements Serializable {
         persist();
     }
 
+    /**
+     * Blendet alle abwählbaren Spalten aus (Karte 1853); {@link TableColumn#isRequired()
+     * Pflichtspalten} bleiben sichtbar. Der Knopf «Alle aus» im Spalten-Panel.
+     */
+    public void alleSpaltenAus() {
+        for (TableColumn column : columns) {
+            state.getColumnVisible().put(column.getKey(), column.isRequired());
+        }
+        persist();
+        meldung = "Alle abwählbaren Spalten sind ausgeblendet.";
+    }
+
+    /** Gehoert die Spalte zu den Pflichtspalten — nicht abschaltbar, bleibt bei «Alle aus» sichtbar? */
+    public boolean isPflichtspalte(String key) {
+        return columns.stream().anyMatch(c -> c.getKey().equals(key) && c.isRequired());
+    }
+
+    /**
+     * Sichtbarkeit einzelner Spalten fuer die Schalter in der Reihenfolge-Liste des Spalten-Panels.
+     * Lesend mit Vorgabe-Fallback ({@link #isVisible(String)}), schreibend direkt in den Stand —
+     * der Listener {@link #onSichtbarkeitGeaendert()} sichert danach und hebt Pflichtspalten
+     * wieder an, falls ein manipulierter Request sie ausgeschaltet hat.
+     */
+    public Map<String, Boolean> getSpaltenSichtbarkeit() {
+        return new AbstractMap<>() {
+            @Override
+            public Set<Entry<String, Boolean>> entrySet() {
+                Map<String, Boolean> alle = new LinkedHashMap<>();
+                for (TableColumn column : getOrderedColumns()) {
+                    alle.put(column.getKey(), isVisible(column.getKey()));
+                }
+                return alle.entrySet();
+            }
+
+            @Override
+            public Boolean get(Object key) {
+                return key instanceof String k ? isVisible(k) : null;
+            }
+
+            @Override
+            public Boolean put(String key, Boolean value) {
+                Boolean alt = isVisible(key);
+                if (value != null) {
+                    state.getColumnVisible().put(key, value);
+                }
+                return alt;
+            }
+        };
+    }
+
+    /** Nach dem Kippen eines Sichtbarkeits-Schalters: sichern, Pflichtspalten absichern. */
+    public void onSichtbarkeitGeaendert() {
+        for (TableColumn column : columns) {
+            if (column.isRequired()) {
+                state.getColumnVisible().put(column.getKey(), true);
+            }
+        }
+        persist();
+    }
+
+    /** Kopftext einer Spalte — fuer die Reihenfolge-Liste im Spalten-Panel. */
+    public String columnLabel(String key) {
+        return columns.stream()
+                .filter(c -> c.getKey().equals(key))
+                .map(TableColumn::getLabel)
+                .findFirst()
+                .orElse(key);
+    }
+
     /** Zurueck auf die Grundeinstellung der Seite. */
     public void standardSpalten() {
         for (TableColumn column : columns) {
             state.getColumnVisible().put(column.getKey(), column.isDefaultVisible());
         }
+        persist();
+    }
+
+    // ── Reihenfolge (Karte 1853) ────────────────────────────────────────────
+
+    /**
+     * Die Spalten in der vom Benutzer zuletzt gespeicherten Reihenfolge. Unbekannte Eintraege
+     * (neue Spalten der Seite) bleiben in ihrer Markup-Reihenfolge, ganz hinten.
+     */
+    public List<TableColumn> getOrderedColumns() {
+        List<String> order = state.getColumnOrder();
+        if (order == null || order.isEmpty()) {
+            return columns;
+        }
+        Map<String, TableColumn> byKey = new LinkedHashMap<>();
+        for (TableColumn column : columns) {
+            byKey.put(column.getKey(), column);
+        }
+        List<TableColumn> result = new ArrayList<>();
+        for (String key : order) {
+            TableColumn column = byKey.remove(key);
+            if (column != null) {
+                result.add(column);
+            }
+        }
+        result.addAll(byKey.values());
+        return result;
+    }
+
+    /** Wert der Reihenfolge-Liste im Spalten-Panel: Schluessel in Anzeigereihenfolge. */
+    public List<String> getSpaltenReihenfolge() {
+        return getOrderedColumns().stream().map(TableColumn::getKey).toList();
+    }
+
+    /** Die Liste schreibt die vom Benutzer im Panel gezogene Reihenfolge zurueck. */
+    public void setSpaltenReihenfolge(List<String> reihenfolge) {
+        if (reihenfolge == null || reihenfolge.isEmpty()) {
+            return;
+        }
+        state.setColumnOrder(new ArrayList<>(reihenfolge));
+    }
+
+    /**
+     * Nach dem Ziehen in der Reihenfolge-Liste des Panels: sichern und die Tabelle gleich
+     * umsortieren — sonst zeigte ein folgendes Teilupdate der Tabelle noch die alte Reihenfolge
+     * (das Auf-ziehen-im-Vollrender passiert erst beim naechsten Seitenaufruf).
+     *
+     * @param tabelle Suchausdruck der Tabelle, wie ihn das Tag bekommt (z.B. {@code ":fm:tbl"})
+     */
+    public void onReihenfolgeGeaendert(String tabelle) {
+        persist();
+        reihenfolgeAnwenden(tabelle);
+    }
+
+    /**
+     * Spalte im Tabellenkopf per Ziehen verschoben (colReorder): PrimeFaces meldet nur von/to —
+     * als Indizes ueber die gerenderten, also sichtbaren Spalten. Zusätzliche rendered-Bedingungen
+     * der Seite (z.B. «✓» bei abgeschaltetem Jahresbeitrags-Versand) entziehen dem Client Spalten,
+     * ohne dass der Server das sieht — dann landet die neue Reihenfolge einen Platz daneben.
+     * Genauigkeitsgrenze, bewusst dokumentiert statt mit Mess-JS nachgebessert (Karte 1853).
+     *
+     * @param tabelle Suchausdruck der Tabelle
+     */
+    public void onColReorder(ReorderEvent event, String tabelle) {
+        if (event == null) {
+            return;
+        }
+        List<String> sichtbar = new ArrayList<>();
+        for (TableColumn column : getOrderedColumns()) {
+            if (isVisible(column.getKey())) {
+                sichtbar.add(column.getKey());
+            }
+        }
+        int from = event.getFromIndex();
+        int to = event.getToIndex();
+        if (from < 0 || to < 0 || from >= sichtbar.size() || to >= sichtbar.size() || from == to) {
+            return;
+        }
+        String gezogen = sichtbar.remove(from);
+        sichtbar.add(to, gezogen);
+        state.setColumnOrder(mergeSichtbar(sichtbar));
+        persist();
+        reihenfolgeAnwenden(tabelle);
+        log.debug("[TableSettings:{}] onColReorder | from={} | to={}", page, from, to);
+    }
+
+    /**
+     * Setzt die sichtbaren Schluessel in ihre Positionen in der bisherigen Gesamtreihenfolge
+     * ein — unsichtbare Spalten behalten ihren Platz, damit sie nach «Alle ein» wieder dort
+     * stehen, wo die Konfiguration sie vorsieht.
+     */
+    private List<String> mergeSichtbar(List<String> sichtbarNeu) {
+        Set<String> sichtbarSet = new HashSet<>(sichtbarNeu);
+        List<String> result = new ArrayList<>();
+        int naechste = 0;
+        for (String key : getSpaltenReihenfolge()) {
+            if (sichtbarSet.contains(key) && naechste < sichtbarNeu.size()) {
+                result.add(sichtbarNeu.get(naechste++));
+            } else {
+                result.add(key);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Ordnet die Spalten-Kinder der Tabelle nach dem gespeicherten Stand an — aufgerufen vom Tag
+     * kurz vor dem Rendern. PrimeFaces rendert statische {@code p:column} in
+     * Komponenten-Reihenfolge; wer die Reihenfolge nach dem Neuladen halten will, muss die Kinder
+     * hier bewegen. Idempotent, Schluessel-basiert; Kinder ohne Kopftext bleiben unangetastet.
+     *
+     * @param tabelle Suchausdruck der Tabelle
+     */
+    public void reihenfolgeAnwenden(String tabelle) {
+        UIData data = tabelleFinden(tabelle);
+        if (data != null) {
+            reihenfolgeAnwenden(data);
+        }
+    }
+
+    /** Der Kern von {@link #reihenfolgeAnwenden(String)}, mit der Tabelle von aussen — testbar ohne Faces. */
+    void reihenfolgeAnwenden(UIData data) {
+        List<String> order = state.getColumnOrder();
+        if (order == null || order.isEmpty()) {
+            return;
+        }
+        List<UIComponent> kinder = data.getChildren();
+        Map<String, UIComponent> spalten = new HashMap<>();
+        Set<String> zielKeys = new LinkedHashSet<>(order);
+        for (UIComponent kind : kinder) {
+            if (kind instanceof UIColumn) {
+                String key = keyFromHeader(((UIColumn) kind).getHeaderText());
+                if (key != null && zielKeys.contains(key)) {
+                    spalten.put(key, kind);
+                }
+            }
+        }
+        if (spalten.size() < 2) {
+            return;
+        }
+        List<String> ziel = order.stream().filter(spalten::containsKey).toList();
+        List<UIComponent> gemischt = new ArrayList<>(kinder);
+        java.util.Iterator<String> it = ziel.iterator();
+        for (int i = 0; i < gemischt.size() && it.hasNext(); i++) {
+            UIComponent kind = gemischt.get(i);
+            if (kind instanceof UIColumn) {
+                String key = keyFromHeader(((UIColumn) kind).getHeaderText());
+                if (key != null && zielKeys.contains(key)) {
+                    gemischt.set(i, spalten.get(it.next()));
+                }
+            }
+        }
+        kinder.clear();
+        kinder.addAll(gemischt);
+    }
+
+    // ── Schalter «Verschieben» / «Grösse aendern» (Karte 1853) ─────────────
+
+    /** Schalter «Verschieben»: duerfen die Spaltenkoepfe per Ziehen umgeordnet werden? Vorgabe: aus. */
+    public boolean isVerschiebenAktiv() {
+        return Boolean.TRUE.equals(state.getMoveEnabled());
+    }
+
+    public void setVerschiebenAktiv(boolean aktiv) {
+        state.setMoveEnabled(aktiv);
+    }
+
+    public void onVerschiebenChange() {
+        persist();
+    }
+
+    /** Schalter «Grösse aendern»: duerfen Spaltenbreiten gezogen werden? Vorgabe: an (bisheriges Verhalten). */
+    public boolean isGroesseAendernAktiv() {
+        return !Boolean.FALSE.equals(state.getResizeEnabled());
+    }
+
+    public void setGroesseAendernAktiv(boolean aktiv) {
+        state.setResizeEnabled(aktiv);
+    }
+
+    public void onGroesseAendernChange() {
         persist();
     }
 

@@ -54,6 +54,9 @@ class UserPreferenceTabellenStaendeTest {
         stand.setActiveProfile("Breit");
         stand.setPaginatorTop(false);          // Karte 1336
         stand.setRowsPerPage(1000);
+        stand.setColumnOrder(List.of("typ", "nr", "name"));   // Karte 1853
+        stand.setMoveEnabled(true);                           // Karte 1853
+        stand.setResizeEnabled(false);                        // Karte 1853
         TableColumnProfile profil = new TableColumnProfile();
         profil.getColumnWidths().put("nr", "88px");
         profil.getColumnVisible().put("typ", false);
@@ -92,6 +95,10 @@ class UserPreferenceTabellenStaendeTest {
         assertThat(geladen.getPaginatorTop()).isFalse();
         assertThat(geladen.getPaginatorBottom()).isNull();
         assertThat(geladen.getRowsPerPage()).isEqualTo(1000);
+        // Karte 1853: Reihenfolge und Schalter ueberleben den Konverter (Default-Typing inklusive).
+        assertThat(geladen.getColumnOrder()).containsExactly("typ", "nr", "name");
+        assertThat(geladen.getMoveEnabled()).isTrue();
+        assertThat(geladen.getResizeEnabled()).isFalse();
         assertThat(geladen.getProfiles().get("Breit").getPaginatorBottom()).isFalse();
         assertThat(geladen.getProfiles().get("Breit").getPaginatorTop()).isNull();
         assertThat(geladen.getProfiles().get("Breit").getRowsPerPage()).isEqualTo(3000);
@@ -113,10 +120,12 @@ class UserPreferenceTabellenStaendeTest {
         pref.getTabellenStaende().put("guild42/guild-member", stand);
         String json = converter.convertToDatabaseColumn(pref);
 
-        // Ein Feld am Datensatz und eines am Stand, die es heute nicht gibt.
+        // Ein Feld am Datensatz und eines am Stand, die es heute nicht gibt. (Karte 1853:
+        // "columnOrder" ist seitdem KEIN Zukunftsfeld mehr — der Dummy muss einen anderen
+        // Namen tragen, sonst laesst der Konverter den Datensatz nicht mehr los.)
         String zukunft = json
                 .replace("\"tabellenStaende\"", "\"zukunftsFeld\":\"x\",\"tabellenStaende\"")
-                .replace("\"columnWidths\"", "\"columnOrder\":[\"nr\"],\"columnWidths\"");
+                .replace("\"columnWidths\"", "\"zukunftsListe\":[\"nr\"],\"columnWidths\"");
         assertThat(zukunft).isNotEqualTo(json);
 
         SimpleStorable gelesen = converter.convertToEntityAttribute(zukunft);

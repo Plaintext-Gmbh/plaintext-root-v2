@@ -180,6 +180,12 @@
             if (!remoteName) {
                 continue;   // Seite ohne Spaltenbreiten - dann gibt es nichts zu setzen.
             }
+            // Karte 1853 (Nachtrag Daniel): der Schalter «Grösse ändern» steuert die Griffe. Nur
+            // wenn er ein ist, bekommen die Köpfe das Viereck — bei aus hängt nichts im Kopf.
+            // Der Wert lebt an der Schalterzeile im Panel, weil sie bei jedem Kippen mitgerendert
+            // wird; der Rahmen selbst wird nicht aktualisiert.
+            var schalterZeile = r.querySelector('.pt-ts-schalterzeile');
+            var resizeAktiv = schalterZeile && schalterZeile.getAttribute('data-pt-resize') === '1';
             var tabelle = document.getElementById(r.getAttribute('data-pt-tablesettings'));
             if (!tabelle) {
                 continue;   // Tabelle (noch) nicht im DOM, z.B. ein Reiter, der zu ist.
@@ -189,6 +195,14 @@
             // Idempotent - nach jedem Teilupdate ist der Tabellenknoten neu, der Beobachter
             // setzt die Klasse dann wieder.
             tabelle.classList.add('pt-tablesettings-breiten');
+            if (!resizeAktiv) {
+                // Schalter aus: kein eigenes Symbol im Spaltenkopf (Punkt 4 des Nachtrags).
+                var alt = tabelle.querySelectorAll('.pt-tablesettings-setzen');
+                for (var x = 0; x < alt.length; x++) {
+                    alt[x].parentNode.removeChild(alt[x]);
+                }
+                continue;
+            }
             var koepfe = tabelle.querySelectorAll('thead th');
             for (var k = 0; k < koepfe.length; k++) {
                 kopfEinrichten(koepfe[k], tabelle, r, remoteName);
