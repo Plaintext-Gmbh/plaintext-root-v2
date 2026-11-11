@@ -240,6 +240,12 @@
                     <p:orderList id="#{ptSettingsId}-reihenfolge"
                                  value="#{anzeige.spaltenReihenfolge}" var="key" itemValue="#{key}"
                                  controlsPosition="right" styleClass="pt-ts-reihenfolge">
+                        <!-- PF 16 OrderList verbraucht das reorder-Event komplett intern (customEvents,
+                             ueberschreibt auch validate) — der Listener unten laeuft nie. Gesichert
+                             wird stattdessen beim erneuten Rendern nach dem Request: das _values-Feld
+                             der Liste traegt die neue Ordnung mit, preRenderComponent am Wrap liest
+                             es (TableSettings.reihenfolgeAnwenden, Feldweg). Playwright-validiert:
+                             Drag -> Reload -> Reihenfolge steht. -->
                         <p:ajax event="reorder" process="@this"
                                 listener="#{anzeige.onReihenfolgeGeaendert(tabelle)}"
                                 update="#{tabelle} #{ptSettingsId}-meldung"/>

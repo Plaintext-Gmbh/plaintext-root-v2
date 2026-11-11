@@ -451,7 +451,13 @@ public class TableSettings implements Serializable {
     /** Persistiert die im Request mitgelieferte neue Reihenfolge, falls sie vom Stand abweicht. */
     private void neueReihenfolgeAusRequestUebernehmen(UIData data) {
         try {
-            List<String> keys = reihenfolgeAusColumnOrderFeld(data);
+            List<String> keys = data != null ? reihenfolgeAusColumnOrderFeld(data) : List.of();
+            if (keys.isEmpty()) {
+                // Panel-Weg (Karte 1853, Fix-Runde 3): PF 16 OrderList consumt das reorder-Event
+                // intern — der Listener feuert nie. Die Reihenfolge steht im _values-Feld der
+                // Reihenfolge-Liste (alle Eintraege, in neuer Ordnung).
+                keys = reihenfolgeAusOrderListValuesFeld();
+            }
             if (keys.isEmpty()) {
                 return;
             }
@@ -459,11 +465,43 @@ public class TableSettings implements Serializable {
             if (!gemerged.equals(state.getColumnOrder())) {
                 state.setColumnOrder(gemerged);
                 persist();
-                log.debug("[TableSettings:{}] Reihenfolge aus _columnOrder-Feld uebernommen | {}", page, gemerged);
+                log.debug("[TableSettings:{}] Reihenfolge aus Request uebernommen | {}", page, gemerged);
             }
         } catch (RuntimeException e) { // NOSONAR - ein Kippen der Reihenfolge darf das Rendern nicht abbrechen
-            log.debug("[TableSettings:{}] _columnOrder-Verarbeitung fehlgeschlagen | {}", page, e.getMessage());
+            log.debug("[TableSettings:{}] Reihenfolge-Request-Verarbeitung fehlgeschlagen | {}", page, e.getMessage());
         }
+    }
+
+    /**
+     * Liest die Reihenfolge aus dem versteckten {@code <id>_values}-Select der Reihenfolge-Liste
+     * (p:orderList im Panel). Der Browser sendet alle Eintraege in ihrer neuen Ordnung als
+     * Mehrfach-Parameter. Erkannte wird das Feld daran, dass alle Werte bekannte Spalten-Keys sind.
+     */
+    private List<String> reihenfolgeAusOrderListValuesFeld() {
+        FacesContext faces = FacesContext.getCurrentInstance();
+        if (faces == null || faces.getExternalContext() == null) {
+            return List.of();
+        }
+        java.util.Set<String> bekannteKeys = new java.util.HashSet<>();
+        for (TableColumn column : getOrderedColumns()) {
+            bekannteKeys.add(column.getKey());
+        }
+        for (Map.Entry<String, String[]> eintrag
+                : faces.getExternalContext().getRequestParameterValuesMap().entrySet()) {
+            if (!eintrag.getKey().endsWith("_values")) {
+                continue;
+            }
+            String[] werte = eintrag.getValue();
+            if (werte == null || werte.length == 0 || !bekannteKeys.containsAll(java.util.Arrays.asList(werte))) {
+                continue;
+            }
+            List<String> keys = new ArrayList<>();
+            for (String wert : werte) {
+                keys.add(wert);
+            }
+            return keys;
+        }
+        return List.of();
     }
 
     /**
