@@ -220,16 +220,16 @@
                     <h:panelGroup layout="block" styleClass="pt-ts-spaltenknoepfe">
                         <p:commandButton value="Alle ein" icon="pi pi-check-square"
                                          action="#{anzeige.alleSpaltenEin()}"
-                                         update="#{tabelle} #{ptSettingsId}-meldung" process="@this"
+                                         update="#{tabelle} #{ptSettingsId}-meldung #{ptSettingsId}-reihenfolge" process="@this"
                                          styleClass="ui-button-outlined" style="margin-right:6px;"/>
                         <p:commandButton value="Alle aus" icon="pi pi-times"
                                          action="#{anzeige.alleSpaltenAus()}"
-                                         update="#{tabelle} #{ptSettingsId}-meldung" process="@this"
+                                         update="#{tabelle} #{ptSettingsId}-meldung #{ptSettingsId}-reihenfolge" process="@this"
                                          styleClass="ui-button-outlined" style="margin-right:6px;"
                                          title="Pflichtspalten bleiben sichtbar"/>
                         <p:commandButton value="Standard" icon="pi pi-undo"
                                          action="#{anzeige.standardSpalten()}"
-                                         update="#{tabelle} #{ptSettingsId}-meldung" process="@this"
+                                         update="#{tabelle} #{ptSettingsId}-meldung #{ptSettingsId}-reihenfolge" process="@this"
                                          styleClass="ui-button-outlined" style="margin-right:6px;"/>
                         <ui:insert/>
                     </h:panelGroup>
@@ -250,14 +250,25 @@
                                    rendered="#{anzeige.pflichtspalte(key)}"/>
                         </p:column>
                         <p:column styleClass="pt-ts-spalte-schalter">
-                            <p:toggleSwitch value="#{anzeige.spaltenSichtbarkeit[key]}"
-                                            disabled="#{anzeige.pflichtspalte(key)}"
-                                            title="#{anzeige.pflichtspalte(key) ? 'Pflichtspalte - bleibt sichtbar' : 'Spalte ein-/ausblenden'}">
-                                <p:ajax process="@this" listener="#{anzeige.onSichtbarkeitGeaendert()}"
-                                        update="#{tabelle} #{ptSettingsId}-meldung"/>
-                            </p:toggleSwitch>
+                            <!-- Karte 1853/1904: schlichte Checkbox statt p:toggleSwitch. p:orderList ist
+                                 keine Iterationskomponente - alle Schalter darin bekamen dieselbe
+                                 Widget-Id ohne Zeilenindex, keiner fand sein Element, ein Klick
+                                 schickte nichts ab. Die Checkbox meldet Schluessel und Zustand ueber
+                                 den remoteCommand unter der Liste (Listener in js/table-settings.js,
+                                 kein on…-Attribut: CSP ohne 'unsafe-inline'). -->
+                            <input type="checkbox" class="pt-ts-schalter-sichtbar" role="switch"
+                                   data-spalte="#{key}"
+                                   checked="#{anzeige.isVisible(key) ? 'checked' : null}"
+                                   disabled="#{anzeige.pflichtspalte(key) ? 'disabled' : null}"
+                                   aria-label="#{anzeige.columnLabel(key)}"
+                                   title="#{anzeige.pflichtspalte(key) ? 'Pflichtspalte - bleibt sichtbar' : 'Spalte ein-/ausblenden'}"
+                                   data-pt-remote="#{ptSettingsId}SpalteSichtbar"/>
                         </p:column>
                     </p:orderList>
+                    <p:remoteCommand name="#{ptSettingsId}SpalteSichtbar" process="@this"
+                                     actionListener="#{anzeige.onSpalteSichtbarGemeldet}"
+                                     update="#{tabelle} #{ptSettingsId}-meldung"
+                                     ignoreAutoUpdate="true"/>
 
                     <h:outputText value="Griff ziehen oder Pfeile nutzen: Reihenfolge der Spalten. Schalter: ein-/ausblenden."
                                   styleClass="pt-tablesettings-hint"/>
