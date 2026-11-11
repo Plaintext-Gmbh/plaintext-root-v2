@@ -222,6 +222,23 @@
         }
     }
 
+    /*
+     * Karte 1853/1904: Schalter je Spalte im Spalten-Panel. Die Checkbox traegt data-spalte und
+     * data-pt-remote (Name des p:remoteCommand). EIN Listener am document erreicht auch die
+     * Schalter, die jedes Teilupdate neu rendert.
+     */
+    document.addEventListener('change', function (e) {
+        var schalter = e.target;
+        if (!schalter || !schalter.classList || !schalter.classList.contains('pt-ts-schalter-sichtbar')) {
+            return;
+        }
+        var melde = window[schalter.getAttribute('data-pt-remote')];
+        if (typeof melde === 'function') {
+            melde([{name: 'spalte', value: schalter.getAttribute('data-spalte')},
+                {name: 'sichtbar', value: String(schalter.checked)}]);
+        }
+    });
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', sicherEinrichten);
     } else {

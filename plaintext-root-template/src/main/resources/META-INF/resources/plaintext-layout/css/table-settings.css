@@ -136,6 +136,52 @@
     text-align: right;
 }
 
+/* Schalter je Spalte (Karte 1853/1904): schlichte Checkbox im Schalter-Stil - p:toggleSwitch wirkt in
+   einer p:orderList nicht. */
+.pt-ts-reihenfolge .pt-ts-schalter-sichtbar {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    width: 2.25rem;
+    height: 1.25rem;
+    margin: 0;
+    border-radius: 1rem;
+    background: var(--pt-tablesettings-rand, #cbd5e1);
+    cursor: pointer;
+    vertical-align: middle;
+    transition: background-color .15s;
+}
+
+.pt-ts-reihenfolge .pt-ts-schalter-sichtbar::after {
+    content: "";
+    position: absolute;
+    top: .15rem;
+    left: .15rem;
+    width: .95rem;
+    height: .95rem;
+    border-radius: 50%;
+    background: var(--surface-card, #fff);
+    transition: transform .15s;
+}
+
+.pt-ts-reihenfolge .pt-ts-schalter-sichtbar:checked {
+    background: var(--pt-tablesettings-akzent, #2563eb);
+}
+
+.pt-ts-reihenfolge .pt-ts-schalter-sichtbar:checked::after {
+    transform: translateX(1rem);
+}
+
+.pt-ts-reihenfolge .pt-ts-schalter-sichtbar:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+.pt-ts-reihenfolge .pt-ts-schalter-sichtbar:focus-visible {
+    outline: 2px solid var(--pt-tablesettings-akzent, #2563eb);
+    outline-offset: 2px;
+}
+
 /* Reihenfolge-Liste: schmale Zeilen, Griff links (per Drag), Pfeile rechts. */
 .pt-ts-reihenfolge {
     width: 100%;
