@@ -117,6 +117,25 @@
     vertical-align: middle;
 }
 
+/* Reihenfolge-Liste: Spalten statt style-Attributen am Tag (UI-Grundlage, Karte 1548). */
+.pt-ts-reihenfolge .pt-ts-spalte-griff {
+    width: 62%;
+}
+
+.pt-ts-reihenfolge .pt-ts-spaltenlabel {
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
+.pt-ts-reihenfolge .pt-ts-pflicht {
+    margin-left: 6px;
+}
+
+.pt-ts-reihenfolge .pt-ts-spalte-schalter {
+    width: 38%;
+    text-align: right;
+}
+
 /* Reihenfolge-Liste: schmale Zeilen, Griff links (per Drag), Pfeile rechts. */
 .pt-ts-reihenfolge {
     width: 100%;
