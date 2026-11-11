@@ -6,6 +6,7 @@ package ch.plaintext.boot.table;
 import jakarta.faces.component.UIComponent;
 import jakarta.faces.component.UIData;
 import jakarta.faces.context.FacesContext;
+import jakarta.faces.event.AjaxBehaviorEvent;
 import jakarta.faces.model.SelectItem;
 import lombok.Getter;
 import lombok.Setter;
@@ -421,8 +422,23 @@ public class TableSettings implements Serializable {
      *
      * @param tabelle Suchausdruck der Tabelle
      */
-    public void onColReorder(ReorderEvent event, String tabelle) {
+    public void onColReorder(AjaxBehaviorEvent event, String tabelle) {
         if (event == null) {
+            return;
+        }
+        // PF 16 sendet die neue Reihenfolge im versteckten Feld <clientId>_columnOrder
+        // (kommagetrennte Client-Ids der Spaltenköpfe) — from/to bleiben dabei leer.
+        // Der Feldweg ist der Hauptweg; from/to bleibt als Fallback für Wege, die sie mitsenden.
+        log.debug("[TableSettings:{}] onColReorder EINTRITT | tabelle={}", page, tabelle);
+        UIData data = tabelleFinden(tabelle);
+        log.debug("[TableSettings:{}] onColReorder | tabelleGefunden={}", page, data != null);
+        List<String> feldReihenfolge = data != null ? reihenfolgeAusColumnOrderFeld(data) : List.of();
+        log.debug("[TableSettings:{}] onColReorder | feldReihenfolge={}", page, feldReihenfolge);
+        if (!feldReihenfolge.isEmpty()) {
+            state.setColumnOrder(mergeSichtbar(feldReihenfolge));
+            persist();
+            reihenfolgeAnwenden(tabelle);
+            log.debug("[TableSettings:{}] onColReorder | ueber columnOrder-Feld | {}", page, feldReihenfolge);
             return;
         }
         List<String> sichtbar = new ArrayList<>();
@@ -431,8 +447,8 @@ public class TableSettings implements Serializable {
                 sichtbar.add(column.getKey());
             }
         }
-        int from = event.getFromIndex();
-        int to = event.getToIndex();
+        int from = event instanceof ReorderEvent re ? re.getFromIndex() : -1;
+        int to = event instanceof ReorderEvent re2 ? re2.getToIndex() : -1;
         if (from < 0 || to < 0 || from >= sichtbar.size() || to >= sichtbar.size() || from == to) {
             return;
         }
@@ -442,6 +458,60 @@ public class TableSettings implements Serializable {
         persist();
         reihenfolgeAnwenden(tabelle);
         log.debug("[TableSettings:{}] onColReorder | from={} | to={}", page, from, to);
+    }
+
+    /** Persistiert die im Request mitgelieferte neue Reihenfolge, falls sie vom Stand abweicht. */
+    private void neueReihenfolgeAusRequestUebernehmen(UIData data) {
+        try {
+            List<String> keys = reihenfolgeAusColumnOrderFeld(data);
+            if (keys.isEmpty()) {
+                return;
+            }
+            List<String> gemerged = mergeSichtbar(keys);
+            if (!gemerged.equals(state.getColumnOrder())) {
+                state.setColumnOrder(gemerged);
+                persist();
+                log.debug("[TableSettings:{}] Reihenfolge aus _columnOrder-Feld uebernommen | {}", page, gemerged);
+            }
+        } catch (RuntimeException e) { // NOSONAR - ein Kippen der Reihenfolge darf das Rendern nicht abbrechen
+            log.debug("[TableSettings:{}] _columnOrder-Verarbeitung fehlgeschlagen | {}", page, e.getMessage());
+        }
+    }
+
+    /**
+     * Liest die neue Spaltenreihenfolge aus dem versteckten {@code <clientId>_columnOrder}-Feld
+     * des DataTable-Requests (kommagetrennte Client-Ids der gerenderten Spaltenköpfe). Die Ids
+     * sind die Client-Ids der UIColumn-Kinder — bei Spalten ohne explizite Id generische
+     * j_idt-Ids, die sich NICHT über SearchExpressions auflösen lassen. Der Abgleich laeuft
+     * deshalb direkt ueber die Kinder der Tabelle.
+     */
+    private List<String> reihenfolgeAusColumnOrderFeld(UIData data) {
+        FacesContext faces = FacesContext.getCurrentInstance();
+        if (faces == null || faces.getExternalContext() == null) {
+            return List.of();
+        }
+        String wert = faces.getExternalContext().getRequestParameterMap()
+                .get(data.getClientId(faces) + "_columnOrder");
+        if (wert == null || wert.isBlank()) {
+            return List.of();
+        }
+        Map<String, String> clientIdZuKey = new HashMap<>();
+        for (UIComponent kind : data.getChildren()) {
+            if (kind instanceof UIColumn col) {
+                String key = keyFromHeader(col.getHeaderText());
+                if (key != null && !key.isBlank()) {
+                    clientIdZuKey.put(col.getClientId(faces), key);
+                }
+            }
+        }
+        List<String> keys = new ArrayList<>();
+        for (String thId : wert.split(",")) {
+            String key = clientIdZuKey.get(thId.trim());
+            if (key != null) {
+                keys.add(key);
+            }
+        }
+        return keys;
     }
 
     /**
@@ -480,6 +550,11 @@ public class TableSettings implements Serializable {
 
     /** Der Kern von {@link #reihenfolgeAnwenden(String)}, mit der Tabelle von aussen — testbar ohne Faces. */
     void reihenfolgeAnwenden(UIData data) {
+        // PF 16 decodiert den colReorder-Request selbst; das Behavior-Event erreicht unseren
+        // Listener nicht zuverlässig. Die neue Reihenfolge steht im _columnOrder-Feld des
+        // Requests — beim erneuten Rendern der Tabelle (update am colReorder-Ajax) wird sie
+        // hier uebernommen und gespeichert.
+        neueReihenfolgeAusRequestUebernehmen(data);
         List<String> order = state.getColumnOrder();
         if (order == null || order.isEmpty()) {
             return;
