@@ -125,6 +125,13 @@
                  aus TableSettings#growl zeigt das globalGrowl des Templates. -->
         </h:panelGroup>
 
+        <!-- Wrap-Schluss HIER (Karte 1853, Runde 5): das OverlayPanel, der Profil-Dialog und der
+             Breiten-remoteCommand liegen ausserhalb des Wraps. Der Wrap bleibt Ajax-Ziel des
+             Reorder (Persist laeuft ueber sein preRenderComponent) — und weil die Panel-SHELL
+             nicht mehr im Wrap liegt, bleibt das Panel bei Reihenfolge-Aenderung und jedem
+             Toggle OFFEN (Daniel 16:21, Punkt 3). -->
+    </h:panelGroup>
+
         <!-- Das schwebende Panel: Schalter zuoberst, dann Profil, dann die drei Reiter.
              dismissable: Klick ausserhalb schliesst (Mockup Variante A). -->
         <p:overlayPanel for="#{ptSettingsId}-oeffnen" id="#{ptSettingsId}-panel"
@@ -403,7 +410,5 @@
             <h:outputStylesheet library="plaintext-layout" name="css/table-settings.css"/>
             <h:outputScript library="plaintext-layout" name="js/table-settings.js" target="body"/>
         </h:panelGroup>
-
-    </h:panelGroup>
 
 </ui:composition>

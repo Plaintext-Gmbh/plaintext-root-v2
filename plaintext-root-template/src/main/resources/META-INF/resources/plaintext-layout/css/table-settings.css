@@ -311,55 +311,10 @@
 
 /* ── Runde 4 (Karte 1853, Abnahme-Feedback Daniel 11.11.) ─────────────────── */
 
-/* (1) Das Regler-Symbol wohnt im Spaltenkopf, angeklebt an der rechtesten Spalte.
-   table-settings.js hängt einen Klon in die letzte Kopfzelle; der echte Öffner bleibt in
-   der Toolbar (PrimeFaces rendert ihn bei Teilupdates) und wird nur visuell versteckt,
-   solange der Klon im Kopf sitzt. Die Kopfzelle bekommt Platz rechts, damit der Titel
-   nicht unter dem Symbol verschwindet. */
-.pt-ts-regler-anker {
-    position: relative;
-    padding-right: 2.2rem !important;
-}
 
-.pt-ts-regler {
-    position: absolute;
-    /* Karte 1904: ueber dem Spalten-Resizer (PF 15 setzt ihn mit z-index 1 genau hierhin; sonst
-       faengt er den Klick ab und das Panel geht nicht auf - gemessen im Inventar, PF 15.0.19). */
-    z-index: 3;
-    right: 2px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 1.55rem;
-    height: 1.55rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    background: var(--pt-tablesettings-bg, #f8fafc);
-    border: 1px solid var(--pt-tablesettings-rand, #94a3b8);
-    color: var(--pt-tablesettings-hint, #64748b);
-    cursor: pointer;
-    font-size: 0.9rem;
-}
-
-.pt-ts-regler:hover,
-.pt-ts-regler:focus-visible {
-    background: var(--pt-tablesettings-akzent-bg, #dbeafe);
-    border-color: var(--pt-tablesettings-akzent-hell, #60a5fa);
-    color: var(--pt-tablesettings-akzent, #2563eb);
-    outline: none;
-}
 
 /* Der echte Öffner ist hinter dem Klon im Kopf nicht mehr sichtbar — aber im DOM, damit
    PrimeFaces ihn bei Teilupdates rendert und das overlayPanel sein for-Attribut behält. */
-.pt-tablesettings-wrap.pt-ts-regler-im-kopf .pt-ts-toolbar .pt-ts-oeffner {
-    position: absolute;
-    left: -9999px;
-    top: 0;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-}
 
 /* Die Kopfleiste ueber der Tabelle traegt jetzt nur noch die Meldung — ohne Button
    wird sie zum schlanken Einzeiler. */
@@ -427,9 +382,14 @@
     margin-left: 4px;
 }
 
-/* (6) Spalten-Reiter: Pfeil-Buttons der Liste weg, dafuer laenger und von Hand
-   vergroesserbar (Ziehen an der rechten unteren Ecke des Listenfelds). */
-.pt-ts-reihenfolge .ui-orderlist-controls {
+/* (6) Spalten-Reiter: die Sprung-Buttons «ganz nach oben/unten» sind WEG
+   (Karte 1853, Runde 5, Daniel 16:21, Punkt 4). PF 16 heisst die Spalte
+   ui-orderlist-controls-right mit ui-orderlist-button-move-* — die alte Regel auf
+   .ui-orderlist-controls griff deshalb nie und alle vier Buttons waren sichtbar.
+   Die Pfeile hoch/runter (move-up/move-down) BLEIBEN — sie sind die Tastatur-Alternative
+   zum Ziehen (Barrierefreiheit). */
+.pt-ts-reihenfolge .ui-orderlist-button-move-top,
+.pt-ts-reihenfolge .ui-orderlist-button-move-bottom {
     display: none;
 }
 
@@ -467,7 +427,4 @@
 /* Unter dem Mobil-Umbruch bleibt das Regler-Symbol klebrig-rechts; die Breitenregel
    oben (padding-right 1rem) greift nicht — das Symbol braucht seinen Platz. */
 @media (max-width: 768px) {
-    .pt-ts-regler-anker {
-        padding-right: 2.2rem !important;
-    }
 }
