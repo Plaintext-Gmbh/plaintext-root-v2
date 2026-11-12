@@ -64,9 +64,29 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Wie in plaintext-root-common: FacesContext loest EL ueber den BeanManager auf, seit
+             CDI 4.1 liegt ELAwareBeanManager im getrennten cdi-el-api. provided, die App bringt sie. -->
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <groupId>jakarta.enterprise</groupId>
+            <artifactId>jakarta.enterprise.cdi-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.enterprise</groupId>
+            <artifactId>jakarta.enterprise.cdi-el-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- EL fuer die Tests (in root-common kommt sie ueber Spring Boot herein). -->
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-el</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Tests: junit, mockito, assertj, spring-test (ReflectionTestUtils) - nur test-scope. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -106,6 +126,21 @@
                             </sources>
                         </configuration>
                     </execution>
+                    <!-- Dieselben Tests wie in plaintext-root-common, soweit sie ohne root auskommen:
+                         die Quellen sind identisch, also gilt hier dieselbe Pruefung (und das
+                         JaCoCo-Gate misst echte Abdeckung statt einer Ausnahme). -->
+                    <execution>
+                        <id>table-tests-aus-common</id>
+                        <phase>generate-test-sources</phase>
+                        <goals>
+                            <goal>add-test-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/../plaintext-root-common/src/test/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
             <plugin>
@@ -128,6 +163,13 @@
                     <excludes>
                         <exclude>ch/plaintext/boot/table/UserPreferenceTableStateStore.java</exclude>
                     </excludes>
+                    <testIncludes>
+                        <testInclude>ch/plaintext/boot/table/TablesettingsArtefaktTest.java</testInclude>
+                        <testInclude>ch/plaintext/boot/table/TableSettingsTest.java</testInclude>
+                        <testInclude>ch/plaintext/boot/table/TableSettingsPaginatorTest.java</testInclude>
+                        <testInclude>ch/plaintext/boot/table/TableSettingsSortierungTest.java</testInclude>
+                        <testInclude>ch/plaintext/boot/table/TableSettingsSpaltenauswahlTest.java</testInclude>
+                    </testIncludes>
                 </configuration>
             </plugin>
         </plugins>
