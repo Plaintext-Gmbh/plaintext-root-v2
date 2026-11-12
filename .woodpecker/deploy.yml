@@ -130,7 +130,8 @@ steps:
         export MAVEN_ARGS="-s /tmp/ci/settings.xml
         -Daether.transport.http.requestTimeout=300000
         -Daether.transport.http.retryHandler.count=3
-        -Daether.transport.http.retryHandler.interval=5000"
+        -Daether.transport.http.retryHandler.interval=5000
+        -Dmaven.build.cache.enabled=false"
 
       # ── 4. Testdatenbank ───────────────────────────────────────────────────────────────
       - >-
