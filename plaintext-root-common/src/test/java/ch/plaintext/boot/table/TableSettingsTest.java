@@ -3,16 +3,23 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.boot.table;
 
+import jakarta.faces.component.UIData;
+import org.primefaces.component.api.UIColumn;
+import jakarta.faces.context.ExternalContext;
+import jakarta.faces.context.FacesContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mockStatic;
 
 /**
  * Die Anzeige-Steuerung ohne Faces-Kontext: Sichtbarkeiten, Breiten und Profile rechnen allein
@@ -170,5 +177,83 @@ class TableSettingsTest {
     void persistiertUnterSeite() {
         anzeige.persist();
         Mockito.verify(store, Mockito.atLeastOnce()).save(eq("testpage"), any(TableState.class));
+    }
+
+    @Test
+    @DisplayName("Ereignis-Differenzierung: beide Felder im Request — reorder nimmt _values, colReorder nimmt columnOrder, sonst nichts")
+    void ereignisDifferenziertBeideFelder() {
+        // Karte 1853: PF schickt _values der orderList UND columnOrder der Tabelle bei jedem
+        // Submit mit (die orderList liegt im selben Formular). Nur das Behavior-Event sagt,
+        // welche Reihenfolge gemeint ist — Feld-Reihenfolge entscheidet nicht mehr.
+        UIData data = tabelleMitZweiSpalten();
+        Map<String, String[]> values = Map.of("fm:anz:reihenfolge_values", new String[] {"team", "name"});
+        Map<String, String> params = Map.of(
+                "jakarta.faces.behavior.event", "reorder",
+                "fm:tbl_columnOrder", "fm:tbl:j_idt1,fm:tbl:j_idt2");
+
+        FacesContext faces1 = facesMit(params, values);
+        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
+            holder.when(FacesContext::getCurrentInstance).thenReturn(faces1);
+
+            anzeige.reihenfolgeAnwenden(data);
+            assertThat(anzeige.getState().getColumnOrder()).containsExactly("team", "name", "extra");
+        }
+
+        // colReorder: columnOrder (Kopf, neu) gewinnt gegen _values (Panel, alt = Stand).
+        TableSettings zweite = new TableSettings("testpage", true);
+        zweite.init(store, COLUMNS);
+        Map<String, String> params2 = Map.of(
+                "jakarta.faces.behavior.event", "colReorder",
+                "fm:tbl_columnOrder", "fm:tbl:j_idt2,fm:tbl:j_idt1");
+        Map<String, String[]> values2 = Map.of("fm:anz:reihenfolge_values", new String[] {"name", "team"});
+
+        FacesContext faces2 = facesMit(params2, values2);
+        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
+            holder.when(FacesContext::getCurrentInstance).thenReturn(faces2);
+
+            zweite.reihenfolgeAnwenden(data);
+            assertThat(zweite.getState().getColumnOrder()).containsExactly("team", "name", "extra");
+        }
+
+        // Ohne Behavior-Event (normaler Formular-Submit): nichts uebernehmen, nichts speichern.
+        TableStateStore store3 = Mockito.mock(TableStateStore.class);
+        Mockito.when(store3.load(any())).thenReturn(new TableState());
+        TableSettings dritte = new TableSettings("testpage", true);
+        dritte.init(store3, COLUMNS);
+        Map<String, String> params3 = Map.of("fm:tbl_columnOrder", "fm:tbl:j_idt2,fm:tbl:j_idt1");
+        Map<String, String[]> values3 = Map.of("fm:anz:reihenfolge_values", new String[] {"team", "name"});
+
+        FacesContext faces3 = facesMit(params3, values3);
+        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
+            holder.when(FacesContext::getCurrentInstance).thenReturn(faces3);
+
+            Mockito.clearInvocations(store3);   // init() legt das Standardprofil ab — nicht zaehlen
+            dritte.reihenfolgeAnwenden(data);
+            assertThat(dritte.getState().getColumnOrder()).isNull();
+            Mockito.verify(store3, Mockito.never()).save(eq("testpage"), any(TableState.class));
+        }
+    }
+
+    private UIData tabelleMitZweiSpalten() {
+        UIData data = Mockito.mock(UIData.class);
+        org.primefaces.component.column.Column col1 = Mockito.mock(org.primefaces.component.column.Column.class);
+        org.primefaces.component.column.Column col2 = Mockito.mock(org.primefaces.component.column.Column.class);
+        Mockito.when(col1.getHeaderText()).thenReturn("Name");
+        Mockito.when(col2.getHeaderText()).thenReturn("TeamKey");
+        List<jakarta.faces.component.UIComponent> kinder = new java.util.ArrayList<>(java.util.List.of(col1, col2));
+        Mockito.when(data.getChildren()).thenReturn(kinder);
+        Mockito.when(data.getClientId(any())).thenReturn("fm:tbl");
+        Mockito.when(col1.getClientId(any())).thenReturn("fm:tbl:j_idt1");
+        Mockito.when(col2.getClientId(any())).thenReturn("fm:tbl:j_idt2");
+        return data;
+    }
+
+    private FacesContext facesMit(Map<String, String> params, Map<String, String[]> values) {
+        FacesContext faces = Mockito.mock(FacesContext.class);
+        ExternalContext ext = Mockito.mock(ExternalContext.class);
+        Mockito.when(faces.getExternalContext()).thenReturn(ext);
+        Mockito.when(ext.getRequestParameterMap()).thenReturn(params);
+        Mockito.when(ext.getRequestParameterValuesMap()).thenReturn(values);
+        return faces;
     }
 }
