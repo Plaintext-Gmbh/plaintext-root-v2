@@ -214,6 +214,8 @@
 
         <!-- template -->
         <module>plaintext-root-template</module>
+        <!-- pt:tableSettings eigenstaendig fuer Apps ohne Template (Karte 1904, Inventar/BIT) -->
+        <module>plaintext-root-tablesettings</module>
 
         <module>plaintext-root-webapp</module>
         <!-- Laufzeit-Module: Lader vor dem Start der Huelle (Karte 1513) -->
