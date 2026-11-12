@@ -97,6 +97,7 @@
          finden — und zwei Bedienbereiche auf einer Seite waeren nicht auseinanderzuhalten. -->
     <h:panelGroup layout="block" styleClass="pt-tablesettings-wrap"
                   id="#{ptSettingsId}-bereich"
+                  binding="#{anzeige.reihenfolgeZiel}"
                   a:data-pt-tablesettings="#{ptTabelleDom}"
                   a:data-pt-remote="#{anzeige.mitBreiten ? ptSettingsId.concat('MeldeSpaltenbreite') : ''}"
                   a:data-pt-settings-id="#{ptSettingsId}">
@@ -264,11 +265,15 @@
                              ueberschreibt auch validate) — der Listener unten laeuft nie. Gesichert
                              wird stattdessen beim erneuten Rendern nach dem Request: das _values-Feld
                              der Liste traegt die neue Ordnung mit, preRenderComponent am Wrap liest
-                             es (TableSettings.reihenfolgeAnwenden, Feldweg). Playwright-validiert:
-                             Drag -> Reload -> Reihenfolge steht. -->
+                             es (TableSettings.reihenfolgeAnwenden, Feldweg). Dazu muss der Wrap
+                             Teil des reorder-Updates sein — direkt vor der Tabelle, damit die
+                             Spalten-Kinder vor deren Rendern umgeordnet sind. Der Wrap kommt per
+                             binding in das Ziel: aus der Liste (NamingContainer) heraus ist keine
+                             relative Id moeglich, die Form-Id kennt das Tag nicht. Playwright-
+                             validiert: Drag -> Reload -> Reihenfolge steht. -->
                         <p:ajax event="reorder" process="@this"
                                 listener="#{anzeige.onReihenfolgeGeaendert(tabelle)}"
-                                update="#{tabelle} #{ptSettingsId}-meldung"/>
+                                update="#{anzeige.reihenfolgeZielClientId} #{tabelle}"/>
                         <p:column styleClass="pt-ts-spalte-griff">
                             <i class="pi pi-ellipsis-v pt-ts-griff" title="Ziehen zum Verschieben"/>
                             <h:outputText value="#{anzeige.columnLabel(key)}" styleClass="pt-ts-spaltenlabel"/>

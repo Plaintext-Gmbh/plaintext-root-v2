@@ -166,6 +166,28 @@ public class TableSettings implements Serializable {
      */
     private transient TableStateStore store;
 
+    /**
+     * Der umschliessende Wrap des Tags, per {@code binding} gesetzt. Grund: die Reihenfolge-Liste
+     * (p:orderList) ist ein NamingContainer — aus ihr heraus lassen sich weder der Wrap noch die
+     * Meldung per relativer Id erreichen, und das Tag kennt die Form-Id nicht fuer absolute Ids.
+     * Das reorder-Ajax braucht den Wrap aber als Update-Ziel, weil das preRenderComponent dort
+     * die neue Ordnung aus dem Request liest und speichert (Karte 1853, Panel-Weg).
+     */
+    private transient UIComponent reihenfolgeZiel;
+
+    public UIComponent getReihenfolgeZiel() {
+        return reihenfolgeZiel;
+    }
+
+    public void setReihenfolgeZiel(UIComponent reihenfolgeZiel) {
+        this.reihenfolgeZiel = reihenfolgeZiel;
+    }
+
+    /** ClientId des Wraps — Ziel des reorder-Updates; leer, solange das Tag nicht gerendert wurde. */
+    public String getReihenfolgeZielClientId() {
+        return reihenfolgeZiel != null ? reihenfolgeZiel.getClientId() : "";
+    }
+
     /** Die Spalten der Seite, in Tabellenreihenfolge. Bei dynamischen Spalten via {@link #setColumns} nachgefuehrt. */
     @Getter
     private List<TableColumn> columns = new ArrayList<>();
