@@ -256,4 +256,16 @@ class TableSettingsTest {
         Mockito.when(ext.getRequestParameterValuesMap()).thenReturn(values);
         return faces;
     }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("Karte 1904: breite(key) liefert gespeicherte Breite, sonst Vorgabe, ohne Breiten null")
+    void breiteFuerDasWidthAttribut() {
+        TableSettings mit = new TableSettings("t1904", true);
+        mit.init(null, java.util.List.of(new TableColumn("a", "A", 120), new TableColumn("b", "B", 0)));
+        org.junit.jupiter.api.Assertions.assertEquals("120px", mit.breite("a"));
+        org.junit.jupiter.api.Assertions.assertNull(mit.breite("b"));
+        TableSettings ohne = new TableSettings("t1904b", false);
+        ohne.init(null, java.util.List.of(new TableColumn("a", "A", 120)));
+        org.junit.jupiter.api.Assertions.assertNull(ohne.breite("a"));
+    }
 }

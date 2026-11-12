@@ -29,7 +29,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -42,9 +41,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>Warum die Benutzerverwaltung.</b> Die einzige Seite in root, die ihren Tabellenstand
  * ueber {@code TableSettings} und die mitgelieferte Ablage ({@code UserPreferenceTableStateStore})
- * haelt, ist {@code useradmin.xhtml} — dort ueber das Spaltenmenue. Das Tag
- * {@code pt:tableSettings} rendert in root keine Seite; sein erster Abnehmer ist member.xhtml in
- * guild. Die Ablage ist fuer beide dieselbe: der ganze Stand als JSON in {@code UserPreference}, je
+ * haelt, ist {@code useradmin.xhtml} — seit Karte 1904 ueber das Tag {@code pt:tableSettings}
+ * (vorher ein eigenes Spaltenmenue). Die Ablage ist fuer beide dieselbe: der ganze Stand als JSON in {@code UserPreference}, je
  * Benutzer und Mandant. Was hier fuer die Spaltenwahl gilt, gilt deshalb fuer jedes Feld des
  * Stands; dass Paginator und Seitengroesse (Karte 1336) den Weg durch das JSON ueberstehen, zeigt
  * {@code TabellenStandZweiBenutzerTest} in plaintext-root-common.</p>
@@ -130,21 +128,34 @@ class TabellenstandZweiBenutzerPlaywrightIT {
     @DisplayName("A blendet eine Spalte aus: B sieht sie weiter, A nach neuer Anmeldung nicht")
     void spaltenwahlGehoertDerPerson() {
         // ── A: Vorgabe sehen (Positivkontrolle), dann "ID" ausblenden ──────
-        try (BrowserContext a = browser.newContext()) {
+        try (BrowserContext a = neuerKontext()) {
             Page seite = benutzerverwaltung(a, ANNA);
             assertTrue(idKopf(seite).isVisible(), "Vorgabe: die Spalte ID muss zu Beginn sichtbar sein");
 
-            seite.click("#fm\\:spalten");
-            Locator eintragId = seite.locator("#fm\\:spalten_panel li.ui-selectcheckboxmenu-item")
-                    .filter(new Locator.FilterOptions().setHasText(Pattern.compile("^\\s*ID\\s*$")));
-            eintragId.locator(".ui-chkbox-box").click();
-            seite.keyboard().press("Escape");
+            // Karte 1904: pt:tableSettings - Regler-Symbol, Reiter "Spalten", Schalter der Zeile "ID".
+            // Seit Karte 1853 Runde 4 sitzt das Regler-Symbol als Klon im Spaltenkopf (.pt-ts-regler);
+            // der echte Oeffner bleibt unsichtbar im DOM (left:-9999px) und ist nicht klickbar.
+            seite.click("#fm\\:tbl .pt-ts-regler");
+            seite.locator(".pt-ts-panel").waitFor();
+            seite.locator(".pt-ts-panel .ui-tabs-nav li").filter(new Locator.FilterOptions().setHasText("Spalten")).click();
+            Locator zeileId = spaltenZeile(seite, "id");
+            zeileId.locator(".pt-ts-schalter-sichtbar").click();
 
             TableState gespeichert = warteAufGespeichertenStand(seite, ANNA);
             assertEquals(Boolean.FALSE, gespeichert.getColumnVisible().get("id"),
                     "In der Datenbank steht fuer A nicht 'id=false': " + gespeichert.getColumnVisible());
             idKopf(seite).waitFor(new Locator.WaitForOptions()
                     .setState(com.microsoft.playwright.options.WaitForSelectorState.HIDDEN));
+
+            // Reihenfolge ueber die Pfeile der Liste (Tastatur-Alternative zum Griff): "Vorname"
+            // eine Stelle nach oben, vor "Benutzername".
+            spaltenZeile(seite, "vorname").locator(".pt-ts-spaltenlabel").click();
+            seite.locator(".pt-ts-reihenfolge .ui-orderlist-button-move-up").click();
+            TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder() != null
+                    && st.getColumnOrder().indexOf("vorname") >= 0
+                    && st.getColumnOrder().indexOf("vorname") < st.getColumnOrder().indexOf("username"));
+            assertEquals(Boolean.FALSE, mitReihenfolge.getColumnVisible().get("id"),
+                    "Die Reihenfolge hat die Abwahl von ID ueberschrieben: " + mitReihenfolge);
         }
         // Der Befund vom 29.09.2026: das Session-Bean entstand auf der Anmeldeseite und schrieb
         // danach fuer jeden Benutzer in den gemeinsamen Datensatz "anonymousUser".
@@ -152,7 +163,7 @@ class TabellenstandZweiBenutzerPlaywrightIT {
                 "Es gibt einen gemeinsamen Datensatz anonymousUser: " + eintraegeInDerAblage());
 
         // ── B: eigene Sitzung, eigener Stand — die Spalte ist da ───────────
-        try (BrowserContext b = browser.newContext()) {
+        try (BrowserContext b = neuerKontext()) {
             Page seite = benutzerverwaltung(b, BRUNO);
             assertTrue(idKopf(seite).isVisible(), "B sieht die Einstellung von A: Spalte ID fehlt");
         }
@@ -163,13 +174,26 @@ class TabellenstandZweiBenutzerPlaywrightIT {
                 "Der Stand von B enthaelt die Abwahl von A: " + standB);
 
         // ── A: neue Sitzung (Abmelden/Neuladen) — die Abwahl ist geblieben ─
-        try (BrowserContext aNeu = browser.newContext()) {
+        try (BrowserContext aNeu = neuerKontext()) {
             Page seite = benutzerverwaltung(aNeu, ANNA);
             // Gegenkontrolle, dass die Tabelle ueberhaupt da ist: die Spalte Benutzername.
             assertTrue(seite.locator("#fm\\:tbl thead th .ui-column-title:text-is('Benutzername')").isVisible(),
                     "Tabelle der Benutzerverwaltung nicht gerendert");
             assertFalse(idKopf(seite).isVisible(), "A hat nach neuer Anmeldung die Spalte ID wieder");
+            java.util.List<String> koepfe = seite.locator("#fm\\:tbl thead th .ui-column-title").allInnerTexts();
+            assertTrue(koepfe.indexOf("Vorname") >= 0 && koepfe.indexOf("Vorname") < koepfe.indexOf("Benutzername"),
+                    "A hat nach neuer Anmeldung die alte Reihenfolge: " + koepfe);
         }
+    }
+
+    /**
+     * Karte 1904: ein Fenster, in dem Tabelle und Panel ohne Scrollen Platz haben. Playwright
+     * scrollt vor jedem Klick das Ziel ins Bild, und PrimeFaces schliesst ein offenes
+     * OverlayPanel bei jedem Scrollen (verbundenes Overlay) - sonst geht das Spalten-Panel je
+     * nach Lage vor dem Klick auf den Schalter wieder zu.
+     */
+    private BrowserContext neuerKontext() {
+        return browser.newContext(new Browser.NewContextOptions().setViewportSize(1600, 1400));
     }
 
     private Page benutzerverwaltung(BrowserContext kontext, String benutzer) {
@@ -186,6 +210,14 @@ class TabellenstandZweiBenutzerPlaywrightIT {
         return seite;
     }
 
+    /**
+     * Zeile einer Spalte in der Liste des Reiters "Spalten", ueber ihren Schluessel. Die Liste
+     * liegt im TabView (NamingContainer) - ihre Client-Id traegt eine generierte j_idt-Stufe.
+     */
+    private static Locator spaltenZeile(Page seite, String schluessel) {
+        return seite.locator(".pt-ts-reihenfolge li.ui-orderlist-item[data-item-value='" + schluessel + "']");
+    }
+
     /** Kopfzelle der Spalte "ID" — nur im Tabellenkopf, reflow wiederholt die Titel in jeder Zeile. */
     private static Locator idKopf(Page seite) {
         return seite.locator("#fm\\:tbl thead th:has(.ui-column-title:text-is('ID'))");
@@ -199,18 +231,22 @@ class TabellenstandZweiBenutzerPlaywrightIT {
      * ihre Ereignisse weiter, und es gibt keine {@code InterruptedException} zu behandeln.</p>
      */
     private TableState warteAufGespeichertenStand(Page seite, String benutzer) {
+        return warteAufStand(seite, benutzer, stand -> Boolean.FALSE.equals(stand.getColumnVisible().get("id")));
+    }
+
+    private TableState warteAufStand(Page seite, String benutzer, java.util.function.Predicate<TableState> erfuellt) {
         long bis = System.currentTimeMillis() + 15_000;
         while (System.currentTimeMillis() < bis) {
             UserPreference prefs = userPrefs.findByUniqueId(benutzer);
             TableState stand = prefs == null ? null : prefs.getTabellenStaende().get(SCHLUESSEL);
-            if (stand != null && Boolean.FALSE.equals(stand.getColumnVisible().get("id"))) {
+            if (stand != null && erfuellt.test(stand)) {
                 return stand;
             }
             seite.waitForTimeout(200);
         }
         UserPreference prefs = userPrefs.findByUniqueId(benutzer);
         String vorhanden = eintraegeInDerAblage().toString();
-        throw new AssertionError("Kein Stand mit id=false fuer " + benutzer + " unter " + SCHLUESSEL
+        throw new AssertionError("Kein passender Stand fuer " + benutzer + " unter " + SCHLUESSEL
                 + " — gefunden: " + (prefs == null ? "keine Einstellungen" : prefs.getTabellenStaende())
                 + " — Eintraege in der Ablage: " + vorhanden);
     }

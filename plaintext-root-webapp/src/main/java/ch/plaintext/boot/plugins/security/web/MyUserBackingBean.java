@@ -180,30 +180,33 @@ public class MyUserBackingBean implements Serializable {
     static final String TABELLE = "useradmin";
 
     /**
-     * All columns that can be switched off, in display order: key, header text, and no fixed
-     * width (the table runs with {@code reflow} and auto layout, hence {@code mitBreiten=false}).
+     * All columns of the table, in display order: key, header text (must match the header, the
+     * resize and reorder events only carry the header) and default width in pixels. The widths
+     * add up to 950 px so the table fits a 1280 px laptop next to the menu: a wider table scrolls
+     * the page sideways, and every scroll closes the open settings panel (PrimeFaces overlay).
      *
-     * <p>The column "Bearbeiten" is missing here on purpose: it is the only way to open a
-     * user. If it could be deselected, one could render the administration unusable
-     * and would then have no way back.
+     * <p>Karte 1904: "Bearbeiten" is a mandatory column ({@code required}) - it is the only way
+     * to open a user. The panel shows it with the "Pflicht" badge and cannot switch it off, so
+     * the administration cannot be made unusable; its position may still be changed.
      */
     private static final List<TableColumn> SPALTEN = List.of(
-            new TableColumn("id", "ID", 0),
-            new TableColumn("username", "Benutzername", 0),
-            new TableColumn("vorname", "Vorname", 0),
-            new TableColumn("nachname", "Nachname", 0),
-            new TableColumn(SPALTE_MANDAT, "Mandat", 0),
-            new TableColumn("startpage", "Startseite", 0),
-            new TableColumn("remember", "Remember-Me", 0),
-            new TableColumn("impersonate", "Impersonate", 0));
+            new TableColumn("id", "ID", 50),
+            new TableColumn("username", "Benutzername", 200),
+            new TableColumn("vorname", "Vorname", 110),
+            new TableColumn("nachname", "Nachname", 110),
+            new TableColumn(SPALTE_MANDAT, "Mandat", 100),
+            new TableColumn("startpage", "Startseite", 140),
+            new TableColumn("bearbeiten", "Bearbeiten", 80, true, true),
+            new TableColumn("remember", "Rem.Me", 70),
+            new TableColumn("impersonate", "Impersonate", 90));
 
     /**
-     * Karte 1077: the display state of the table — the same building block as
-     * {@code pt:tableSettings}, here only for the visibility, driven by the checkbox menu that
-     * Daniel asked for on 25.08.2026. Loading and saving run through {@link #tableStateStore};
-     * the state is keyed per user and tenant.
+     * Karte 1077/1904: the display state of the table, rendered by {@code pt:tableSettings}
+     * (visibility, order, widths, paginator, profiles). Loading and saving run through
+     * {@link #tableStateStore}; the state is keyed per user and tenant. 200 rows per page as
+     * default, so a normal user list stays on one page as before.
      */
-    private final TableSettings anzeige = new TableSettings(TABELLE, false);
+    private final TableSettings anzeige = new TableSettings(TABELLE, true, 200);
 
     /**
      * Wired optionally: contexts without user settings (lean tests) shall be able to keep
@@ -211,45 +214,9 @@ public class MyUserBackingBean implements Serializable {
      */
     private transient TableStateStore tableStateStore;
 
-    /** The selection for the checkbox menu above the table. */
-    public List<SelectItem> getSpaltenAuswahl() {
-        return anzeige.getColumnItems();
-    }
-
-    /** The visible column keys — value of the checkbox menu. */
-    public List<String> getSichtbareSpalten() {
-        return anzeige.getVisibleColumns();
-    }
-
-    /**
-     * An <b>empty</b> selection is a valid statement ("I want none of these columns") and is
-     * kept as such — {@link TableSettings#setVisibleColumns(List)} marks every column that is
-     * not in the list as hidden.
-     */
-    public void setSichtbareSpalten(List<String> spalten) {
-        anzeige.setVisibleColumns(spalten);
-    }
-
     /** @return {@code true} if the column is shown for this user */
     public boolean spalteSichtbar(String schluessel) {
         return anzeige.isVisible(schluessel);
-    }
-
-    /**
-     * Applies the column selection to the user settings <b>immediately</b>.
-     *
-     * <p>Request from Daniel, 25.08.2026: "whenever one opens it there and makes the column
-     * selection, it should be saved". That is why this hangs off the {@code change} event of the menu and
-     * not off a save button - a button that one can forget is exactly what
-     * was not wanted here.
-     */
-    public void spaltenGeaendert() {
-        if (tableStateStore == null) {
-            log.debug("Spaltenauswahl nicht gespeichert - keine Ablage verfuegbar");
-            return;
-        }
-        anzeige.persist();
-        log.debug("Spaltenauswahl fuer {} gespeichert: {}", TABELLE, anzeige.getVisibleColumns());
     }
 
     /**

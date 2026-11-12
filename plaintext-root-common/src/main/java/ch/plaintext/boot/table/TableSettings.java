@@ -695,6 +695,23 @@ public class TableSettings implements Serializable {
      * Breite einer Spalte fuer das {@code style}-Attribut, z.B. {@code "width:180px;"}.
      * Leer, wenn die Seite ohne Breiten arbeitet oder die Spalte keine Vorgabe hat.
      */
+    /**
+     * Karte 1904: nur der Breitenwert ({@code "120px"}) fuer das {@code width}-Attribut einer
+     * {@code p:column} - ohne {@code style=}, das der UI-Linter zaehlt. {@code null} ohne Breiten
+     * oder ohne Vorgabe (PrimeFaces laesst das Attribut dann weg).
+     */
+    public String breite(String key) {
+        if (!mitBreiten) {
+            return null;
+        }
+        String stored = state.getColumnWidths().get(key);
+        if (stored != null && !stored.isBlank()) {
+            return stored;
+        }
+        int fallback = defaultWidth(key);
+        return fallback > 0 ? fallback + "px" : null;
+    }
+
     public String widthStyle(String key) {
         if (!mitBreiten) {
             return "";

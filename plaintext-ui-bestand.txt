@@ -55,4 +55,4 @@ plaintext-root-webapp/src/main/resources/META-INF/resources/login.xhtml  23 0 0
 plaintext-root-webapp/src/main/resources/META-INF/resources/mandate.xhtml  10 0 0
 plaintext-root-webapp/src/main/resources/META-INF/resources/myuser.xhtml  34 0 0
 plaintext-root-webapp/src/main/resources/META-INF/resources/performance.xhtml  9 0 0
-plaintext-root-webapp/src/main/resources/META-INF/resources/useradmin.xhtml  16 0 0
+plaintext-root-webapp/src/main/resources/META-INF/resources/useradmin.xhtml  14 0 0

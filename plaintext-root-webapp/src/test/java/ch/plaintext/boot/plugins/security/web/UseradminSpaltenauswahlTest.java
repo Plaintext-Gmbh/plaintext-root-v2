@@ -20,7 +20,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,21 +92,21 @@ class UseradminSpaltenauswahlTest {
     void ohneGespeichertesGiltDieVoreinstellung() {
         bean.init();
 
-        assertThat(bean.getSichtbareSpalten())
+        assertThat(bean.getAnzeige().getVisibleColumns())
                 .contains("username", "mandat", "startpage", "id", "remember", "impersonate")
-                .contains("vorname", "nachname");
+                .contains("vorname", "nachname", "bearbeiten");
         verify(store).load(eq(MyUserBackingBean.TABELLE), anyList());
     }
 
     @Test
-    @DisplayName("Eine gespeicherte Auswahl wird uebernommen")
+    @DisplayName("Eine gespeicherte Auswahl wird uebernommen - Bearbeiten bleibt als Pflichtspalte")
     void gespeicherteAuswahlWirdUebernommen() {
         when(store.load(eq(MyUserBackingBean.TABELLE), anyList()))
                 .thenReturn(stand(List.of("username", "mandat")));
 
         bean.init();
 
-        assertThat(bean.getSichtbareSpalten()).containsExactly("username", "mandat");
+        assertThat(bean.getAnzeige().getVisibleColumns()).containsExactly("username", "mandat", "bearbeiten");
         assertThat(bean.spalteSichtbar("username")).isTrue();
         assertThat(bean.spalteSichtbar("startpage")).isFalse();
     }
@@ -119,48 +118,64 @@ class UseradminSpaltenauswahlTest {
      * deselected and on the next login everything would be there again.
      */
     @Test
-    @DisplayName("Eine ausdruecklich leere Auswahl bleibt leer")
+    @DisplayName("Eine ausdruecklich leere Auswahl bleibt leer - bis auf die Pflichtspalte")
     void leereAuswahlBleibtLeer() {
         when(store.load(eq(MyUserBackingBean.TABELLE), anyList())).thenReturn(stand(List.of()));
 
         bean.init();
 
-        assertThat(bean.getSichtbareSpalten()).isEmpty();
+        assertThat(bean.getAnzeige().getVisibleColumns()).containsExactly("bearbeiten");
         assertThat(bean.spalteSichtbar("username")).isFalse();
     }
 
     // ------------------------------------------------------------------- Saving
 
     @Test
-    @DisplayName("Jede Aenderung wird sofort gespeichert - ohne Speichern-Knopf")
+    @DisplayName("Jeder Schalter im Panel speichert sofort - ohne Speichern-Knopf")
     void aenderungWirdSofortGespeichert() {
         bean.init();
-        bean.setSichtbareSpalten(new ArrayList<>(List.of("username", "nachname")));
+        bean.getAnzeige().setVisible("id", false);
+        bean.getAnzeige().setVisible("startpage", false);
 
-        bean.spaltenGeaendert();
+        bean.getAnzeige().onSichtbarkeitGeaendert();
 
         ArgumentCaptor<TableState> gespeichert = ArgumentCaptor.forClass(TableState.class);
         verify(store, atLeastOnce()).save(eq(MyUserBackingBean.TABELLE), gespeichert.capture());
         TableState letzter = gespeichert.getValue();
         assertThat(letzter.getColumnVisible())
-                .containsEntry("username", true)
-                .containsEntry("nachname", true)
                 .containsEntry("id", false)
-                .containsEntry("startpage", false);
+                .containsEntry("startpage", false)
+                .containsEntry("bearbeiten", true);
+        assertThat(bean.spalteSichtbar("username")).isTrue();
     }
 
     @Test
-    @DisplayName("Eine leere Auswahl wird als solche gespeichert, nicht als Vorgabe")
+    @DisplayName("«Alle aus» wird als solches gespeichert, nicht als Vorgabe; Bearbeiten bleibt")
     void leereAuswahlWirdGespeichert() {
         bean.init();
-        bean.setSichtbareSpalten(new ArrayList<>());
 
-        bean.spaltenGeaendert();
+        bean.getAnzeige().alleSpaltenAus();
 
         ArgumentCaptor<TableState> gespeichert = ArgumentCaptor.forClass(TableState.class);
         verify(store, atLeastOnce()).save(eq(MyUserBackingBean.TABELLE), gespeichert.capture());
-        assertThat(gespeichert.getValue().getColumnVisible()).doesNotContainValue(true);
-        assertThat(bean.getSichtbareSpalten()).isEmpty();
+        assertThat(gespeichert.getValue().getColumnVisible())
+                .containsEntry("bearbeiten", true)
+                .containsEntry("username", false)
+                .containsEntry("impersonate", false);
+        assertThat(bean.getAnzeige().getVisibleColumns()).containsExactly("bearbeiten");
+    }
+
+    /** Karte 1904: "Bearbeiten" is the only way to open a user - a manipulated request cannot hide it. */
+    @Test
+    @DisplayName("Bearbeiten laesst sich nicht abschalten, auch nicht per manipuliertem Request")
+    void bearbeitenIstPflicht() {
+        bean.init();
+        bean.getAnzeige().setVisible("bearbeiten", false);
+
+        bean.getAnzeige().onSichtbarkeitGeaendert();
+
+        assertThat(bean.getAnzeige().isPflichtspalte("bearbeiten")).isTrue();
+        assertThat(bean.spalteSichtbar("bearbeiten")).isTrue();
     }
 
     @Test
@@ -170,22 +185,22 @@ class UseradminSpaltenauswahlTest {
                 null, null, null, null, null);
         ohne.init();
 
-        ohne.spaltenGeaendert();
+        ohne.getAnzeige().onSichtbarkeitGeaendert();
 
-        assertThat(ohne.getSichtbareSpalten()).isNotEmpty();
+        assertThat(ohne.getAnzeige().getVisibleColumns()).isNotEmpty();
         verify(store, never()).save(anyString(), any());
     }
 
     @Test
-    @DisplayName("Das Auswahlmenue bietet jede abschaltbare Spalte mit ihrem Kopftext an")
-    void auswahlmenue() {
+    @DisplayName("Das Panel listet jede Spalte mit ihrem Kopftext, in Tabellenreihenfolge")
+    void spaltenliste() {
         bean.init();
 
-        List<String> schluessel = bean.getSpaltenAuswahl().stream().map(i -> String.valueOf(i.getValue())).toList();
-
-        assertThat(schluessel).containsExactly("id", "username", "vorname", "nachname", "mandat",
-                "startpage", "remember", "impersonate");
-        assertThat(bean.getSpaltenAuswahl().get(1).getLabel()).isEqualTo("Benutzername");
+        assertThat(bean.getAnzeige().getSpaltenReihenfolge()).containsExactly("id", "username", "vorname",
+                "nachname", "mandat", "startpage", "bearbeiten", "remember", "impersonate");
+        assertThat(bean.getAnzeige().columnLabel("username")).isEqualTo("Benutzername");
+        // Kopftext = Label: Breite und Reihenfolge werden ueber den Kopftext zugeordnet.
+        assertThat(bean.getAnzeige().keyFromHeader("Rem.Me")).isEqualTo("remember");
     }
 
     // ------------------------------------------------------------------ Multiple tenant filter
