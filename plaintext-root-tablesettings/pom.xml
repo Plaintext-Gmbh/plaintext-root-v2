@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        Karte 1904: der Tabellen-Bedienbereich pt:tableSettings als EIGENSTAENDIGES Artefakt -
+        fuer Anwendungen, die plaintext-root-template/-common NICHT einbinden koennen (eigenes
+        Theme, root v1, z. B. das Inventar mit dem Oblique-Theme und PrimeFaces 15).
+
+        Gebaut wird aus DENSELBEN Quellen wie in root (keine Kopie, kein Drift):
+          - Java: ch.plaintext.boot.table aus plaintext-root-common (ohne
+            UserPreferenceTableStateStore - der haengt an root; die App stellt ihren TableStateStore)
+          - Tag + JS + CSS aus plaintext-root-template
+          - eigenes Taglib (META-INF/plaintext-tablesettings.taglib.xml) im Namensraum
+            http://plaintext.ch/ui - Mojarra fuehrt Taglibs mit gleichem Namensraum zusammen.
+
+        Alle Abhaengigkeiten sind provided: die Anwendung bringt PrimeFaces (15 oder 16), Faces,
+        Jackson und slf4j selbst mit. Geprueft: das Paket kompiliert gegen PF 15.0.19 und 16.0.1.
+
+        NICHT zusammen mit plaintext-root-template einbinden (doppeltes Tag) - root-v2-Apps
+        bekommen pt:tableSettings schon ueber das Template.
+    -->
+    <parent>
+        <groupId>ch.plaintext.v2</groupId>
+        <artifactId>plaintext-root-parent</artifactId>
+        <version>3.11.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>plaintext-root-tablesettings</artifactId>
+    <name>plaintext-root-tablesettings</name>
+    <description>pt:tableSettings eigenstaendig: Tag, JS, CSS und ch.plaintext.boot.table (ohne root-Abhaengigkeit)</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish</groupId>
+            <artifactId>jakarta.faces</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.primefaces</groupId>
+            <artifactId>primefaces</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+            </resource>
+            <!-- Tag, JS und CSS unveraendert aus plaintext-root-template (einzige Quelle). -->
+            <resource>
+                <directory>${project.basedir}/../plaintext-root-template/src/main/resources</directory>
+                <filtering>false</filtering>
+                <includes>
+                    <include>META-INF/tags/tableSettings.xhtml</include>
+                    <include>META-INF/resources/plaintext-layout/js/table-settings.js</include>
+                    <include>META-INF/resources/plaintext-layout/css/table-settings.css</include>
+                </includes>
+            </resource>
+        </resources>
+        <plugins>
+            <!-- Java aus plaintext-root-common (einzige Quelle), nur das Paket ch.plaintext.boot.table. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>table-quellen-aus-common</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/../plaintext-root-common/src/main/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <!-- Nur Lombok: das Paket traegt keine @ModulApi, der Katalog-Prozessor des
+                         Parents wird hier nicht gebraucht (und ist kein Reaktor-Vorgaenger). -->
+                    <annotationProcessorPaths combine.self="override">
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <compilerArgs combine.self="override"/>
+                    <includes>
+                        <include>ch/plaintext/boot/table/**</include>
+                    </includes>
+                    <excludes>
+                        <exclude>ch/plaintext/boot/table/UserPreferenceTableStateStore.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

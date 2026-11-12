@@ -115,6 +115,7 @@ things are worth knowing:
 | `plaintext-root-web` | Reusable web infrastructure: `.html` -> `.xhtml` URL rewrite, `SpringSecurityProvider`, `MenuBean`, debug controllers |
 | `plaintext-root-webapp` | Main web application with security, login, and controllers |
 | `plaintext-root-template` | UI Template |
+| `plaintext-root-tablesettings` | `pt:tableSettings` standalone (tag, JS, CSS, `ch.plaintext.boot.table`, all deps `provided`) for apps without `plaintext-root-template`, e.g. own theme / PrimeFaces 15. Do not combine with the template. |
 | `plaintext-admin-settings` | Application settings management UI |
 | `plaintext-admin-sessions` | Active session monitoring and insights |
 | `plaintext-admin-cron` | Cron job monitoring and management UI |
@@ -370,6 +371,7 @@ plaintext-root/
 ├── plaintext-root-pageguard/           # Page Access Guard
 ├── plaintext-root-web/                 # Reusable web infrastructure
 ├── plaintext-root-template/            # UI template
+├── plaintext-root-tablesettings/       # pt:tableSettings standalone (Karte 1904)
 ├── plaintext-root-webapp/              # Main web application
 ├── plaintext-admin-settings/           # Settings admin
 ├── plaintext-admin-sessions/           # Session monitoring

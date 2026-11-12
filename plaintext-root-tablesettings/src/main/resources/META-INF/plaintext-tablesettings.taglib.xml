@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Karte 1904: nur pt:tableSettings, fuer Anwendungen ohne plaintext-root-template.
+    Gleicher Namensraum wie plaintext.taglib.xml im Template: Mojarra fuehrt Taglibs mit
+    gleichem Namensraum zusammen, die Seiten schreiben weiter <pt:tableSettings .../>.
+    <source> ist relativ zu dieser Datei - das Tag-File liegt in diesem JAR unter META-INF/tags/.
+-->
+<facelet-taglib xmlns="https://jakarta.ee/xml/ns/jakartaee"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-facelettaglibrary_4_0.xsd"
+                version="4.0">
+    <namespace>http://plaintext.ch/ui</namespace>
+    <tag>
+        <tag-name>tableSettings</tag-name>
+        <source>tags/tableSettings.xhtml</source>
+    </tag>
+</facelet-taglib>
