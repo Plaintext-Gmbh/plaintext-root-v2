@@ -30,7 +30,9 @@
       (Nachtrag Daniel 23.11., geht dem Mockup vor). Die Schalter wirken ueber die Bindung der
       Seite: draggableColumns / resizableColumns an #{x.anzeige.verschiebenAktiv} und
       #{x.anzeige.groesseAendernAktiv}, das Ziehen im Kopf meldet <p:ajax event="colReorder">
-      an #{x.anzeige.onColReorder}. Ohne diese drei Zeilen an der Tabelle bleiben die Schalter
+      an #{x.anzeige.onColReorder(event, tabelle)} (Signatur AjaxBehaviorEvent + Tabellen-
+      Suchausdruck; update muss den Tag-Wrap <ptSettingsId>-bereich UND die Tabelle mitrendern —
+      Vorbild: guild member.xhtml). Ohne diese drei Zeilen an der Tabelle bleiben die Schalter
       wirkungslos (das Tag kann fremde Komponenten nur anbieten, nicht verdrahten) — und ohne
       eingeschalteten Schalter haengt auch kein Griff im Spaltenkopf (Punkt 4 des Nachtrags,
       umgesetzt in table-settings.js ueber data-pt-resize an der Schalterzeile).
@@ -96,7 +98,8 @@
     <h:panelGroup layout="block" styleClass="pt-tablesettings-wrap"
                   id="#{ptSettingsId}-bereich"
                   a:data-pt-tablesettings="#{ptTabelleDom}"
-                  a:data-pt-remote="#{anzeige.mitBreiten ? ptSettingsId.concat('MeldeSpaltenbreite') : ''}">
+                  a:data-pt-remote="#{anzeige.mitBreiten ? ptSettingsId.concat('MeldeSpaltenbreite') : ''}"
+                  a:data-pt-settings-id="#{ptSettingsId}">
 
         <!-- Reihenfolge der Spalten-Kinder vor jedem Rendern an den gespeicherten Stand anpassen
              (Karte 1853). Dieses Ereignis feuert am Wrap, der im Markup vor der Tabelle steht —
@@ -109,79 +112,95 @@
                       a:aria-label="#{empty legend ? 'Anzeige einrichten' : legend}">
             <p:commandButton id="#{ptSettingsId}-oeffnen" type="button"
                              icon="pi pi-sliders-h"
-                             styleClass="ui-button-outlined"
+                             styleClass="ui-button-outlined pt-ts-oeffner"
                              title="Anzeige einrichten: Verschieben, Grösse, Ansicht, Spalten, Breiten"/>
 
             <h:panelGroup id="#{ptSettingsId}-meldung" layout="block" styleClass="pt-ts-meldung">
                 <h:outputText value="#{anzeige.meldung}"
                               rendered="#{not empty anzeige.meldung}"/>
             </h:panelGroup>
+
+            <!-- Kein eigenes p:growl hier (Karte 1547, EinGrowlProSeiteTest): die FacesMessages
+                 aus TableSettings#growl zeigt das globalGrowl des Templates. -->
         </h:panelGroup>
 
         <!-- Das schwebende Panel: Schalter zuoberst, dann Profil, dann die drei Reiter.
              dismissable: Klick ausserhalb schliesst (Mockup Variante A). -->
         <p:overlayPanel for="#{ptSettingsId}-oeffnen" id="#{ptSettingsId}-panel"
+                        widgetVar="#{ptSettingsId}PanelWv"
                         styleClass="pt-ts-panel" dismissable="true"
                         hideEffect="fade" showEffect="fade">
             <h:panelGroup layout="block" id="#{ptSettingsId}-panelInhalt">
-            <!-- Schalter (Nachtrag Daniel 23:16): sie wirken auf der Tabelle — die Seite bindet
+            <!-- Kopfzeile des Panels (Runde 4, Karte 1853): Schalter und Profil stehen nebeneinander
+                 in einer Zeile, nicht untereinander. Sie wirken auf der Tabelle — die Seite bindet
                  draggableColumns/resizableColumns an dieselben Eigenschaften. Ohne Schalter keine
-                 Griffe in den Spaltenköpfen (table-settings.js liest data-pt-resize an der Toolbar). -->
-            <h:panelGroup layout="block" styleClass="pt-ts-schalterzeile"
-                          a:data-pt-resize="#{anzeige.groesseAendernAktiv ? '1' : ''}">
-                <p:selectBooleanButton id="#{ptSettingsId}-verschieben"
-                                       value="#{anzeige.verschiebenAktiv}"
-                                       onLabel="Verschieben" offLabel="Verschieben"
-                                       onIcon="pi pi-arrows-h" offIcon="pi pi-arrows-h"
-                                       styleClass="pt-ts-schalter"
-                                       title="Wenn ein, lassen sich die Spaltenköpfe per Ziehen verschieben">
-                    <p:ajax process="@this" listener="#{anzeige.onVerschiebenChange}"
-                            update="#{tabelle} #{ptSettingsId}-panelInhalt #{ptSettingsId}-meldung"/>
-                </p:selectBooleanButton>
+                 Griffe in den Spaltenköpfen (table-settings.js liest data-pt-resize an der
+                 Schalterzeile). -->
+            <h:panelGroup layout="block" styleClass="pt-ts-kopfzeile">
+                <h:panelGroup layout="block" styleClass="pt-ts-schalterzeile"
+                              a:data-pt-resize="#{anzeige.groesseAendernAktiv ? '1' : ''}">
+                    <p:commandButton id="#{ptSettingsId}-fertig"
+                                     value="Fertig" icon="pi pi-check"
+                                     action="#{anzeige.verschiebenBeenden()}"
+                                     process="@this"
+                                     update="#{tabelle} #{ptSettingsId}-panelInhalt #{ptSettingsId}-meldung"
+                                     rendered="#{anzeige.verschiebenAktiv}"
+                                     title="Verschieben beenden — die Reihenfolge ist gespeichert"/>
 
-                <p:selectBooleanButton id="#{ptSettingsId}-groesse"
-                                       value="#{anzeige.groesseAendernAktiv}"
-                                       onLabel="Grösse ändern" offLabel="Grösse ändern"
-                                       onIcon="pi pi-arrow-h-right" offIcon="pi pi-arrow-h-right"
-                                       styleClass="pt-ts-schalter"
-                                       title="Wenn ein, lassen sich die Spaltenbreiten per Ziehen anpassen">
-                    <p:ajax process="@this" listener="#{anzeige.onGroesseAendernChange}"
-                            update="#{tabelle} #{ptSettingsId}-panelInhalt #{ptSettingsId}-meldung"/>
-                </p:selectBooleanButton>
+                    <p:selectBooleanButton id="#{ptSettingsId}-verschieben"
+                                           value="#{anzeige.verschiebenAktiv}"
+                                           onLabel="Verschieben" offLabel="Verschieben"
+                                           onIcon="pi pi-arrows-h" offIcon="pi pi-arrows-h"
+                                           styleClass="pt-ts-schalter"
+                                           title="Wenn ein, lassen sich die Spaltenköpfe per Ziehen verschieben">
+                        <p:ajax process="@this" listener="#{anzeige.onVerschiebenChange}"
+                                update="#{tabelle} #{ptSettingsId}-panelInhalt #{ptSettingsId}-meldung"/>
+                    </p:selectBooleanButton>
 
-                <p:commandButton id="#{ptSettingsId}-standardKnopf"
-                                 value="Standard setzen" icon="pi pi-refresh"
-                                 action="#{anzeige.resetColumnWidths()}"
-                                 process="@this"
-                                 update="#{tabelle} #{ptSettingsId}-panelInhalt #{ptSettingsId}-meldung"
-                                 rendered="#{anzeige.mitBreiten}"
-                                 styleClass="ui-button-outlined pt-ts-standard"
-                                 title="Alle Spaltenbreiten auf die konfigurierte Standardbreite zurücksetzen"/>
-            </h:panelGroup>
+                    <!-- Runde 4: «Grösse ändern» traegt nur das Symbol — Text, Farbe und Bedeutung
+                         des Symbols erklaert der Titel (auf dem Button steht das Breitensymbol). -->
+                    <p:selectBooleanButton id="#{ptSettingsId}-groesse"
+                                           value="#{anzeige.groesseAendernAktiv}"
+                                           onIcon="pi pi-arrow-h-right" offIcon="pi pi-arrow-h-right"
+                                           styleClass="pt-ts-schalter pt-ts-schalter-icon"
+                                           title="Grösse ändern: wenn ein, lassen sich die Spaltenbreiten per Ziehen anpassen">
+                        <p:ajax process="@this" listener="#{anzeige.onGroesseAendernChange}"
+                                update="#{tabelle} #{ptSettingsId}-panelInhalt #{ptSettingsId}-meldung"/>
+                    </p:selectBooleanButton>
 
-            <h:panelGroup layout="block" styleClass="pt-ts-profilzeile">
-                <h:outputText value="Profil:" styleClass="pt-tablesettings-label"/>
+                    <p:commandButton id="#{ptSettingsId}-standardKnopf"
+                                     value="Standard setzen" icon="pi pi-refresh"
+                                     action="#{anzeige.resetColumnWidths()}"
+                                     process="@this"
+                                     update="#{tabelle} #{ptSettingsId}-panelInhalt #{ptSettingsId}-meldung"
+                                     rendered="#{anzeige.mitBreiten}"
+                                     styleClass="ui-button-outlined pt-ts-standard"
+                                     title="Alle Spaltenbreiten auf die konfigurierte Standardbreite zurücksetzen"/>
+                </h:panelGroup>
 
-                <p:selectOneMenu id="#{ptSettingsId}-profileSelect" value="#{anzeige.selectedProfile}"
-                                 style="min-width:200px;">
-                    <f:selectItems value="#{anzeige.profileNames}"/>
-                    <p:ajax event="change" process="@this"
-                            listener="#{anzeige.profilAnwenden(tabelle)}"
-                            update="#{tabelle} #{ptSettingsId}-panelInhalt #{ptSettingsId}-meldung"/>
-                </p:selectOneMenu>
+                <h:panelGroup layout="block" styleClass="pt-ts-profilzeile">
+                    <h:outputText value="Profil:" styleClass="pt-tablesettings-label"/>
 
-                <p:commandButton value="Neu" icon="pi pi-plus"
-                                 process="@this" update="#{ptSettingsId}-profileDialog"
-                                 oncomplete="PF('#{ptSettingsId}ProfileDlg').show();"
-                                 title="Ein neues Profil aus dem aktuellen Stand anlegen"/>
+                    <p:selectOneMenu id="#{ptSettingsId}-profileSelect" value="#{anzeige.selectedProfile}">
+                        <f:selectItems value="#{anzeige.profileNames}"/>
+                        <p:ajax event="change" process="@this"
+                                listener="#{anzeige.profilAnwenden(tabelle)}"
+                                update="#{tabelle} #{ptSettingsId}-panelInhalt #{ptSettingsId}-meldung"/>
+                    </p:selectOneMenu>
 
-                <p:commandButton value="Löschen" icon="pi pi-trash"
-                                 action="#{anzeige.deleteProfile()}"
-                                 process="@this #{ptSettingsId}-profileSelect"
-                                 update="#{ptSettingsId}-panelInhalt #{ptSettingsId}-meldung"
-                                 rendered="#{anzeige.profileActive}"
-                                 styleClass="ui-button-secondary"
-                                 title="Nur das Profil entfernt - der aktuelle Stand bleibt"/>
+                    <p:commandButton value="Neu" icon="pi pi-plus"
+                                     process="@this" update="#{ptSettingsId}-profileDialog"
+                                     oncomplete="PF('#{ptSettingsId}ProfileDlg').show();"
+                                     title="Ein neues Profil aus dem aktuellen Stand anlegen"/>
+
+                    <p:commandButton value="Löschen" icon="pi pi-trash"
+                                     action="#{anzeige.deleteProfile()}"
+                                     process="@this #{ptSettingsId}-profileSelect"
+                                     update="#{ptSettingsId}-panelInhalt #{ptSettingsId}-meldung"
+                                     rendered="#{anzeige.profileActive}"
+                                     styleClass="ui-button-secondary"
+                                     title="Nur das Profil entfernt - der aktuelle Stand bleibt"/>
+                </h:panelGroup>
             </h:panelGroup>
 
             <p:tabView styleClass="pt-ts-tabs">
@@ -234,12 +253,19 @@
                         <ui:insert/>
                     </h:panelGroup>
 
-                    <!-- Griff zum Ziehen (und Pfeile rechts als Tastatur-Alternative); der Schalter
-                         pro Zeile steuert die Sichtbarkeit. Reihenfolge und Sichtbarkeit bleiben
-                         je Benutzer gespeichert. -->
+                    <!-- Griff zum Ziehen; der Schalter pro Zeile steuert die Sichtbarkeit. Reihenfolge
+                         und Sichtbarkeit bleiben je Benutzer gespeichert. Die Pfeil-Buttons der
+                         Liste sind ausgeblendet (Runde 4) — das Ziehen am Griff reicht, die Liste
+                         ist dafuer laenger und von Hand vergroesserbar (CSS). -->
                     <p:orderList id="#{ptSettingsId}-reihenfolge"
                                  value="#{anzeige.spaltenReihenfolge}" var="key" itemValue="#{key}"
-                                 controlsPosition="right" styleClass="pt-ts-reihenfolge">
+                                 styleClass="pt-ts-reihenfolge">
+                        <!-- PF 16 OrderList verbraucht das reorder-Event komplett intern (customEvents,
+                             ueberschreibt auch validate) — der Listener unten laeuft nie. Gesichert
+                             wird stattdessen beim erneuten Rendern nach dem Request: das _values-Feld
+                             der Liste traegt die neue Ordnung mit, preRenderComponent am Wrap liest
+                             es (TableSettings.reihenfolgeAnwenden, Feldweg). Playwright-validiert:
+                             Drag -> Reload -> Reihenfolge steht. -->
                         <p:ajax event="reorder" process="@this"
                                 listener="#{anzeige.onReihenfolgeGeaendert(tabelle)}"
                                 update="#{tabelle} #{ptSettingsId}-meldung"/>
@@ -270,7 +296,7 @@
                                      update="#{tabelle} #{ptSettingsId}-meldung"
                                      ignoreAutoUpdate="true"/>
 
-                    <h:outputText value="Griff ziehen oder Pfeile nutzen: Reihenfolge der Spalten. Schalter: ein-/ausblenden."
+                    <h:outputText value="Griff ziehen: Reihenfolge der Spalten. Schalter: ein-/ausblenden."
                                   styleClass="pt-tablesettings-hint"/>
                 </p:tab>
 

@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.boot.table;
 
+import ch.plaintext.boot.plugins.jsf.FacesMessages;
 import jakarta.faces.component.UIComponent;
 import jakarta.faces.component.UIData;
 import jakarta.faces.context.FacesContext;
@@ -444,6 +445,7 @@ public class TableSettings implements Serializable {
         sichtbar.add(to, gezogen);
         state.setColumnOrder(mergeSichtbar(sichtbar));
         persist();
+        growl("Spaltenreihenfolge wurde geändert.");
         reihenfolgeAnwenden(tabelle);
         log.debug("[TableSettings:{}] onColReorder | from={} | to={}", page, from, to);
     }
@@ -451,7 +453,13 @@ public class TableSettings implements Serializable {
     /** Persistiert die im Request mitgelieferte neue Reihenfolge, falls sie vom Stand abweicht. */
     private void neueReihenfolgeAusRequestUebernehmen(UIData data) {
         try {
-            List<String> keys = reihenfolgeAusColumnOrderFeld(data);
+            List<String> keys = data != null ? reihenfolgeAusColumnOrderFeld(data) : List.of();
+            if (keys.isEmpty()) {
+                // Panel-Weg (Karte 1853, Fix-Runde 3): PF 16 OrderList consumt das reorder-Event
+                // intern — der Listener feuert nie. Die Reihenfolge steht im _values-Feld der
+                // Reihenfolge-Liste (alle Eintraege, in neuer Ordnung).
+                keys = reihenfolgeAusOrderListValuesFeld();
+            }
             if (keys.isEmpty()) {
                 return;
             }
@@ -459,11 +467,43 @@ public class TableSettings implements Serializable {
             if (!gemerged.equals(state.getColumnOrder())) {
                 state.setColumnOrder(gemerged);
                 persist();
-                log.debug("[TableSettings:{}] Reihenfolge aus _columnOrder-Feld uebernommen | {}", page, gemerged);
+                log.debug("[TableSettings:{}] Reihenfolge aus Request uebernommen | {}", page, gemerged);
             }
         } catch (RuntimeException e) { // NOSONAR - ein Kippen der Reihenfolge darf das Rendern nicht abbrechen
-            log.debug("[TableSettings:{}] _columnOrder-Verarbeitung fehlgeschlagen | {}", page, e.getMessage());
+            log.debug("[TableSettings:{}] Reihenfolge-Request-Verarbeitung fehlgeschlagen | {}", page, e.getMessage());
         }
+    }
+
+    /**
+     * Liest die Reihenfolge aus dem versteckten {@code <id>_values}-Select der Reihenfolge-Liste
+     * (p:orderList im Panel). Der Browser sendet alle Eintraege in ihrer neuen Ordnung als
+     * Mehrfach-Parameter. Erkannte wird das Feld daran, dass alle Werte bekannte Spalten-Keys sind.
+     */
+    private List<String> reihenfolgeAusOrderListValuesFeld() {
+        FacesContext faces = FacesContext.getCurrentInstance();
+        if (faces == null || faces.getExternalContext() == null) {
+            return List.of();
+        }
+        java.util.Set<String> bekannteKeys = new java.util.HashSet<>();
+        for (TableColumn column : getOrderedColumns()) {
+            bekannteKeys.add(column.getKey());
+        }
+        for (Map.Entry<String, String[]> eintrag
+                : faces.getExternalContext().getRequestParameterValuesMap().entrySet()) {
+            if (!eintrag.getKey().endsWith("_values")) {
+                continue;
+            }
+            String[] werte = eintrag.getValue();
+            if (werte == null || werte.length == 0 || !bekannteKeys.containsAll(java.util.Arrays.asList(werte))) {
+                continue;
+            }
+            List<String> keys = new ArrayList<>();
+            for (String wert : werte) {
+                keys.add(wert);
+            }
+            return keys;
+        }
+        return List.of();
     }
 
     /**
@@ -592,6 +632,13 @@ public class TableSettings implements Serializable {
         persist();
     }
 
+    /** Der «Fertig»-Knopf im Panel (Runde 4, Karte 1853): beendet den Zieh-Modus nach dem Verschieben. */
+    public void verschiebenBeenden() {
+        state.setMoveEnabled(false);
+        meldung = "Verschieben beendet — die Reihenfolge ist gespeichert.";
+        persist();
+    }
+
     /** Schalter «Grösse aendern»: duerfen Spaltenbreiten gezogen werden? Vorgabe: an (bisheriges Verhalten). */
     public boolean isGroesseAendernAktiv() {
         return !Boolean.FALSE.equals(state.getResizeEnabled());
@@ -666,6 +713,7 @@ public class TableSettings implements Serializable {
         }
         state.getColumnWidths().put(key, event.getWidth() + "px");
         persist();
+        growl("Spaltenbreite wurde geändert.");
         log.debug("[TableSettings:{}] onColumnResize | column={} | width={}px", page, key, event.getWidth());
     }
 
@@ -688,6 +736,15 @@ public class TableSettings implements Serializable {
         // wieder der Summe ihrer Spalten.
         state.setTotalWidth(null);
         persist();
+        growl("Spaltenbreite wurde gespeichert.");
+    }
+
+    /** Kurzes Growl-Overlay fuer gelungene Aenderungen (Runde 4, Karte 1853) — globale
+     *  FacesMessage, die das globalGrowl des Templates mit autoUpdate uebernimmt. Laeuft
+     *  zentral ueber FacesMessages (Null-Sicherheit ausserhalb eines JSF-Requests,
+     *  Architekturregel meldungenNurUeberFacesMessages). */
+    private void growl(String text) {
+        FacesMessages.info(text);
     }
 
     /** Gesamtbreite fuer das Eingabefeld; ohne eigene Angabe die aktuelle Summe als Vorschlag. */
