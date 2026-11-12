@@ -79,9 +79,13 @@ Drei Mechanismen muss man kennen:
    sendet die neue Ordnung aber mit dem reorder-Request im versteckten `_values`-Feld der
    Liste. `TableSettings#neueReihenfolgeAusRequestUebernehmen` liest beim erneuten Rendern
    (derselbe `preRenderComponent`-Weg) alle Request-Parameter, deren Werte ausschließlich
-   bekannte Spalten-Keys sind, und persistiert bei Abweichung. Beweis:
-   `SpaltenReihenfolgeDragPlaywrightIT` in plaintext-guild (Drag → Reload → Reihenfolge
-   steht).
+   bekannte Spalten-Keys sind, und persistiert bei Abweichung. **Der Wrap muss dazu im
+   `update` des reorder-Ajax stehen** — sonst rendert er beim reorder-Request gar nicht
+   und der Feldweg läuft nie (live auf PROD gemessen, 12.11.2026). Das Ziel kommt per
+   `binding="#{anzeige.reihenfolgeZiel}"` in das Update: aus der Liste heraus ist keine
+   relative Id möglich, weil `p:orderList` ein NamingContainer ist, und die Form-Id kennt
+   das Tag nicht. Beweis: `SpaltenReihenfolgeDragPlaywrightIT` in plaintext-guild (Drag →
+   Reload → Reihenfolge steht).
 
 **Für KIs: was NICHT funktioniert** (alle messbar erprobt, Karte 1853 Runde 3):
 - `listener` am `<p:ajax event="reorder">` — feuert nie.
