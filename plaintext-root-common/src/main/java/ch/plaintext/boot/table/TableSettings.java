@@ -1428,7 +1428,43 @@ public class TableSettings implements Serializable {
                 return column.getKey();
             }
         }
+        // Karte 1904: Kopftexte kommen oft uebersetzt (#{i18n.t('Benutzername')} -> "Username"), das Label
+        // ist die deutsche Vorgabe. Ohne diesen Zweig fanden Kopf-Zug, Breite und Reihenfolge in EN nichts.
+        for (TableColumn column : columns) {
+            String uebersetzt = column.getLabel() == null ? null : uebersetzt(column.getLabel());
+            if (uebersetzt != null && uebersetzt.trim().toLowerCase(Locale.ROOT).equals(h)) {
+                return column.getKey();
+            }
+        }
         return null;
+    }
+
+    /** Uebersetzer fuer Labels (Tests setzen ihn); null = die i18n-Bean der App per EL. */
+    private transient java.util.function.UnaryOperator<String> uebersetzer;
+
+    void setUebersetzer(java.util.function.UnaryOperator<String> uebersetzer) {
+        this.uebersetzer = uebersetzer;
+    }
+
+    private String uebersetzt(String label) {
+        return uebersetzer != null ? uebersetzer.apply(label) : perI18nBean(label);
+    }
+
+    /**
+     * Das Label in der Sprache der Seite ueber {@code #{i18n.t(...)}} — ohne Kompilier-Abhaengigkeit auf
+     * root-i18n, damit das tablesettings-Modul in v1-Apps ohne diese Bean weiterlaeuft (dann null).
+     */
+    private static String perI18nBean(String label) {
+        FacesContext faces = FacesContext.getCurrentInstance();
+        if (faces == null) {
+            return null;
+        }
+        try {
+            String literal = label.replace("\\", "\\\\").replace("'", "\\'");
+            return faces.getApplication().evaluateExpressionGet(faces, "#{i18n.t('" + literal + "')}", String.class);
+        } catch (RuntimeException e) { // NOSONAR - keine i18n-Bean oder kein Eintrag: Label bleibt unuebersetzt
+            return null;
+        }
     }
 
     private int defaultWidth(String key) {

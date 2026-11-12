@@ -150,6 +150,21 @@ class TableSettingsTest {
     }
 
     @Test
+    @DisplayName("Karte 1904: uebersetzte Kopftexte (EN) finden die Spalte ueber das uebersetzte Label")
+    void uebersetzterKopftext() {
+        // Ohne Faces und ohne Uebersetzer: nur das deutsche Label trifft (Verhalten wie bisher).
+        assertThat(anzeige.keyFromHeader("Team key")).isNull();
+
+        anzeige.setUebersetzer(label -> "TeamKey".equals(label) ? "Team key" : label);
+        assertThat(anzeige.keyFromHeader("Team key")).isEqualTo("team");
+        assertThat(anzeige.keyFromHeader("TeamKey")).isEqualTo("team");
+        assertThat(anzeige.keyFromHeader("Gibtsnicht")).isNull();
+
+        anzeige.setUebersetzer(label -> null); // keine Uebersetzung vorhanden
+        assertThat(anzeige.keyFromHeader("Team key")).isNull();
+    }
+
+    @Test
     @DisplayName("Gesamtbreite verteilen: proportional, aber keine Spalte unter dem Minimum")
     void breiteVerteilen() {
         anzeige.setGesamtBreite(540);
