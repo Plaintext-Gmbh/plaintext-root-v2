@@ -144,6 +144,14 @@ plaintext:
     kompatibel-ab: '@plaintext.root.kompatibel-ab@'
   menu:
     scan-package: ch.plaintext
+  login:
+    # Card 2042: show the built-in username/password form on the login page (default true = status quo).
+    # false hides it, e.g. for an application that signs in only through its identity provider.
+    form: ${PLAINTEXT_LOGIN_FORM:true}
+    # Card 2042: with the form hidden and exactly ONE active OIDC provider, the login page redirects
+    # straight to that provider (default false = status quo). With two or more providers it does not.
+    # Never after ?error or ?logout, so a failed or ended sign-in does not loop.
+    auto-redirect-single-idp: ${PLAINTEXT_LOGIN_AUTO_REDIRECT_SINGLE_IDP:false}
   security:
     # Signing key for the persistent remember-me cookie. Leave blank in dev
     # (an ephemeral key is generated + WARN-logged). MUST be a stable secret in
