@@ -64,7 +64,7 @@
              ui:include, CVSS 7.5). Nicht zurueckdrehen. Die Kehrseite derselben Haertung —
              Facelet-Verweise brauchen seither einen fuehrenden "/" — haelt der Test
              FaceletPfadInvariantTest (plaintext-root-webapp) fest, dort steht die Begruendung. -->
-        <jakarta.faces.version>4.1.19</jakarta.faces.version>
+        <jakarta.faces.version>4.1.20</jakarta.faces.version>
 
         <!-- Cron & Scheduling -->
         <cron4j.version>2.2.5</cron4j.version>
@@ -76,13 +76,13 @@
         <xstream.version>1.4.21</xstream.version>
         <joda-time.version>2.15.1</joda-time.version>
         <commons-beanutils.version>1.11.0</commons-beanutils.version>
-        <guava.version>33.7.2-jre</guava.version>
+        <guava.version>33.8.0-jre</guava.version>
         <commons-lang3.version>3.21.0</commons-lang3.version>
         <commons-io.version>2.22.0</commons-io.version>
         <lombok.version>1.18.48</lombok.version>
 
         <!-- Web -->
-        <jsoup.version>1.23.2</jsoup.version>
+        <jsoup.version>1.24.1</jsoup.version>
 
         <!-- Misc -->
         <prettytime.version>5.0.9.Final</prettytime.version>
@@ -106,7 +106,7 @@
         <antlr4.version>4.13.2</antlr4.version>
 
         <!-- Karte 1618: die Huelle loest 2.50.0 auf, Apps ohne eigenen Pfad dorthin 2.41.0 (ueber guava); ein Pin fuer beide. -->
-        <error_prone_annotations.version>2.51.0</error_prone_annotations.version>
+        <error_prone_annotations.version>2.52.0</error_prone_annotations.version>
 
         <!-- Karte 1618: ZXing fuer TOTP-QR (root-webapp). totp 1.7.1 bringt 3.4.0 und com.beust:jcommander 1.72,
              die Apps 3.5.4 (dazu org.jcommander 1.85). Nur in root-webapp benutzt, darum nicht im
