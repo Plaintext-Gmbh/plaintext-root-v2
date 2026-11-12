@@ -147,6 +147,9 @@ plaintext:
   login:
     # Card 2042: show the built-in username/password form on the login page (default true = status quo).
     # false hides it, e.g. for an application that signs in only through its identity provider.
+    # The reset and registration links sit inside the form and go with it; the magic-link section has its
+    # own setup switch and stays. This HIDES the form, it does not disable form login: POST /login still
+    # accepts passwords.
     form: ${PLAINTEXT_LOGIN_FORM:true}
     # Card 2042: with the form hidden and exactly ONE active OIDC provider, the login page redirects
     # straight to that provider (default false = status quo). With two or more providers it does not.
