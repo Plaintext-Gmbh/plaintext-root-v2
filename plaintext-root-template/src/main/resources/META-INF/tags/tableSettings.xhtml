@@ -30,7 +30,9 @@
       (Nachtrag Daniel 23.11., geht dem Mockup vor). Die Schalter wirken ueber die Bindung der
       Seite: draggableColumns / resizableColumns an #{x.anzeige.verschiebenAktiv} und
       #{x.anzeige.groesseAendernAktiv}, das Ziehen im Kopf meldet <p:ajax event="colReorder">
-      an #{x.anzeige.onColReorder}. Ohne diese drei Zeilen an der Tabelle bleiben die Schalter
+      an #{x.anzeige.onColReorder(event, tabelle)} (Signatur AjaxBehaviorEvent + Tabellen-
+      Suchausdruck; update muss den Tag-Wrap <ptSettingsId>-bereich UND die Tabelle mitrendern —
+      Vorbild: guild member.xhtml). Ohne diese drei Zeilen an der Tabelle bleiben die Schalter
       wirkungslos (das Tag kann fremde Komponenten nur anbieten, nicht verdrahten) — und ohne
       eingeschalteten Schalter haengt auch kein Griff im Spaltenkopf (Punkt 4 des Nachtrags,
       umgesetzt in table-settings.js ueber data-pt-resize an der Schalterzeile).

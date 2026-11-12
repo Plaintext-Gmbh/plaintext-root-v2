@@ -15,7 +15,8 @@ das Speichern pro Person funktioniert (und wo die bekannten Fallstricke liegen).
     <p:dataTable id="tbl" value="#{meinBackingBean.zeilen}" var="z"
                  draggableColumns="#{meinBackingBean.anzeige.verschiebenAktiv}"
                  resizableColumns="#{meinBackingBean.anzeige.groesseAendernAktiv}">
-        <p:ajax event="colReorder" listener="#{meinBackingBean.anzeige.onColReorder}"/>
+        <p:ajax event="colReorder" listener="#{meinBackingBean.anzeige.onColReorder(event, ':fm:tbl')}"
+                update="fm:anz-bereich :fm:tbl"/>
         <p:column headerText="Name">...</p:column>
     </p:dataTable>
 </h:form>
