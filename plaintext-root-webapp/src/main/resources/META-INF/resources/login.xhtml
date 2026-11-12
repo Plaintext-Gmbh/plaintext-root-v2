@@ -356,8 +356,9 @@
         </form>
         </h:panelGroup>
 
-        <!-- OIDC Auto-Redirect (only when no error/logout parameter) -->
-        <h:panelGroup rendered="#{loginSetupBean.oidcAutoRedirectActive and empty param.error and empty param.logout}">
+        <!-- OIDC Auto-Redirect (only when no error/logout parameter). Spring appends ?logout / ?error WITHOUT a
+             value: param.logout is then "" and empty("") is true - so test for presence (== null), not emptiness (card 2042). -->
+        <h:panelGroup rendered="#{loginSetupBean.oidcAutoRedirectActive and param.error == null and param.logout == null}">
             <!-- The target URL arrives as a data attribute, not as EL in a script body: an
                  inline <script> forces the Content Security Policy to script-src 'unsafe-inline'
                  (wave 4). js/login.js reads the attribute and redirects. -->
