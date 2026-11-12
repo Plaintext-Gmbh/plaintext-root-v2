@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.boot.table;
 
-import jakarta.faces.application.FacesMessage;
+import ch.plaintext.boot.plugins.jsf.FacesMessages;
 import jakarta.faces.component.UIComponent;
 import jakarta.faces.component.UIData;
 import jakarta.faces.context.FacesContext;
@@ -739,14 +739,12 @@ public class TableSettings implements Serializable {
         growl("Spaltenbreite wurde gespeichert.");
     }
 
-    /** Kurzes Growl-Overlay fuer gelungene Aenderungen (Runde 4, Karte 1853) — global, damit
-     *  es das Growl des Tags mit autoUpdate uebernimmt, ohne dass die Seite etwas verdrahten
-     *  muss. Ohne FacesContext (Rein-Java-Tests) still weglassen. */
+    /** Kurzes Growl-Overlay fuer gelungene Aenderungen (Runde 4, Karte 1853) — globale
+     *  FacesMessage, die das globalGrowl des Templates mit autoUpdate uebernimmt. Laeuft
+     *  zentral ueber FacesMessages (Null-Sicherheit ausserhalb eines JSF-Requests,
+     *  Architekturregel meldungenNurUeberFacesMessages). */
     private void growl(String text) {
-        FacesContext faces = FacesContext.getCurrentInstance();
-        if (faces != null) {
-            faces.addMessage(null, new FacesMessage(FacesMessage.SEVERITY_INFO, text, null));
-        }
+        FacesMessages.info(text);
     }
 
     /** Gesamtbreite fuer das Eingabefeld; ohne eigene Angabe die aktuelle Summe als Vorschlag. */
