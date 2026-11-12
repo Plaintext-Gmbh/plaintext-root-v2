@@ -115,8 +115,9 @@ Attribut + Listener in dieser Datei.
 
 Gelungene Änderungen meldet das Tag kurz oben rechts: Spaltenbreite geändert (freies Ziehen
 und Setzen-Knopf) sowie Spaltenreihenfolge geändert (Kopf-Zug). `TableSettings#growl` legt
-eine globale FacesMessage ab; das `p:growl` im Tag (`globalOnly="true" autoUpdate="true"`)
-nimmt sie mit dem Ajax-Response auf — Seiten verdrahten nichts und fremde Validierungs-
-Messages bleiben unberührt. Der Panel-Griff und die Sichtbarkeit melden bewusst nur die
-Textzeile: Ihre Requests rendern oft, ein Growl pro Render waere Laerm.
+eine globale FacesMessage ab; zeigt tut sie das eine `globalGrowl` des Templates (Karte 1547,
+aktualisiert sich per `p:autoUpdate` bei jedem Ajax-Response) — das Tag trägt bewusst KEIN
+eigenes `p:growl` (Regel: ein Growl pro Seite, `EinGrowlProSeiteTest`). Seiten verdrahten
+nichts. Der Panel-Griff und die Sichtbarkeit melden bewusst nur die Textzeile: Ihre Requests
+rendern oft, ein Growl pro Render waere Laerm.
 

@@ -118,13 +118,8 @@
                               rendered="#{not empty anzeige.meldung}"/>
             </h:panelGroup>
 
-            <!-- Growl-Overlay (Runde 4, Karte 1853): meldet gelungene Aenderungen kurz oben
-                 rechts (Spaltenbreite, Reihenfolge). globalOnly, damit fremde
-                 komponentengebundene Messages unberuehrt bleiben; autoUpdate, damit die
-                 FacesMessage mit dem naechsten Ajax-Response mitkommt — die Seite verdrahtet
-                 nichts. -->
-            <p:growl id="#{ptSettingsId}-growl" globalOnly="true" showDetail="false"
-                     life="4000" autoUpdate="true"/>
+            <!-- Kein eigenes p:growl hier (Karte 1547, EinGrowlProSeiteTest): die FacesMessages
+                 aus TableSettings#growl zeigt das globalGrowl des Templates. -->
         </h:panelGroup>
 
         <!-- Das schwebende Panel: Schalter zuoberst, dann Profil, dann die drei Reiter.
