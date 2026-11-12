@@ -475,15 +475,17 @@ public class TableSettings implements Serializable {
     /** Persistiert die im Request mitgelieferte neue Reihenfolge, falls sie vom Stand abweicht. */
     private void neueReihenfolgeAusRequestUebernehmen(UIData data) {
         try {
-            // Panel-Weg zuerst (Karte 1853): Das _values-Feld der Reihenfolge-Liste sendet
-            // PF nur bei deren reorder-Event — ist es im Request, traegt es den aktuellen
-            // Nutzerwunsch. Das columnOrder-Feld der Tabelle kommt dagegen mit JEDEM
-            // Formular-Request mit und wuerde eine Panel-Aenderung mit der alten Kopf-
-            // Reihenfolge ueberschreiben (gemessen: claude1, Inventar-Pilot 3.15/3.19).
-            List<String> keys = reihenfolgeAusOrderListValuesFeld();
-            if (keys.isEmpty()) {
-                keys = data != null ? reihenfolgeAusColumnOrderFeld(data) : List.of();
-            }
+            // Nach dem Ereignis unterscheiden, nicht nach Feld-Reihenfolge (Karte 1853):
+            // PF schickt BEIDE Felder mit jedem Submit mit — die orderList liegt im selben
+            // Formular, also ist auch ihr _values bei jedem POST dabei (alter Stand), und
+            // das columnOrder der Tabelle ebenso. Nur das Behavior-Event sagt, was gemeint
+            // ist (gemessen: claude1, Inventar-Pilot 3.19/3.20).
+            String event = eventAusRequest();
+            List<String> keys = switch (event) {
+                case "reorder" -> reihenfolgeAusOrderListValuesFeld();
+                case "colReorder" -> data != null ? reihenfolgeAusColumnOrderFeld(data) : List.of();
+                default -> List.of();
+            };
             if (keys.isEmpty()) {
                 return;
             }
@@ -496,6 +498,17 @@ public class TableSettings implements Serializable {
         } catch (RuntimeException e) { // NOSONAR - ein Kippen der Reihenfolge darf das Rendern nicht abbrechen
             log.debug("[TableSettings:{}] Reihenfolge-Request-Verarbeitung fehlgeschlagen | {}", page, e.getMessage());
         }
+    }
+
+    /** Das Behavior-Event des Requests ({@code jakarta.faces.behavior.event}), leer wenn keins. */
+    private String eventAusRequest() {
+        FacesContext faces = FacesContext.getCurrentInstance();
+        if (faces == null || faces.getExternalContext() == null) {
+            return "";
+        }
+        String event = faces.getExternalContext().getRequestParameterMap()
+                .get("jakarta.faces.behavior.event");
+        return event != null ? event : "";
     }
 
     /**
