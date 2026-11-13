@@ -315,10 +315,57 @@ class TableSettingsTest {
     @DisplayName("Modus-Label und -Icon folgen dem Zustand")
     void modusLabelUndIcon() {
         assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.vergroessern"));
-        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrow-h-right");
+        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrows-h");
         anzeige.modusWechseln();
         assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.anpassen"));
         assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-sliders-h");
+    }
+
+    @Test
+    @DisplayName("Runde 7: Modus Verschieben hat ein eigenes Symbol, Resize kein erfundenes")
+    void modusIconsExistieren() {
+        anzeige.modusWechseln();   // 2 -> 0
+        anzeige.modusWechseln();   // 0 -> 1 Verschieben
+        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrow-right-arrow-left");
+        assertThat(anzeige.text("modus.anpassen")).isEqualTo("Anpassen");
+    }
+
+    @Test
+    @DisplayName("Runde 7: fester Stand - festhalten, verstellen, genau zurueck; wandert mit ins Profil")
+    void festerStandFesthaltenUndHerstellen() {
+        anzeige.getState().getColumnWidths().put("name", "180px");
+        anzeige.getState().setColumnOrder(java.util.List.of("team", "name", "extra"));
+        anzeige.getState().setTotalWidth(900);
+        assertThat(anzeige.isFesterStandErfasst()).isFalse();
+
+        anzeige.festerStandErfassen();
+        assertThat(anzeige.isFesterStandErfasst()).isTrue();
+        assertThat(anzeige.getState().getProfiles().get(TableSettings.PROFILE_DEFAULT).getFesterStand())
+                .isEqualTo(anzeige.getState().getFesterStand());
+
+        // verstellen: andere Breite, neue Spalte mit Breite, andere Reihenfolge, keine Gesamtbreite
+        anzeige.getState().getColumnWidths().put("name", "300px");
+        anzeige.getState().getColumnWidths().put("team", "77px");
+        anzeige.getState().setColumnOrder(java.util.List.of("extra", "name", "team"));
+        anzeige.getState().setTotalWidth(null);
+
+        anzeige.festerStandHerstellen(":fm:tbl");
+
+        assertThat(anzeige.getState().getColumnWidths()).containsExactly(java.util.Map.entry("name", "180px"));
+        assertThat(anzeige.getState().getColumnOrder()).containsExactly("team", "name", "extra");
+        assertThat(anzeige.getState().getTotalWidth()).isEqualTo(900);
+
+        // Der feste Stand bleibt unberuehrt, wenn danach weiter gezogen wird.
+        anzeige.getState().getColumnWidths().put("name", "222px");
+        assertThat(anzeige.getState().getFesterStand().columnWidths()).containsEntry("name", "180px");
+    }
+
+    @Test
+    @DisplayName("Runde 7: ohne festen Stand aendert der Doppelklick nichts")
+    void festerStandFehlt() {
+        anzeige.getState().getColumnWidths().put("name", "300px");
+        anzeige.festerStandHerstellen(":fm:tbl");
+        assertThat(anzeige.getState().getColumnWidths()).containsEntry("name", "300px");
     }
 
     @Test
@@ -343,7 +390,7 @@ class TableSettingsTest {
 
         try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
             holder.when(FacesContext::getCurrentInstance).thenReturn(faces);
-            assertThat(TableSettingsTexte.bundle().getString("modus.anpassen")).isEqualTo("Adjust columns");
+            assertThat(TableSettingsTexte.bundle().getString("modus.anpassen")).isEqualTo("Adjust");
         }
     }
 
@@ -361,7 +408,7 @@ class TableSettingsTest {
 
         try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
             holder.when(FacesContext::getCurrentInstance).thenReturn(faces);
-            assertThat(TableSettingsTexte.text("modus.anpassen")).isEqualTo("Adjust columns");
+            assertThat(TableSettingsTexte.text("modus.anpassen")).isEqualTo("Adjust");
             assertThat(TableSettingsTexte.text("meldung.reihenfolgeGeaendert")).isEqualTo("Column order changed.");
         }
     }

@@ -696,6 +696,29 @@ public class TableSettings implements Serializable {
         return TableSettingsTexte.modusIcon(getModus());
     }
 
+    /** Haelt Breiten und Reihenfolge fest (Ansicht-Reiter, Karte 1853 Runde 7); wandert mit ins Profil. */
+    public void festerStandErfassen() {
+        state.setFesterStand(FesterStand.aus(state));
+        persist();
+        growl(text("meldung.festerStand.erfasst"));
+    }
+
+    public boolean isFesterStandErfasst() {
+        return state.getFesterStand() != null;
+    }
+
+    /** Doppelklick auf den Modus-Knopf: Breiten und Reihenfolge genau auf den festen Stand. */
+    public void festerStandHerstellen(String tabelle) {
+        if (state.getFesterStand() == null) {
+            growl(text("meldung.festerStand.fehlt"));
+            return;
+        }
+        state.getFesterStand().anwenden(state);
+        persist();
+        reihenfolgeAnwenden(tabelle);
+        growl(text("meldung.festerStand.hergestellt"));
+    }
+
     /** Schalter «Verschieben»: duerfen die Spaltenkoepfe per Ziehen umgeordnet werden? Vorgabe: aus. */
     public boolean isVerschiebenAktiv() {
         return Boolean.TRUE.equals(state.getMoveEnabled());
@@ -1267,6 +1290,7 @@ public class TableSettings implements Serializable {
         state.setRowsPerPage(profile.getRowsPerPage());
         state.setSortBy(TableSort.kopie(profile.getSortBy()));
         state.setPageState(new LinkedHashMap<>(profile.getPageState()));
+        state.setFesterStand(profile.getFesterStand());
         state.setActiveProfile(selectedProfile);
         save();
         growl(profilMeldung(selectedProfile, "meldung.profil.angewendet"));
@@ -1372,6 +1396,7 @@ public class TableSettings implements Serializable {
         profile.setRowsPerPage(state.getRowsPerPage());
         profile.setSortBy(TableSort.kopie(state.getSortBy()));
         profile.setPageState(new LinkedHashMap<>(state.getPageState()));
+        profile.setFesterStand(state.getFesterStand());
         state.getProfiles().put(name, profile);
     }
 

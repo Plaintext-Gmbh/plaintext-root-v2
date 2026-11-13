@@ -58,4 +58,7 @@ public class TableColumnProfile implements Serializable {
      * seine Filter nicht dasselbe Profil.
      */
     private Map<String, String> pageState = new LinkedHashMap<>();
+
+    /** Der feste Spaltenstand des Profils (Karte 1853 Runde 7); {@code null} = keiner erfasst. */
+    private FesterStand festerStand;
 }

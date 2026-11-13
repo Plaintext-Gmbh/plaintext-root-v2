@@ -89,8 +89,9 @@ public final class TableSettingsTexte {
     /** Icon des Dreifach-Modus-Schalters je Modus. */
     public static String modusIcon(int modus) {
         return switch (modus) {
-            case 1 -> "pi pi-arrows-h";
-            case 2 -> "pi pi-arrow-h-right";
+            case 1 -> "pi pi-arrow-right-arrow-left";
+            // pi-arrow-h-right gibt es in PrimeIcons nicht - Resize stand ohne Symbol (Runde 7)
+            case 2 -> "pi pi-arrows-h";
             default -> "pi pi-sliders-h";
         };
     }
