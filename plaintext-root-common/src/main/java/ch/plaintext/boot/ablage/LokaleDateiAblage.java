@@ -5,6 +5,7 @@ package ch.plaintext.boot.ablage;
 
 import ch.plaintext.ablagen.AblageEintrag;
 import ch.plaintext.ablagen.DateiAblage;
+import ch.plaintext.modules.ModulApiUmsetzung;
 
 import java.io.IOException;
 import java.nio.file.DirectoryNotEmptyException;
@@ -35,6 +36,12 @@ import java.util.stream.Stream;
  * ist das in Java nicht ganz zu schliessen; die Ablage selbst legt nie Links an, und über die API lassen sich
  * keine anlegen.</p>
  */
+@ModulApiUmsetzung(beschreibung = "Stores, reads, lists, moves and deletes files and folders in a folder of the server's file system,"
+        + " below a base the operator sets (plaintext.ablagen.lokal.basis).",
+        seiteneffekte = ModulApiUmsetzung.Seiteneffekte.INTERN,
+        hinweise = {"Paths stay below the folder: no dot segments, no symlink leading outside", "A store never covers the whole base",
+                "Writes are atomic (temp file, then move)", "Reads at most 50 MB per file"},
+        beispiele = {"schreibe(\"notizen/default/anna.md\", bytes)"})
 public final class LokaleDateiAblage implements DateiAblage {
 
     private static final String UNGUELTIG = "Ungültiger Pfad.";
