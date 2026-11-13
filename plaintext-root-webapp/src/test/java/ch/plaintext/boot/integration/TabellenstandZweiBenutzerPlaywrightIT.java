@@ -263,12 +263,18 @@ TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder()
                     && st.getProfiles().values().stream().anyMatch(pr -> pr.getFesterStand() != null));
             // Im KOPF ziehen (Modus Reorder), nicht in der Liste: danach haelt PF die Ordnung selbst
             // im View-State - genau der Fall, in dem der Doppelklick erst nach Reload wirkte (claude2).
+            // Panel zu, sonst liegt es ueber den Koepfen und der Zug trifft das Panel.
+            seite.click("#fm\\:anz-oeffnen");
+            seite.locator(".pt-ts-panel").waitFor(new Locator.WaitForOptions()
+                    .setState(com.microsoft.playwright.options.WaitForSelectorState.HIDDEN));
             kopfZiehen(seite, "Vorname", "Benutzername");
             warteAufStand(seite, CARLA, st -> st.getColumnOrder() != null
                     && st.getColumnOrder().indexOf("vorname") < st.getColumnOrder().indexOf("username"));
             java.util.List<String> gezogen = seite.locator("#fm\\:tbl thead th .ui-column-title").allInnerTexts();
             assertTrue(gezogen.indexOf("Vorname") < gezogen.indexOf("Benutzername"), "Ziehen wirkt nicht: " + gezogen);
 
+            seite.click("#fm\\:anz-oeffnen");
+            seite.locator(".pt-ts-panel").waitFor();
             seite.locator("#fm\\:anz-modus").dblclick();
             seite.locator(".ui-growl-message").filter(new Locator.FilterOptions()
                     .setHasText(java.util.regex.Pattern.compile("festen Stand gesetzt|fixed layout"))).first().waitFor();
