@@ -372,6 +372,29 @@ class TableSettingsTest {
     }
 
     @Test
+    @DisplayName("Runde 7: Restore vergisst PFs Kopf-Zug-Ordnung (displayPriority), Breite/Sichtbarkeit bleiben")
+    void pfReihenfolgeVergessen() {
+        org.primefaces.component.datatable.DataTable tabelle = Mockito.mock(org.primefaces.component.datatable.DataTable.class);
+        org.primefaces.model.ColumnMeta meta = new org.primefaces.model.ColumnMeta("fm:tbl:c1");
+        meta.setDisplayPriority(3);
+        meta.setWidth("120");
+        meta.setVisible(Boolean.FALSE);
+        Mockito.when(tabelle.getColumnMeta()).thenReturn(new java.util.HashMap<>(java.util.Map.of("fm:tbl:c1", meta)));
+
+        TableKomponenten.pfReihenfolgeVergessen(tabelle);
+
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<java.util.Map<String, org.primefaces.model.ColumnMeta>> neu =
+                org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
+        Mockito.verify(tabelle).setColumnMeta(neu.capture());
+        org.primefaces.model.ColumnMeta kopie = neu.getValue().get("fm:tbl:c1");
+        assertThat(kopie.getDisplayPriority()).isNull();
+        assertThat(kopie.getWidth()).isEqualTo("120");
+        assertThat(kopie.getVisible()).isFalse();
+        Mockito.verify(tabelle).setColumns(null);
+    }
+
+    @Test
     @DisplayName("Runde 7: ohne festen Stand aendert der Doppelklick nichts")
     void festerStandFehlt() {
         anzeige.getState().getColumnWidths().put("name", "300px");

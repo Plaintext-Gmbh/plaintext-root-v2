@@ -261,8 +261,9 @@ TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder()
             seite.click("[id$='anz-festhalten']");
             warteAufStand(seite, CARLA, st -> st.getFesterStand() != null
                     && st.getProfiles().values().stream().anyMatch(pr -> pr.getFesterStand() != null));
-            seite.locator(".pt-ts-panel .ui-tabs-nav li").filter(new Locator.FilterOptions().setHasText("Spalten")).click();
-            griffZiehen(seite, "vorname", "username");
+            // Im KOPF ziehen (Modus Reorder), nicht in der Liste: danach haelt PF die Ordnung selbst
+            // im View-State - genau der Fall, in dem der Doppelklick erst nach Reload wirkte (claude2).
+            kopfZiehen(seite, "Vorname", "Benutzername");
             warteAufStand(seite, CARLA, st -> st.getColumnOrder() != null
                     && st.getColumnOrder().indexOf("vorname") < st.getColumnOrder().indexOf("username"));
             java.util.List<String> gezogen = seite.locator("#fm\\:tbl thead th .ui-column-title").allInnerTexts();
@@ -279,6 +280,30 @@ TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder()
             assertTrue(zurueck.indexOf("Benutzername") < zurueck.indexOf("Vorname"),
                     "Doppelklick stellt die Reihenfolge nicht ohne Neuladen her: " + zurueck);
         }
+    }
+
+    /**
+     * Zieht im Tabellenkopf (Modus Reorder, jQuery-UI-draggable der PF-DataTable) die Spalte
+     * {@code von} auf die linke Haelfte von {@code vor} und wartet den colReorder-Ajax ab.
+     */
+    private static void kopfZiehen(Page seite, String von, String vor) {
+        var start = seite.locator("#fm\\:tbl thead th:has(.ui-column-title:text-is('" + von + "'))").boundingBox();
+        var ziel = seite.locator("#fm\\:tbl thead th:has(.ui-column-title:text-is('" + vor + "'))").boundingBox();
+        assertNotNull(start, "Kopf " + von + " sichtbar");
+        assertNotNull(ziel, "Kopf " + vor + " sichtbar");
+        double sx = start.x + start.width / 2;
+        double sy = start.y + 12;
+        double zx = ziel.x + 6;
+        double zy = ziel.y + 12;
+        seite.mouse().move(sx, sy);
+        seite.mouse().down();
+        for (int i = 1; i <= 15; i++) {
+            seite.mouse().move(sx + (zx - sx) * i / 15.0, sy + (zy - sy) * i / 15.0);
+            seite.waitForTimeout(40);
+        }
+        seite.waitForTimeout(300);
+        seite.mouse().up();
+        seite.waitForTimeout(2500);   // colReorder-Ajax abwarten
     }
 
     /**

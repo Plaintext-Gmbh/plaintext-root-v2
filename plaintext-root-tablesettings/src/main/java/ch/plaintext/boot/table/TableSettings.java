@@ -715,7 +715,11 @@ public class TableSettings implements Serializable {
         }
         state.getFesterStand().anwenden(state);
         persist();
-        reihenfolgeAnwenden(tabelle);
+        UIData data = tabelleFinden(tabelle);
+        if (data != null) {
+            TableKomponenten.pfReihenfolgeVergessen(data);   // sonst gilt PFs Kopf-Zug-Ordnung weiter
+            reihenfolgeAnwenden(data);
+        }
         growl(text("meldung.festerStand.hergestellt"));
     }
 
