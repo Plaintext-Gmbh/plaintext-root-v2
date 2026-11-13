@@ -365,4 +365,62 @@ class TableSettingsTest {
             assertThat(TableSettingsTexte.text("meldung.reihenfolgeGeaendert")).isEqualTo("Column order changed.");
         }
     }
+
+    // ── Karte 2097: Wrap-Binding request-gebunden ───────────────────────────
+
+    private static FacesContext request() {
+        FacesContext faces = Mockito.mock(FacesContext.class);
+        Mockito.when(faces.getAttributes()).thenReturn(new java.util.HashMap<>());
+        return faces;
+    }
+
+    @Test
+    @DisplayName("Karte 2097: in Request 1 gesetzt - Request 2 sieht die Komponente nicht (JSF1104)")
+    void reihenfolgeZielUeberlebtKeinenRequest() {
+        jakarta.faces.component.UIComponent wrap = Mockito.mock(jakarta.faces.component.UIComponent.class);
+        FacesContext request1 = request();
+        FacesContext request2 = request();
+        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
+            holder.when(FacesContext::getCurrentInstance).thenReturn(request1);
+            anzeige.setReihenfolgeZiel(wrap);
+
+            holder.when(FacesContext::getCurrentInstance).thenReturn(request2);
+            assertThat(anzeige.getReihenfolgeZiel()).isNull();
+            assertThat(anzeige.getReihenfolgeZielClientId()).isEmpty();
+        }
+        assertThat(anzeige.getReihenfolgeZiel()).isNull();   // ohne FacesContext
+    }
+
+    @Test
+    @DisplayName("Karte 2097: im selben Request liefert der Getter die Komponente und ihre ClientId")
+    void reihenfolgeZielImSelbenRequest() {
+        jakarta.faces.component.UIComponent wrap = Mockito.mock(jakarta.faces.component.UIComponent.class);
+        Mockito.when(wrap.getClientId()).thenReturn("fm:anz-bereich");
+        FacesContext request = request();
+        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
+            holder.when(FacesContext::getCurrentInstance).thenReturn(request);
+            anzeige.setReihenfolgeZiel(wrap);
+
+            assertThat(anzeige.getReihenfolgeZiel()).isSameAs(wrap);
+            assertThat(anzeige.getReihenfolgeZielClientId()).isEqualTo("fm:anz-bereich");
+        }
+    }
+
+    @Test
+    @DisplayName("Karte 2097: zwei TableSettings im selben Request kommen sich nicht in die Quere")
+    void zweiBereicheImSelbenRequest() {
+        TableSettings zweite = new TableSettings("testpage", true);
+        zweite.init(store, COLUMNS);
+        jakarta.faces.component.UIComponent wrapA = Mockito.mock(jakarta.faces.component.UIComponent.class);
+        jakarta.faces.component.UIComponent wrapB = Mockito.mock(jakarta.faces.component.UIComponent.class);
+        FacesContext request = request();
+        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
+            holder.when(FacesContext::getCurrentInstance).thenReturn(request);
+            anzeige.setReihenfolgeZiel(wrapA);
+            zweite.setReihenfolgeZiel(wrapB);
+
+            assertThat(anzeige.getReihenfolgeZiel()).isSameAs(wrapA);
+            assertThat(zweite.getReihenfolgeZiel()).isSameAs(wrapB);
+        }
+    }
 }

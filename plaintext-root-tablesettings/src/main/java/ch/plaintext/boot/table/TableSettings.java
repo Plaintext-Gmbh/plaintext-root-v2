@@ -38,6 +38,7 @@ import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -183,21 +184,44 @@ public class TableSettings implements Serializable {
      * Meldung per relativer Id erreichen, und das Tag kennt die Form-Id nicht fuer absolute Ids.
      * Das reorder-Ajax braucht den Wrap aber als Update-Ziel, weil das preRenderComponent dort
      * die neue Ordnung aus dem Request liest und speichert (Karte 1853, Panel-Weg).
+     *
+     * <p><b>Request-gebunden</b> (Karte 2097, Jakarta Faces 3.1.5): die Komponente liegt in
+     * {@link FacesContext#getAttributes()}, nicht in einem Feld. Im Feld eines session-scoped Beans
+     * (Inventar) lieferte der Getter beim naechsten Seitenaufbau die Komponente des VORIGEN Requests,
+     * JSF baute sie samt Panel und Knoepfen wieder ein: JSF1104, «Profil anlegen» erst beim zweiten
+     * Klick, nach Modus-Wechsel fehlende Knoepfe/Griffe. Ohne FacesContext: {@code null}.</p>
      */
-    private transient UIComponent reihenfolgeZiel;
-
     public UIComponent getReihenfolgeZiel() {
-        return reihenfolgeZiel;
+        FacesContext faces = FacesContext.getCurrentInstance();
+        return faces == null ? null : (UIComponent) faces.getAttributes().get(zielSchluessel());
     }
 
     public void setReihenfolgeZiel(UIComponent reihenfolgeZiel) {
-        this.reihenfolgeZiel = reihenfolgeZiel;
+        FacesContext faces = FacesContext.getCurrentInstance();
+        if (faces != null) {
+            faces.getAttributes().put(zielSchluessel(), reihenfolgeZiel);
+        }
     }
 
     /** ClientId des Wraps — Ziel des reorder-Updates; leer, solange das Tag nicht gerendert wurde. */
     public String getReihenfolgeZielClientId() {
-        return reihenfolgeZiel != null ? reihenfolgeZiel.getClientId() : "";
+        UIComponent ziel = getReihenfolgeZiel();
+        return ziel != null ? ziel.getClientId() : "";
     }
+
+    /**
+     * Schluessel je Instanz (Identitaet, nicht equals): zwei Bedienbereiche im selben Request
+     * treffen sich nicht. Lazy, weil ein Stand aus einer Session vor Karte 2097 das Feld nicht
+     * kennt und es nach der Deserialisierung {@code null} waere.
+     */
+    private String zielSchluessel() {
+        if (zielSchluessel == null) {
+            zielSchluessel = TableSettings.class.getName() + ".reihenfolgeZiel." + UUID.randomUUID();
+        }
+        return zielSchluessel;
+    }
+
+    private String zielSchluessel;
 
     /** Die Spalten der Seite, in Tabellenreihenfolge. Bei dynamischen Spalten via {@link #setColumns} nachgefuehrt. */
     @Getter
