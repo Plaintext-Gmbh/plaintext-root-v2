@@ -504,4 +504,24 @@ class TableSettingsTest {
             assertThat(zweite.getReihenfolgeZiel()).isSameAs(wrapB);
         }
     }
+
+    @Test
+    @DisplayName("Ausgelagerte Rechnungen (Runde 7): Verteilen hebt aufs Minimum, from/to verschiebt")
+    void ausgelagerteRechnungen() {
+        java.util.Map<String, Integer> sichtbar = new java.util.LinkedHashMap<>();
+        sichtbar.put("a", 100);
+        sichtbar.put("b", 300);
+        TableKomponenten.Verteilung v = TableKomponenten.verteilen(sichtbar, 120, 44);
+        assertThat(v.breiten()).containsExactly(java.util.Map.entry("a", 44), java.util.Map.entry("b", 90));
+        assertThat(v.amMinimum()).isEqualTo(1);
+        assertThat(v.summe()).isEqualTo(134);
+        assertThat(TableKomponenten.verteilen(new java.util.LinkedHashMap<>(), 500, 44)).isNull();
+
+        org.primefaces.event.ReorderEvent event = Mockito.mock(org.primefaces.event.ReorderEvent.class);
+        Mockito.when(event.getFromIndex()).thenReturn(2);
+        Mockito.when(event.getToIndex()).thenReturn(0);
+        assertThat(TableKomponenten.verschoben(java.util.List.of("x", "y", "z"), event)).containsExactly("z", "x", "y");
+        Mockito.when(event.getToIndex()).thenReturn(2);
+        assertThat(TableKomponenten.verschoben(java.util.List.of("x", "y", "z"), event)).isNull();
+    }
 }

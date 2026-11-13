@@ -6,16 +6,19 @@ package ch.plaintext.boot.table;
 import jakarta.faces.component.UIComponent;
 import jakarta.faces.component.UIData;
 import jakarta.faces.context.FacesContext;
+import jakarta.faces.event.AjaxBehaviorEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.primefaces.component.api.UIColumn;
 import org.primefaces.component.api.UITable;
 import org.primefaces.expression.SearchExpressionUtils;
+import org.primefaces.event.ReorderEvent;
 import org.primefaces.model.ColumnMeta;
 import org.primefaces.model.SortMeta;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -84,6 +87,50 @@ final class TableKomponenten {
             log.debug("[TableSettings:{}] sortierbareFelderDerTabelle | nicht ermittelbar | {}", page, e.getMessage());
             return null; // NOSONAR - siehe oben
         }
+    }
+
+    /** Ergebnis von {@link #verteilen}: neue Breiten, wie viele auf das Minimum gehoben wurden, Summe. */
+    record Verteilung(Map<String, Integer> breiten, int amMinimum, int summe) {
+    }
+
+    /**
+     * Rechnet die sichtbaren Spaltenbreiten proportional auf {@code ziel} um; keine faellt unter
+     * {@code minimum}. {@code null}, wenn nichts zu verteilen ist. Aus TableSettings ausgelagert
+     * (Groessen-Leitplanke, Karte 1853 Runde 7), Rechnung unveraendert.
+     */
+    static Verteilung verteilen(Map<String, Integer> sichtbar, int ziel, int minimum) {
+        int alt = sichtbar.values().stream().mapToInt(Integer::intValue).sum();
+        if (sichtbar.isEmpty() || alt <= 0) {
+            return null;
+        }
+        Map<String, Integer> breiten = new LinkedHashMap<>();
+        int summe = 0;
+        int amMinimum = 0;
+        for (Map.Entry<String, Integer> e : sichtbar.entrySet()) {
+            int neu = Math.round((float) e.getValue() * ziel / alt);
+            if (neu < minimum) {
+                neu = minimum;
+                amMinimum++;
+            }
+            breiten.put(e.getKey(), neu);
+            summe += neu;
+        }
+        return new Verteilung(breiten, amMinimum, summe);
+    }
+
+    /**
+     * Rueckfall fuer colReorder mit from/to (Indizes ueber die sichtbaren Spalten): die neue
+     * sichtbare Reihenfolge, {@code null} ohne gueltige Verschiebung. Aus TableSettings ausgelagert.
+     */
+    static List<String> verschoben(List<String> sichtbar, AjaxBehaviorEvent event) {
+        int from = event instanceof ReorderEvent re ? re.getFromIndex() : -1;
+        int to = event instanceof ReorderEvent re2 ? re2.getToIndex() : -1;
+        if (from < 0 || to < 0 || from >= sichtbar.size() || to >= sichtbar.size() || from == to) {
+            return null;
+        }
+        List<String> neu = new ArrayList<>(sichtbar);
+        neu.add(to, neu.remove(from));
+        return neu;
     }
 
     /**
