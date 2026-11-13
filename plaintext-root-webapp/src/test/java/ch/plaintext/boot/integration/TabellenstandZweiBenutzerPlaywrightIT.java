@@ -132,10 +132,10 @@ class TabellenstandZweiBenutzerPlaywrightIT {
             Page seite = benutzerverwaltung(a, ANNA);
             assertTrue(idKopf(seite).isVisible(), "Vorgabe: die Spalte ID muss zu Beginn sichtbar sein");
 
-            // Karte 1904: pt:tableSettings - Regler-Symbol, Reiter "Spalten", Schalter der Zeile "ID".
-            // Seit Karte 1853 Runde 4 sitzt das Regler-Symbol als Klon im Spaltenkopf (.pt-ts-regler);
-            // der echte Oeffner bleibt unsichtbar im DOM (left:-9999px) und ist nicht klickbar.
-            seite.click("#fm\\:tbl .pt-ts-regler");
+            // Karte 1904: pt:tableSettings - Oeffner, Reiter "Spalten", Schalter der Zeile "ID".
+            // Seit Karte 1853 Runde 5 (root 3.19.0) ist der Oeffner wieder ein sichtbarer Knopf ueber der
+            // Tabelle (<id>-oeffnen); den Regler-Klon im Spaltenkopf (.pt-ts-regler) gibt es nicht mehr.
+            seite.click("#fm\\:anz-oeffnen");
             seite.locator(".pt-ts-panel").waitFor();
             seite.locator(".pt-ts-panel .ui-tabs-nav li").filter(new Locator.FilterOptions().setHasText("Spalten")).click();
             Locator zeileId = spaltenZeile(seite, "id");
