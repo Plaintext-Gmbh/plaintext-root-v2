@@ -60,8 +60,11 @@ public final class TableSettingsTexte {
     public static void growl(String text) {
         var faces = jakarta.faces.context.FacesContext.getCurrentInstance();
         if (faces != null) {
+            // Detail leer statt null — sonst liefert FacesMessage.getDetail() die
+            // Zusammenfassung und PrimeFaces zeigt Titel und Text doppelt
+            // (claude2-Befund zu Karte 1853).
             faces.addMessage(null, new jakarta.faces.application.FacesMessage(
-                    jakarta.faces.application.FacesMessage.SEVERITY_INFO, text, null));
+                    jakarta.faces.application.FacesMessage.SEVERITY_INFO, text, ""));
         }
     }
 

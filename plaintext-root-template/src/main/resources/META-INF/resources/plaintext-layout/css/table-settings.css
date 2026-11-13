@@ -75,8 +75,16 @@
     box-shadow: 0 4px 18px rgba(15, 23, 42, 0.14);
 }
 
+/* Karte 1853 (claude2-Befund, gemessen an 1280x720): Das Panel darf nie ueber die
+   Fensterunterkante ragen. PrimeFaces schliesst ein OverlayPanel bei JEDER Fensterbewegung
+   (handleViewportChange) — ragt der Inhalt unten hinaus, scrollt der Benutzer die Seite,
+   um ihn zu sehen, und das Panel klappt zu. Die Grenze folgt der tatsaechlichen Lage
+   (--pt-ts-panel-oben = Abstand des Panels vom Fensterrand, von der Delegation gesetzt):
+   Dann scrollt der INNERE Container, ohne handleViewportChange. */
 .pt-ts-panel .ui-overlaypanel-content {
     padding: 12px 14px;
+    max-height: calc(100vh - var(--pt-ts-panel-oben, 2rem) - 1rem);
+    overflow-y: auto;
 }
 
 .pt-ts-profilzeile {

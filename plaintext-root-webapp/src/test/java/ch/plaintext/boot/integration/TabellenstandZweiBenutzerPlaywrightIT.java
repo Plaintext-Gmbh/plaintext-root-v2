@@ -130,6 +130,9 @@ class TabellenstandZweiBenutzerPlaywrightIT {
         // ── A: Vorgabe sehen (Positivkontrolle), dann "ID" ausblenden ──────
         try (BrowserContext a = neuerKontext()) {
             Page seite = benutzerverwaltung(a, ANNA);
+            int vpBreite = Integer.parseInt(System.getProperty("diag.vp.breite", "1600"));
+            int vpHoehe = Integer.parseInt(System.getProperty("diag.vp.hoehe", "900"));
+            seite.setViewportSize(vpBreite, vpHoehe);   // genug Platz, damit das Panel nicht ragt (claude2-Befund)
             assertTrue(idKopf(seite).isVisible(), "Vorgabe: die Spalte ID muss zu Beginn sichtbar sein");
 
             // Karte 1904: pt:tableSettings - Oeffner, Reiter "Spalten", Schalter der Zeile "ID".
@@ -137,6 +140,15 @@ class TabellenstandZweiBenutzerPlaywrightIT {
             // Tabelle (<id>-oeffnen); den Regler-Klon im Spaltenkopf (.pt-ts-regler) gibt es nicht mehr.
             seite.click("#fm\\:anz-oeffnen");
             seite.locator(".pt-ts-panel").waitFor();
+            seite.evaluate("""
+                    () => {
+                      window.__hidelog = [];
+                      const k = Object.keys(PrimeFaces.widgets).find(k => /PanelWv$/.test(k));
+                      const w = PF(k);
+                      const h = w.hide.bind(w);
+                      w.hide = function () { window.__hidelog.push(new Error().stack); return h(); };
+                    }
+                    """);
             seite.locator(".pt-ts-panel .ui-tabs-nav li").filter(new Locator.FilterOptions().setHasText("Spalten")).click();
             Locator zeileId = spaltenZeile(seite, "id");
             zeileId.locator(".pt-ts-schalter-sichtbar").click();
@@ -152,8 +164,17 @@ class TabellenstandZweiBenutzerPlaywrightIT {
             // Regressionsschutz (Daniel Punkt 3, Karte 1853): nach jedem Toggle bleibt das
             // Panel offen und der Reiter «Spalten» aktiv — sonst verdeckt der Griff-Klick
             // unten einen echten Fehler statt ihn zu zeigen.
+            Object hideLog = seite.evaluate("""
+                    () => (window.__hidelog || []).join(' ||| ')
+                    """);
+            try { java.nio.file.Files.writeString(java.nio.file.Path.of("/tmp/diag-hide.txt"),
+                    "hideLog=" + hideLog); } catch (java.io.IOException ignored) { }
+            // PF 16 schliesst ein OverlayPanel bei jedem window-scroll/resize
+            // (handleViewportChange, im hideLog als Ausloeser belegt) — fuer .pt-ts-panel
+            // neutralisiert (Prototyp-Patch in table-settings.js). Playwright scrollt fuer
+            // einen Klick die Seite; das Panel muss trotzdem offen bleiben.
             assertTrue(seite.locator(".pt-ts-panel").isVisible(),
-                    "Panel muss nach dem Sichtbarkeits-Toggle offen bleiben");
+                    "Panel muss nach dem Sichtbarkeits-Toggle offen bleiben (hideLog=" + hideLog + ")");
             assertTrue(seite.locator(".pt-ts-panel .ui-tabs-header[aria-selected='true'], "
                             + ".pt-ts-panel li.ui-state-active").innerText().contains("Spalten"),
                     "Reiter «Spalten» muss nach dem Toggle aktiv bleiben");
@@ -164,16 +185,27 @@ class TabellenstandZweiBenutzerPlaywrightIT {
             assertNotNull(griffBox, "Griff der Zeile «Vorname» sichtbar");
             var zielBox = spaltenZeile(seite, "username").boundingBox();
             assertNotNull(zielBox, "Zeile «Benutzername» sichtbar");
-            seite.mouse().move(griffBox.x + griffBox.width / 2, griffBox.y + griffBox.height / 2);
+            double startX = griffBox.x + griffBox.width / 2;
+            double startY = griffBox.y + griffBox.height / 2;
+            double zielX = zielBox.x + 20;
+            double zielY = zielBox.y + 4;   // Oberkante der Zielzeile + 4 px (claude2-Messung)
+            seite.mouse().move(startX, startY);
             seite.mouse().down();
-            for (int i = 1; i <= 10; i++) {
-                seite.mouse().move(zielBox.x + 20,
-                        zielBox.y + (griffBox.y - zielBox.y) * i / 10.0 + griffBox.height / 2);
-                seite.waitForTimeout(60);
+            for (int i = 1; i <= 12; i++) {
+                seite.mouse().move(startX + (zielX - startX) * i / 12.0,
+                        startY + (zielY - startY) * i / 12.0);
+                seite.waitForTimeout(50);
             }
             seite.waitForTimeout(300);
             seite.mouse().up();
             seite.waitForTimeout(2500);   // reorder-Ajax abwarten
+
+            // Diagnose: DOM-Reihenfolge nach Drag + Server-Stand
+            Object dom = seite.evaluate("""
+                    () => Array.from(document.querySelectorAll('.pt-ts-reihenfolge li.ui-orderlist-item'))
+                        .map(li => li.getAttribute('data-item-value')).join(',')
+                    """);
+            try { java.nio.file.Files.writeString(java.nio.file.Path.of("/tmp/diag-reihenfolge.txt"), "dom=" + dom + "\n"); } catch (java.io.IOException ignored) { }
 
 TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder() != null
                     && st.getColumnOrder().indexOf("vorname") >= 0

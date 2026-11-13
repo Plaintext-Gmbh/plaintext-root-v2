@@ -146,11 +146,11 @@ class PlaintextRootTemplateDriftTest {
 
     static {
         GETEILTE_DATEIEN.put("META-INF/tags/tableSettings.xhtml",
-                "7a0cbeb9d471e54fd9b4ec50ddb77fb7210f590e3d484c222d940060023dd641");
+                "a12ea7251ced1b52f69b6359b2b74f19d31eaf7c38a7991513da52446e1032d6");
         GETEILTE_DATEIEN.put("META-INF/resources/plaintext-layout/js/table-settings.js",
-                "fe4552e94d61160c0614cf1c4139543a3bee0508e28af21820134fac5d9b30f6");
+                "02b649e77b7097f55840ca2575acd138efb720209fa41bec5ac3dc70ff517733");
         GETEILTE_DATEIEN.put("META-INF/resources/plaintext-layout/css/table-settings.css",
-                "b6e11c1af5ca03a0b087c2a573ca9fb505f0bbb45a9556eddb1ed39504fe6f7d");
+                "b11e318309b39d9d4f4da2c6611be45ebc93857079df0245d5c9a2a1711e28c2");
         GETEILTE_DATEIEN.put("META-INF/resources/includes/config.xhtml",
                 "dfbe7b9f4243abfb4dda511748f51a7abfc909c2cf3491148c4d2f0e9ab972e3");
         GETEILTE_DATEIEN.put("META-INF/resources/includes/footer.xhtml",
