@@ -6,6 +6,7 @@ package ch.plaintext.sidecars.service;
 import ch.plaintext.modules.ModulApiUmsetzung;
 
 import ch.plaintext.ablagen.DateiAblage;
+import ch.plaintext.boot.ablage.LokaleDateiAblage;
 import ch.plaintext.ablagen.DateiAblagenRegister;
 import ch.plaintext.boot.plugins.netz.AusgehendesZiel;
 import ch.plaintext.sidecars.ablage.GitAblage;
@@ -58,20 +59,35 @@ public class SpeicherAblageService implements DateiAblagenRegister {
     private final Set<String> erlaubteHosts;
     private final HttpClient http;
     private final Path gitKlone;
+    /** Karte 2096: Basis der lokalen Ablagen, {@code null} = Art LOKAL ist aus. */
+    private final Path lokalBasis;
 
     @org.springframework.beans.factory.annotation.Autowired
     public SpeicherAblageService(SpeicherAblageRepository repo, SidecarCrypto crypto,
                                  @Value("${" + AusgehendesZiel.EIGENSCHAFT_ERLAUBTE_HOSTS + ":}") String erlaubteHosts,
-                                 @Value("${plaintext.ablagen.git.verzeichnis:${java.io.tmpdir}/plaintext-git-ablagen}") String gitKlone) {
-        this(repo, crypto, erlaubteHosts, NextcloudAblage.standardClient(), Path.of(gitKlone));
+                                 @Value("${plaintext.ablagen.git.verzeichnis:${java.io.tmpdir}/plaintext-git-ablagen}") String gitKlone,
+                                 @Value("${plaintext.ablagen.lokal.basis:}") String lokalBasis) {
+        this(repo, crypto, erlaubteHosts, NextcloudAblage.standardClient(), Path.of(gitKlone),
+                lokalBasis == null || lokalBasis.isBlank() ? null : Path.of(lokalBasis.strip()));
     }
 
     SpeicherAblageService(SpeicherAblageRepository repo, SidecarCrypto crypto, String erlaubteHosts, HttpClient http, Path gitKlone) {
+        this(repo, crypto, erlaubteHosts, http, gitKlone, null);
+    }
+
+    SpeicherAblageService(SpeicherAblageRepository repo, SidecarCrypto crypto, String erlaubteHosts, HttpClient http, Path gitKlone,
+                          Path lokalBasis) {
+        this.lokalBasis = lokalBasis;
         this.repo = repo;
         this.crypto = crypto;
         this.erlaubteHosts = AusgehendesZiel.allowlist(erlaubteHosts);
         this.http = http;
         this.gitKlone = gitKlone;
+    }
+
+    /** Karte 2096: darf eine Ablage der Art LOKAL eingerichtet werden (Basis gesetzt)? */
+    public boolean lokalVerfuegbar() {
+        return lokalBasis != null;
     }
 
     /** @return alle Ablagen, nach Name */
@@ -104,6 +120,9 @@ public class SpeicherAblageService implements DateiAblagenRegister {
     public SpeicherAblage speichere(String name, String art, String url, String benutzer, String neuesPasswort, String pfad, String zweig) {
         String n = name == null ? "" : name.strip();
         String t = normiereArt(art);
+        if (SpeicherAblage.ART_LOKAL.equals(t)) {
+            return speichereLokal(n, pfad);
+        }
         boolean git = SpeicherAblage.ART_GIT.equals(t);
         URI u = pruefeAngaben(n, url, benutzer, git ? "/" : pfad);
         if (git && (zweig == null || zweig.isBlank())) {
@@ -128,11 +147,39 @@ public class SpeicherAblageService implements DateiAblagenRegister {
         return pruefe(repo.save(a));
     }
 
-    /** NEXTCLOUD (Vorgabe) oder GIT; Sonar java:S3776 (Karte 1554): aus speichere() herausgeloest. */
+    /**
+     * Karte 2096: Ordner auf dem Server, eingesperrt unter {@code plaintext.ablagen.lokal.basis}. Ohne Adresse,
+     * Benutzer und Passwort; das Formular waehlt nur den Unterordner, nie einen absoluten Pfad.
+     */
+    private SpeicherAblage speichereLokal(String n, String pfad) {
+        if (!SidecarBeschreibung.NAME_MUSTER.matcher(n).matches()) {
+            throw new IllegalArgumentException("Name: a-z, 0-9 und -, höchstens 40 Zeichen.");
+        }
+        String unter = pfad == null ? "" : pfad.strip();
+        try {
+            LokaleDateiAblage.unter(n, lokalBasis, unter);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Pfad: " + e.getMessage());
+        }
+        SpeicherAblage a = repo.findFirstByNameAndDeletedFalse(n).orElseGet(SpeicherAblage::new);
+        boolean neu = a.getId() == null;
+        a.setName(n);
+        a.setArt(SpeicherAblage.ART_LOKAL);
+        a.setMandat(ch.plaintext.sidecars.entity.Sidecar.MANDAT);
+        a.setUrl("");
+        a.setBenutzer("");
+        a.setPasswortEncrypted(null);
+        a.setPfad(unter);
+        a.setZweig(null);
+        log.info("Speicher-Ablage «{}» {}: LOKAL, Unterordner {}", n, neu ? "angelegt" : "geändert", unter.isEmpty() ? "(Basis)" : unter);
+        return pruefe(repo.save(a));
+    }
+
+    /** NEXTCLOUD (Vorgabe), GIT oder LOKAL; Sonar java:S3776 (Karte 1554): aus speichere() herausgeloest. */
     private static String normiereArt(String art) {
         String t = art == null || art.isBlank() ? SpeicherAblage.ART_NEXTCLOUD : art.strip().toUpperCase(Locale.ROOT);
-        if (!SpeicherAblage.ART_GIT.equals(t) && !SpeicherAblage.ART_NEXTCLOUD.equals(t)) {
-            throw new IllegalArgumentException("Art: NEXTCLOUD oder GIT.");
+        if (!SpeicherAblage.ART_GIT.equals(t) && !SpeicherAblage.ART_NEXTCLOUD.equals(t) && !SpeicherAblage.ART_LOKAL.equals(t)) {
+            throw new IllegalArgumentException("Art: NEXTCLOUD, GIT oder LOKAL.");
         }
         return t;
     }
@@ -184,7 +231,8 @@ public class SpeicherAblageService implements DateiAblagenRegister {
         a.setLetztePruefung(Instant.now());
         try {
             DateiAblage d = oeffne(a);
-            a.setMeldung(d instanceof GitAblage g ? g.pruefe() : ((NextcloudAblage) d).pruefe());
+            a.setMeldung(d instanceof GitAblage g ? g.pruefe()
+                    : d instanceof LokaleDateiAblage l ? l.pruefe() : ((NextcloudAblage) d).pruefe());
             a.setOk(true);
         } catch (IOException | RuntimeException e) {
             a.setOk(false);
@@ -201,6 +249,9 @@ public class SpeicherAblageService implements DateiAblagenRegister {
     }
 
     DateiAblage oeffne(SpeicherAblage a) throws IOException {
+        if (SpeicherAblage.ART_LOKAL.equals(a.getArt())) {
+            return baue(a, null);   // kein Netz, also keine Zielpruefung
+        }
         // Bei jedem Öffnen erneut prüfen: ein Host kann seit dem Speichern auf eine interne Adresse zeigen.
         try {
             AusgehendesZiel.pruefeUrl(a.getUrl(), erlaubteHosts);
@@ -211,6 +262,9 @@ public class SpeicherAblageService implements DateiAblagenRegister {
     }
 
     private DateiAblage baue(SpeicherAblage a, String pw) throws IOException {
+        if (SpeicherAblage.ART_LOKAL.equals(a.getArt())) {
+            return LokaleDateiAblage.unter(a.getName(), lokalBasis, a.getPfad());
+        }
         if (SpeicherAblage.ART_GIT.equals(a.getArt())) {
             return new GitAblage(a.getName(), a.getUrl(), a.getZweig(), a.getPfad(), a.getBenutzer(), pw,
                     gitKlone.resolve(a.getName() + "-" + kennung(a.getUrl() + "\n" + a.getZweig())), SpeicherAblageService::angemeldet);
