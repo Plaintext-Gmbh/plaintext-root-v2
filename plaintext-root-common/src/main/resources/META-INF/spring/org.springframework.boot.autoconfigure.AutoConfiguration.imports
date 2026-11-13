@@ -1,2 +1,3 @@
 ch.plaintext.boot.plugins.secret.VaultwardenAutoConfiguration
 ch.plaintext.boot.plugins.jsf.userprofile.UserProfileAutoConfiguration
+ch.plaintext.boot.tablestore.TableStateStoreAutoConfiguration

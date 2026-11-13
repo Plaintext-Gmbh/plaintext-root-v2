@@ -1,12 +1,14 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-package ch.plaintext.boot.table;
+package ch.plaintext.boot.tablestore;
 
-import ch.plaintext.PlaintextSecurity;
 import ch.plaintext.boot.plugins.jsf.userprofile.UserPreferencesBackingBean;
+import ch.plaintext.boot.table.TableSettings;
+import ch.plaintext.boot.table.TableState;
+import ch.plaintext.boot.table.TableStateOwner;
+import ch.plaintext.boot.table.TableStateStore;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 
@@ -18,6 +20,11 @@ import java.util.List;
  * <p><b>Keine Entitaet, kein Repository, keine Migration.</b> {@code UserPreference} wird ueber
  * {@code SimpleStorableConverter} als JSON abgelegt; ein neues Feld ist fuer Bestandsdaten
  * unkritisch. Jede App, die root einbindet, hat diese Ablage damit ohne eine Zeile Code.</p>
+ *
+ * <p><b>Nur ohne eigene Ablage (Karte 2086).</b> Registriert wird sie von
+ * {@link TableStateStoreAutoConfiguration} mit {@code @ConditionalOnMissingBean}: bietet die App
+ * eine eigene {@link TableStateStore}-Bean an, entsteht diese hier gar nicht erst. Den Mandanten
+ * liefert {@link TableStateOwner}, nicht mehr die Security direkt.</p>
  *
  * <p><b>Warum ueber die Session-Bean und nicht direkt ueber {@code UserPrefsSimpleStorage}.</b>
  * {@link UserPreferencesBackingBean} haelt das {@code UserPreference}-Objekt des Benutzers fuer
@@ -49,16 +56,15 @@ import java.util.List;
  * @since 2026
  */
 @Slf4j
-@Component
 public class UserPreferenceTableStateStore implements TableStateStore {
 
     private final UserPreferencesBackingBean preferences;
 
-    private final PlaintextSecurity security;
+    private final TableStateOwner owner;
 
-    public UserPreferenceTableStateStore(UserPreferencesBackingBean preferences, PlaintextSecurity security) {
+    public UserPreferenceTableStateStore(UserPreferencesBackingBean preferences, TableStateOwner owner) {
         this.preferences = preferences;
-        this.security = security;
+        this.owner = owner;
     }
 
     @Override
@@ -97,7 +103,7 @@ public class UserPreferenceTableStateStore implements TableStateStore {
      * einer NPE.
      */
     String schluessel(String page) {
-        String mandat = security == null ? null : security.getMandat();
+        String mandat = owner == null ? null : owner.getMandat();
         return (mandat == null ? "" : mandat) + "/" + page;
     }
 }

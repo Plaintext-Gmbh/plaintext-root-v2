@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.boot.table;
 
-import ch.plaintext.boot.plugins.jsf.FacesMessages;
 import jakarta.faces.component.UIComponent;
 import jakarta.faces.component.UIData;
 import jakarta.faces.context.FacesContext;
@@ -148,9 +147,9 @@ public class TableSettings implements Serializable {
     public static final List<Integer> SEITENGROESSEN =
             List.of(20, 50, 100, 200, 250, 300, 500, 1000, 2000, 3000);
 
-    /** Seitenschluessel, unter dem der Stand gespeichert wird. */
+    /** Seitenschluessel, unter dem der Stand gespeichert wird; wechselt nur per {@link #neuAufsetzen}. */
     @Getter
-    private final String page;
+    private String page;
 
     /** Bietet die Seite Spaltenbreiten an (resizableColumns + Breitenfelder)? */
     @Getter
@@ -159,6 +158,17 @@ public class TableSettings implements Serializable {
     /** Zeilen pro Seite, solange der Benutzer nichts verstellt hat. */
     @Getter
     private final int vorgabeZeilen;
+
+    /** Paginator oben/unten, solange der Benutzer nichts verstellt hat (Karte 2086). */
+    @Getter
+    private final PagingVorgabe pagingVorgabe;
+
+    /** Spalten, die nur unter einer Bedingung der Seite gerendert werden (Karte 2086). */
+    private final Map<String, SpalteGerendert> bedingungen = new HashMap<>();
+
+    /** Einhaenger der Seite nach jedem Profilwechsel, z.B. Zeilen neu aufbauen (Karte 2086). */
+    @Setter
+    private NachProfilwechsel nachProfilwechsel;
 
     /**
      * Transient wie die Services in den Backing-Beans: nach einer Session-Deserialisierung bleibt
@@ -205,7 +215,6 @@ public class TableSettings implements Serializable {
     @Setter
     private String newProfileName = "";
 
-
     public TableSettings(String page, boolean mitBreiten) {
         this(page, mitBreiten, VORGABE_ZEILEN);
     }
@@ -216,9 +225,19 @@ public class TableSettings implements Serializable {
      *                      ergeben {@value #VORGABE_ZEILEN}
      */
     public TableSettings(String page, boolean mitBreiten, int vorgabeZeilen) {
+        this(page, mitBreiten, PagingVorgabe.beides(vorgabeZeilen));
+    }
+
+    /**
+     * Karte 2086: mit Vorgabe fuer den Paginator (oben/unten/beides/aus) statt nur der Zeilenzahl.
+     * Die anderen Konstruktoren entsprechen {@link PagingVorgabe#beides(int)} - dem Verhalten vor
+     * dieser Vorgabe.
+     */
+    public TableSettings(String page, boolean mitBreiten, PagingVorgabe pagingVorgabe) {
         this.page = page;
         this.mitBreiten = mitBreiten;
-        this.vorgabeZeilen = vorgabeZeilen > 0 ? vorgabeZeilen : VORGABE_ZEILEN;
+        this.pagingVorgabe = pagingVorgabe != null ? pagingVorgabe : PagingVorgabe.beides(VORGABE_ZEILEN);
+        this.vorgabeZeilen = this.pagingVorgabe.zeilenProSeite() > 0 ? this.pagingVorgabe.zeilenProSeite() : VORGABE_ZEILEN;
     }
 
     /**
@@ -248,6 +267,18 @@ public class TableSettings implements Serializable {
         this.columns = new ArrayList<>(columns);
     }
 
+    /**
+     * Stellt auf einen anderen Seitenschluessel und andere Spalten um und laedt den Stand, der
+     * dort liegt (Karte 2086) - fuer Seiten, die hinter einer Ansicht viele Tabellen zeigen. Das
+     * Feld der Backing-Bean bleibt dasselbe; Profilauswahl und Profilname der vorigen Tabelle
+     * fallen weg.
+     */
+    public void neuAufsetzen(String page, TableStateStore store, List<TableColumn> columns) {
+        this.page = page;
+        this.newProfileName = "";
+        init(store, columns);
+    }
+
     // ── Sichtbarkeit ────────────────────────────────────────────────────────
 
     public boolean isVisible(String key) {
@@ -266,35 +297,46 @@ public class TableSettings implements Serializable {
         state.getColumnVisible().put(key, visible);
     }
 
-    /** Sichtbare Spalten als Schluesselliste — Wert des {@code p:selectManyCheckbox}. */
+    /** Sichtbare, waehlbare Spalten als Schluesselliste — Wert des {@code p:selectManyCheckbox}. */
     public List<String> getVisibleColumns() {
         List<String> visible = new ArrayList<>();
         for (TableColumn column : columns) {
-            if (isVisible(column.getKey())) {
+            if (column.isWaehlbar() && isVisible(column.getKey())) {
                 visible.add(column.getKey());
             }
         }
         return visible;
     }
 
+    /** Nur waehlbare Spalten werden angefasst: was nicht zur Auswahl stand, kann nicht abgewaehlt sein. */
     public void setVisibleColumns(List<String> visible) {
         for (TableColumn column : columns) {
-            state.getColumnVisible().put(column.getKey(), visible != null && visible.contains(column.getKey()));
+            if (column.isWaehlbar()) {
+                state.getColumnVisible().put(column.getKey(), visible != null && visible.contains(column.getKey()));
+            }
         }
     }
 
-    /** Auswahl fuer das {@code p:selectManyCheckbox}: Wert = Schluessel, Anzeige = Kopftext. */
+    /** Auswahl fuer das {@code p:selectManyCheckbox}: Wert = Schluessel, Anzeige = Name in der Liste. */
     public List<SelectItem> getColumnItems() {
         return columns.stream()
-                .map(c -> new SelectItem(c.getKey(), c.getLabel()))
+                .filter(TableColumn::isWaehlbar)
+                .map(c -> new SelectItem(c.getKey(), columnLabel(c.getKey())))
                 .map(SelectItem.class::cast)
                 .toList();
     }
 
-    /** Blendet alle Spalten ein. */
+    /** EL fuer das Tag: steht die Spalte mit eigenem Schalter in der Spaltenliste (Karte 2086)? */
+    public boolean waehlbar(String key) {
+        return columns.stream().anyMatch(c -> c.getKey().equals(key) && c.isWaehlbar());
+    }
+
+    /** Blendet alle waehlbaren Spalten ein. */
     public void alleSpaltenEin() {
         for (TableColumn column : columns) {
-            state.getColumnVisible().put(column.getKey(), true);
+            if (column.isWaehlbar()) {
+                state.getColumnVisible().put(column.getKey(), true);
+            }
         }
         persist();
     }
@@ -305,7 +347,9 @@ public class TableSettings implements Serializable {
      */
     public void alleSpaltenAus() {
         for (TableColumn column : columns) {
-            state.getColumnVisible().put(column.getKey(), column.isRequired());
+            if (column.isWaehlbar()) {
+                state.getColumnVisible().put(column.getKey(), column.isRequired());
+            }
         }
         persist();
         growl(text("meldung.alleAus"));
@@ -345,7 +389,7 @@ public class TableSettings implements Serializable {
 
     /** Kern von {@link #onSpalteSichtbarGemeldet()}, ohne Faces testbar. Unbekannte Schluessel werden verworfen. */
     void spalteSichtbarSetzen(String key, String sichtbar) {
-        if (key == null || columns.stream().noneMatch(c -> c.getKey().equals(key))) {
+        if (key == null || !waehlbar(key)) {
             log.debug("[TableSettings:{}] onSpalteSichtbarGemeldet | verworfen | spalte={}", page, key);
             return;
         }
@@ -353,21 +397,50 @@ public class TableSettings implements Serializable {
         onSichtbarkeitGeaendert();
     }
 
-    /** Kopftext einer Spalte — fuer die Reihenfolge-Liste im Spalten-Panel. */
+    /**
+     * Name einer Spalte in Spaltenliste und Reihenfolge: der {@link TableColumn#getListenLabel()
+     * Listenname}, sonst der Kopftext; eine kopflose Spalte ohne Listennamen bekommt eine laufende
+     * Nummer ({@code -1}, {@code -2}, ...), damit sie greifbar bleibt (Karte 2086).
+     */
     public String columnLabel(String key) {
-        return columns.stream()
-                .filter(c -> c.getKey().equals(key))
-                .map(TableColumn::getLabel)
-                .findFirst()
-                .orElse(key);
+        int nummer = 0;
+        for (TableColumn c : columns) {
+            boolean kopflos = c.getLabel() == null || c.getLabel().isBlank();
+            nummer += kopflos ? 1 : 0;
+            if (c.getKey().equals(key)) {
+                return c.getListenLabel() != null && !c.getListenLabel().isBlank() ? c.getListenLabel()
+                        : kopflos ? "-" + nummer : c.getLabel();
+            }
+        }
+        return key;
     }
 
-    /** Zurueck auf die Grundeinstellung der Seite. */
+    /** Zurueck auf die Grundeinstellung der Seite (nur waehlbare Spalten). */
     public void standardSpalten() {
         for (TableColumn column : columns) {
-            state.getColumnVisible().put(column.getKey(), column.isDefaultVisible());
+            if (column.isWaehlbar()) {
+                state.getColumnVisible().put(column.getKey(), column.isDefaultVisible());
+            }
         }
         persist();
+    }
+
+    /**
+     * Meldet, dass eine Spalte nur unter einer Bedingung der Seite gerendert wird (Karte 2086);
+     * {@code null} nimmt sie zurueck. Im {@code @PostConstruct} anzumelden.
+     */
+    public void setSpaltenBedingung(String key, SpalteGerendert bedingung) {
+        if (bedingung == null) {
+            bedingungen.remove(key);
+        } else {
+            bedingungen.put(key, bedingung);
+        }
+    }
+
+    /** Steht die Spalte wirklich in der Tabelle - angekreuzt UND von der Seite gerendert? */
+    public boolean istInDerTabelle(String key) {
+        SpalteGerendert bedingung = bedingungen.get(key);
+        return isVisible(key) && (bedingung == null || bedingung.trifftZu());
     }
 
     // ── Reihenfolge (Karte 1853) ────────────────────────────────────────────
@@ -396,17 +469,35 @@ public class TableSettings implements Serializable {
         return result;
     }
 
-    /** Wert der Reihenfolge-Liste im Spalten-Panel: Schluessel in Anzeigereihenfolge. */
+    /**
+     * Wert der Reihenfolge-Liste im Spalten-Panel: Schluessel in Anzeigereihenfolge, ohne die
+     * nicht einzeln {@link TableColumn#isVerschiebbar() verschiebbaren} Spalten (Karte 2086).
+     */
     public List<String> getSpaltenReihenfolge() {
-        return getOrderedColumns().stream().map(TableColumn::getKey).toList();
+        return getOrderedColumns().stream().filter(TableColumn::isVerschiebbar).map(TableColumn::getKey).toList();
     }
 
-    /** Die Liste schreibt die vom Benutzer im Panel gezogene Reihenfolge zurueck. */
+    /** Die Liste schreibt die gezogene Reihenfolge zurueck; nicht verschiebbare Spalten behalten ihren Platz. */
     public void setSpaltenReihenfolge(List<String> reihenfolge) {
         if (reihenfolge == null || reihenfolge.isEmpty()) {
             return;
         }
-        state.setColumnOrder(new ArrayList<>(reihenfolge));
+        state.setColumnOrder(mergeSichtbar(reihenfolge));
+    }
+
+    /**
+     * Wert fuer {@code displayPriority} eines {@code p:column} (Karte 2086): PrimeFaces sortiert die
+     * Spalten danach. Ab 1, weil Spalten ohne Angabe auf 0 stehen und so vorne bleiben; eine
+     * Spalte ausserhalb der Reihenfolge-Liste (z.B. ein {@code p:columns}-Block) steht am Ende.
+     */
+    public int displayPriority(String key) {
+        int index = getSpaltenReihenfolge().indexOf(key);
+        return index < 0 ? getPrioAmEnde() : index + 1;
+    }
+
+    /** Eine Prioritaet hinter allen Spalten der Liste, fuer Bloecke, die am Tabellenende bleiben. */
+    public int getPrioAmEnde() {
+        return columns.size() + 1;
     }
 
     /**
@@ -498,7 +589,6 @@ public class TableSettings implements Serializable {
         }
     }
 
-
     /**
      * Setzt die sichtbaren Schluessel in ihre Positionen in der bisherigen Gesamtreihenfolge
      * ein — unsichtbare Spalten behalten ihren Platz, damit sie nach «Alle ein» wieder dort
@@ -508,7 +598,7 @@ public class TableSettings implements Serializable {
         Set<String> sichtbarSet = new HashSet<>(sichtbarNeu);
         List<String> result = new ArrayList<>();
         int naechste = 0;
-        for (String key : getSpaltenReihenfolge()) {
+        for (String key : getOrderedColumns().stream().map(TableColumn::getKey).toList()) {
             if (sichtbarSet.contains(key) && naechste < sichtbarNeu.size()) {
                 result.add(sichtbarNeu.get(naechste++));
             } else {
@@ -540,38 +630,7 @@ public class TableSettings implements Serializable {
         // Requests — beim erneuten Rendern der Tabelle (update am colReorder-Ajax) wird sie
         // hier uebernommen und gespeichert.
         neueReihenfolgeAusRequestUebernehmen(data);
-        List<String> order = state.getColumnOrder();
-        if (order == null || order.isEmpty()) {
-            return;
-        }
-        List<UIComponent> kinder = data.getChildren();
-        Map<String, UIComponent> spalten = new HashMap<>();
-        Set<String> zielKeys = new LinkedHashSet<>(order);
-        for (UIComponent kind : kinder) {
-            if (kind instanceof UIColumn) {
-                String key = keyFromHeader(((UIColumn) kind).getHeaderText());
-                if (key != null && zielKeys.contains(key)) {
-                    spalten.put(key, kind);
-                }
-            }
-        }
-        if (spalten.size() < 2) {
-            return;
-        }
-        List<String> ziel = order.stream().filter(spalten::containsKey).toList();
-        List<UIComponent> gemischt = new ArrayList<>(kinder);
-        java.util.Iterator<String> it = ziel.iterator();
-        for (int i = 0; i < gemischt.size() && it.hasNext(); i++) {
-            UIComponent kind = gemischt.get(i);
-            if (kind instanceof UIColumn) {
-                String key = keyFromHeader(((UIColumn) kind).getHeaderText());
-                if (key != null && zielKeys.contains(key)) {
-                    gemischt.set(i, spalten.get(it.next()));
-                }
-            }
-        }
-        kinder.clear();
-        kinder.addAll(gemischt);
+        TableKomponenten.kinderOrdnen(data, state.getColumnOrder(), this::keyFromHeader);
     }
 
     // ── Modus-Dreifach-Schalter (Karte 1853, Runde 6, Daniel 13.11.) ─────────
@@ -682,11 +741,11 @@ public class TableSettings implements Serializable {
         return "width: " + spaltenSumme() + "px;";
     }
 
-    /** Summe der sichtbaren Spalten, ohne eine von Hand gesetzte Gesamtbreite. */
+    /** Summe der Spalten, die wirklich in der Tabelle stehen, ohne eine von Hand gesetzte Gesamtbreite. */
     public int spaltenSumme() {
         int summe = 0;
         for (TableColumn column : columns) {
-            if (isVisible(column.getKey())) {
+            if (istInDerTabelle(column.getKey())) {
                 summe += breiteVon(column);
             }
         }
@@ -718,7 +777,7 @@ public class TableSettings implements Serializable {
         Map<String, String> params = FacesContext.getCurrentInstance()
                 .getExternalContext().getRequestParameterMap();
         String key = keyFromHeader(params.get("sp"));
-        Integer breite = zuBreite(params.get("px"));
+        Integer breite = TableKomponenten.zuBreite(params.get("px"), MIN_SPALTE_PX);
         if (key == null || breite == null) {
             log.debug("[TableSettings:{}] onSpaltenbreiteGemeldet | verworfen | sp={} | px={}",
                     page, params.get("sp"), params.get("px"));
@@ -732,12 +791,9 @@ public class TableSettings implements Serializable {
         growl(text("meldung.breiteGespeichert"));
     }
 
-    /** Kurzes Growl-Overlay fuer gelungene Aenderungen (Runde 4, Karte 1853) — globale
-     *  FacesMessage, die das globalGrowl des Templates mit autoUpdate uebernimmt. Laeuft
-     *  zentral ueber FacesMessages (Null-Sicherheit ausserhalb eines JSF-Requests,
-     *  Architekturregel meldungenNurUeberFacesMessages). */
+    /** Kurzes Growl-Overlay fuer gelungene Aenderungen (Runde 4, Karte 1853), siehe {@link TableSettingsTexte#growl}. */
     private void growl(String text) {
-        FacesMessages.info(text);
+        TableSettingsTexte.growl(text);
     }
 
     /** Text des Bedienbereichs in der Sprache der Seite — Weiterleitung an {@link TableSettingsTexte}. */
@@ -871,18 +927,18 @@ public class TableSettings implements Serializable {
 
     // ── Paginator und Seitengroesse (Karte 1336) ───────────────────────────
 
-    /** Paginator oberhalb der Tabelle; ohne Einstellung an (PrimeFaces-Vorgabe "both"). */
+    /** Paginator oberhalb der Tabelle; ohne Einstellung die {@link PagingVorgabe} der Seite. */
     public boolean isPaginatorOben() {
-        return !Boolean.FALSE.equals(state.getPaginatorTop());
+        return state.getPaginatorTop() != null ? state.getPaginatorTop() : pagingVorgabe.oben();
     }
 
     public void setPaginatorOben(boolean oben) {
         state.setPaginatorTop(oben);
     }
 
-    /** Paginator unterhalb der Tabelle; ohne Einstellung an. */
+    /** Paginator unterhalb der Tabelle; ohne Einstellung die {@link PagingVorgabe} der Seite. */
     public boolean isPaginatorUnten() {
-        return !Boolean.FALSE.equals(state.getPaginatorBottom());
+        return state.getPaginatorBottom() != null ? state.getPaginatorBottom() : pagingVorgabe.unten();
     }
 
     public void setPaginatorUnten(boolean unten) {
@@ -991,22 +1047,7 @@ public class TableSettings implements Serializable {
 
     /** Die Tabelle zum Suchausdruck; {@code null}, wenn unbekannt oder ohne Faces-Kontext. */
     private UIData tabelleFinden(String tabelle) {
-        FacesContext faces = FacesContext.getCurrentInstance();
-        if (faces == null || faces.getViewRoot() == null || tabelle == null || tabelle.isBlank()) {
-            return null;
-        }
-        UIComponent gefunden;
-        try {
-            gefunden = SearchExpressionUtils.contextlessOptionalResolveComponent(faces, faces.getViewRoot(), tabelle);
-        } catch (RuntimeException e) { // NOSONAR - eine Einstellung darf den Ajax-Aufruf nicht abbrechen
-            log.debug("[TableSettings:{}] tabelleAngleichen | nicht aufloesbar | tabelle={} | {}", page, tabelle, e.getMessage());
-            return null;
-        }
-        if (gefunden instanceof UIData data) {
-            return data;
-        }
-        log.debug("[TableSettings:{}] tabelleAngleichen | keine Tabelle | tabelle={}", page, tabelle);
-        return null;
+        return TableKomponenten.tabelleFinden(tabelle, page);
     }
 
     /** Der Kern von {@link #tabelleAngleichen(String)}, ohne die Suche — testbar ohne Faces. */
@@ -1038,7 +1079,7 @@ public class TableSettings implements Serializable {
         if (state.getSortBy() == null) {
             return null; // NOSONAR - null heisst fuer PrimeFaces "keine Vorgabe"
         }
-        return sortMetaFuer(sortierbareFelderDerTabelle());
+        return sortMetaFuer(TableKomponenten.sortierbareFelder(page));
     }
 
     /**
@@ -1074,36 +1115,6 @@ public class TableSettings implements Serializable {
             return false;
         }
         return felder == null || felder.contains(sort.getField());
-    }
-
-    /**
-     * Die Sortierfelder der gerenderten Spalten der Tabelle, die gerade ausgewertet wird; {@code null},
-     * wenn keine Tabelle greifbar ist (Unit-Test, Aufruf ausserhalb des Aufbaus). Dieselbe
-     * Rechnung wie in {@code UITable.initSortBy}, damit die Filterung genau das durchlaesst, was
-     * PrimeFaces danach auch findet.
-     */
-    private Set<String> sortierbareFelderDerTabelle() {
-        FacesContext faces = FacesContext.getCurrentInstance();
-        if (faces == null) {
-            return null; // NOSONAR - null = "nicht pruefbar", nicht "keine Felder"
-        }
-        try {
-            if (!(UIComponent.getCurrentComponent(faces) instanceof UITable<?> tabelle)) {
-                return null; // NOSONAR - siehe oben
-            }
-            Set<String> felder = new HashSet<>();
-            tabelle.forEachColumn(spalte -> {
-                SortMeta meta = SortMeta.of(faces, tabelle.getVar(), spalte);
-                if (meta != null && meta.getField() != null) {
-                    felder.add(meta.getField());
-                }
-                return true;
-            });
-            return felder;
-        } catch (RuntimeException e) { // NOSONAR - eine Einstellung darf den Seitenaufbau nicht abbrechen
-            log.debug("[TableSettings:{}] sortierbareFelderDerTabelle | nicht ermittelbar | {}", page, e.getMessage());
-            return null; // NOSONAR - siehe oben
-        }
     }
 
     /**
@@ -1174,19 +1185,6 @@ public class TableSettings implements Serializable {
         }
     }
 
-    private static List<TableSort> kopie(List<TableSort> sortBy) {
-        if (sortBy == null) {
-            return null; // NOSONAR - null bleibt "nie sortiert"
-        }
-        List<TableSort> kopie = new ArrayList<>();
-        for (TableSort sort : sortBy) {
-            if (sort != null) {
-                kopie.add(new TableSort(sort.getColumn(), sort.getField(), sort.isDescending()));
-            }
-        }
-        return kopie;
-    }
-
     private static boolean leer(String wert) {
         return wert == null || wert.isBlank();
     }
@@ -1203,8 +1201,18 @@ public class TableSettings implements Serializable {
         return selectedProfile != null && !selectedProfile.isBlank();
     }
 
-    /** Auswahl im Feld: ein Profil wird sofort angewendet. */
+    /**
+     * Auswahl im Feld: ein Profil wird sofort angewendet, danach laeuft der Einhaenger der Seite
+     * ({@link #setNachProfilwechsel}) - auch ohne gefundenes Profil, damit die Seite zum Feld passt.
+     */
     public void onProfileSelected() {
+        profilUebernehmen();
+        if (nachProfilwechsel != null) {
+            nachProfilwechsel.ausfuehren();
+        }
+    }
+
+    private void profilUebernehmen() {
         if (!isProfileActive()) {
             return;
         }
@@ -1221,7 +1229,8 @@ public class TableSettings implements Serializable {
         state.setPaginatorTop(profile.getPaginatorTop());
         state.setPaginatorBottom(profile.getPaginatorBottom());
         state.setRowsPerPage(profile.getRowsPerPage());
-        state.setSortBy(kopie(profile.getSortBy()));
+        state.setSortBy(TableSort.kopie(profile.getSortBy()));
+        state.setPageState(new LinkedHashMap<>(profile.getPageState()));
         state.setActiveProfile(selectedProfile);
         save();
         growl(profilMeldung(selectedProfile, "meldung.profil.angewendet"));
@@ -1325,8 +1334,31 @@ public class TableSettings implements Serializable {
         profile.setPaginatorTop(state.getPaginatorTop());
         profile.setPaginatorBottom(state.getPaginatorBottom());
         profile.setRowsPerPage(state.getRowsPerPage());
-        profile.setSortBy(kopie(state.getSortBy()));
+        profile.setSortBy(TableSort.kopie(state.getSortBy()));
+        profile.setPageState(new LinkedHashMap<>(state.getPageState()));
         state.getProfiles().put(name, profile);
+    }
+
+    // ── Seitenspezifischer Stand (Karte 2086) ──────────────────────────────
+
+    /** Wert, den die Seite sich gemerkt hat (Filter, Schalter); leer, wenn keiner. Wandert mit ins Profil. */
+    public String pageValue(String key) {
+        String value = state.getPageState().get(key);
+        return value == null ? "" : value;
+    }
+
+    /** Derselbe Wert als Schalter; alles ausser {@code "true"} heisst "aus". */
+    public boolean pageFlag(String key) {
+        return "true".equals(state.getPageState().get(key));
+    }
+
+    /** Legt einen seitenspezifischen Wert ab ({@code null} loescht ihn); speichern mit {@link #persist()}. */
+    public void setPageValue(String key, String value) {
+        if (key != null && value == null) {
+            state.getPageState().remove(key);
+        } else if (key != null) {
+            state.getPageState().put(key, value);
+        }
     }
 
     // ── Auf- und Zuklappen des Bereichs ─────────────────────────────────────
@@ -1419,16 +1451,4 @@ public class TableSettings implements Serializable {
         }
     }
 
-    /** Zahl aus einem Meldeparameter, oder {@code null} wenn unbrauchbar. */
-    private static Integer zuBreite(String roh) {
-        if (roh == null || roh.isBlank()) {
-            return null;
-        }
-        try {
-            int wert = Math.round(Float.parseFloat(roh.trim()));
-            return wert >= MIN_SPALTE_PX ? wert : null;
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
 }

@@ -54,6 +54,28 @@ Der Konstruktor lädt den gespeicherten Stand über `TableStateStore`. root brin
 `UserPreferenceTableStateStore` mit (JSON je Benutzer und Mandant in `UserPreference`) —
 eigene Apps können das `TableStateStore`-Interface implementieren und injizieren.
 
+**Ablage austauschen (Karte 2086).** `ch.plaintext.boot.table` liegt nur noch im Artefakt
+`plaintext-root-tablesettings`; root-common hängt davon ab. Der Default-Store kommt per
+AutoConfiguration (`ch.plaintext.boot.tablestore.TableStateStoreAutoConfiguration`) und nur,
+solange die App **keine eigene `TableStateStore`-Bean** hat (`@ConditionalOnMissingBean`). Eine
+eigene Ablage ist also einfach eine Bean dieses Typs, ohne Property, Exclude oder `@Primary`.
+Benutzer und Mandant liefert die Bean `TableStateOwner` (aus `PlaintextSecurity`); ein eigener
+Store injiziert sie, statt selbst die Security zu fragen. `TableState` ist tolerant gegenüber
+unbekannten Feldern (`@JsonIgnoreProperties(ignoreUnknown = true)`).
+
+**Seiten-API aus dem Inventar (Karte 2086):**
+
+| Bedarf | API |
+|---|---|
+| Paginator-Vorgabe oben/unten/beides/aus | `new TableSettings(seite, mitBreiten, PagingVorgabe.oben(50))`, `PagingVorgabe.aus()` |
+| Spaltenreihenfolge per `displayPriority` | `<p:column displayPriority="#{x.anzeige.displayPriority('key')}">`, Block am Ende: `#{x.anzeige.prioAmEnde}` |
+| Seitenspezifische Werte (Filter, Schalter), auch im Profil | `pageValue(key)`, `pageFlag(key)`, `setPageValue(key, wert)` + `persist()` |
+| Spalte zählt nur, wenn gerendert | `setSpaltenBedingung(key, () -> bean.isSucheGelaufen())` (serialisierbar) |
+| Seite nach Profilwechsel neu aufbauen | `setNachProfilwechsel(() -> bean.zeilenNeu())` (serialisierbar) |
+| Seitenschlüssel/Spalten zur Laufzeit wechseln | `neuAufsetzen(seite, store, spalten)` |
+| Anderer Name in der Spaltenliste, nicht abwählbar, nicht verschiebbar | `TableColumn.listenLabel`, `waehlbar`, `verschiebbar`; `knopfSpalte(...)`, `ausBlock(...)`, `blockPlatzhalter(...)` |
+| Aufgeklappte Zeilen (Baum) | `anzeige.getState().expand(zeile)`, `collapse(zeile)`, `isExpanded(zeile)` (max. 2000) |
+
 Pflichtspalten (nie ausblendbar, immer sichtbar) deklariert die Seite:
 
 ```java

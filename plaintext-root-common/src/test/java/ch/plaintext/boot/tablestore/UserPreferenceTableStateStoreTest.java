@@ -1,9 +1,12 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-package ch.plaintext.boot.table;
+package ch.plaintext.boot.tablestore;
 
-import ch.plaintext.PlaintextSecurity;
+import ch.plaintext.boot.table.TableColumn;
+import ch.plaintext.boot.table.TableSettings;
+import ch.plaintext.boot.table.TableState;
+import ch.plaintext.boot.table.TableStateOwner;
 import ch.plaintext.boot.plugins.jsf.userprofile.UserPreferencesBackingBean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,7 +44,7 @@ class UserPreferenceTableStateStoreTest {
     private UserPreferencesBackingBean preferences;
 
     @Mock
-    private PlaintextSecurity security;
+    private TableStateOwner security;
 
     private UserPreferenceTableStateStore store;
 

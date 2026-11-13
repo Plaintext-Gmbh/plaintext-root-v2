@@ -51,4 +51,11 @@ public class TableColumnProfile implements Serializable {
 
     /** Sortierung (Karte 1346); ein Profil aus der Zeit davor hat {@code null} = Vorgabe der Seite. */
     private List<TableSort> sortBy;
+
+    /**
+     * Der seitenspezifische Anteil des Profils (Karte 2086), gleiche Schluessel wie
+     * {@link TableState#getPageState()}: ein Profil "nur mein Team, ohne Erledigte" waere ohne
+     * seine Filter nicht dasselbe Profil.
+     */
+    private Map<String, String> pageState = new LinkedHashMap<>();
 }

@@ -19,11 +19,27 @@
       mit layout="grid" am selectManyCheckbox (das in PrimeFaces 15 eine FacesException wirft und
       die Seite weiss laesst — auf Produktion aufgefallen, nicht im Build).
 
-      DER GEGENPART IN JAVA: ch.plaintext.boot.table.TableSettings aus plaintext-root-common
-      (bis 1.668.0 in plaintext-root-web; seit Karte 1077 dort, wo auch die Ablage wohnt).
-      Das Tag rendert nur; alles, was es abfragt, steht dort. Die Ablage des Benutzerstands
-      bringt root mit: UserPreferenceTableStateStore (je Benutzer und Mandant, JSON in
-      UserPreference) — die Backing-Bean laesst sich einen TableStateStore injizieren, mehr nicht.
+      DER GEGENPART IN JAVA: ch.plaintext.boot.table.TableSettings - seit Karte 2086 nur noch im
+      Artefakt plaintext-root-tablesettings (root-common haengt davon ab; vorher root-common,
+      bis 1.668.0 plaintext-root-web). Das Tag rendert nur; alles, was es abfragt, steht dort.
+
+      ABLAGE AUSTAUSCHEN (Karte 2086): Die Backing-Bean laesst sich einen TableStateStore
+      injizieren und reicht ihn an anzeige.init(store, spalten) weiter. root bringt per
+      AutoConfiguration UserPreferenceTableStateStore mit (je Benutzer und Mandant, JSON in
+      UserPreference) - aber nur, solange die App KEINE eigene TableStateStore-Bean hat. Eigene
+      Ablage = eigene Bean, ohne Property, ohne Exclude, ohne @Primary. Wem der Stand gehoert,
+      sagt die Bean TableStateOwner (Benutzer, Mandant); ein eigener Store injiziert sie, statt
+      selbst die Security zu fragen.
+
+      SEITEN-API (Karte 2086, aus dem Inventar): new TableSettings(seite, mitBreiten,
+      PagingVorgabe.oben/unten/beides(zeilen) | aus()); an p:column displayPriority=
+      "#{x.anzeige.displayPriority('key')}" (Bloecke am Ende: #{x.anzeige.prioAmEnde});
+      anzeige.pageValue/pageFlag/setPageValue (Filter, Schalter - wandern mit ins Profil);
+      anzeige.setSpaltenBedingung(key, () -> ...) (zaehlt in der Breitensumme nur, wenn
+      gerendert); anzeige.setNachProfilwechsel(() -> ...); anzeige.neuAufsetzen(seite, store,
+      spalten); TableColumn listenLabel / waehlbar / verschiebbar (ausBlock, blockPlatzhalter,
+      knopfSpalte) - nicht waehlbare Spalten haben im Panel keinen Schalter, nicht verschiebbare
+      stehen nicht in der Reihenfolge-Liste; anzeige.state.expand/collapse/isExpanded(zeile).
 
       KOPFLEISTE UND PANEL (Karte 1853): Die Kopfleiste der Tabelle traegt NUR das Regler-Symbol;
       die Schalter «Verschieben» / «Grösse ändern» und «Standard setzen» wohnen im Panel
@@ -272,6 +288,9 @@
                                  schickte nichts ab. Die Checkbox meldet Schluessel und Zustand ueber
                                  den remoteCommand unter der Liste (Listener in js/table-settings.js,
                                  kein on…-Attribut: CSP ohne 'unsafe-inline'). -->
+                            <!-- Karte 2086: nicht waehlbare Spalten (TableColumn.waehlbar=false, z.B.
+                                 Knopfspalten) haben keinen eigenen Schalter - sie bleiben sichtbar. -->
+                            <ui:fragment rendered="#{anzeige.waehlbar(key)}">
                             <input type="checkbox" class="pt-ts-schalter-sichtbar" role="switch"
                                    data-spalte="#{key}"
                                    checked="#{anzeige.isVisible(key) ? 'checked' : null}"
@@ -279,6 +298,7 @@
                                    aria-label="#{anzeige.columnLabel(key)}"
                                    title="#{anzeige.pflichtspalte(key) ? ts['spalten.pflicht.titel'] : ts['spalten.schalter.titel']}"
                                    data-pt-remote="#{ptSettingsId}SpalteSichtbar"/>
+                            </ui:fragment>
                         </p:column>
                     </p:orderList>
                     <p:remoteCommand name="#{ptSettingsId}SpalteSichtbar" process="@this"

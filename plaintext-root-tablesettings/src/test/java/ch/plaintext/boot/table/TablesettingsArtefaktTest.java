@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.List;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -57,6 +58,23 @@ class TablesettingsArtefaktTest {
         assertNotNull(Class.forName("ch.plaintext.boot.table.TableStateStore"));
         URL store = CL.getResource("ch/plaintext/boot/table/UserPreferenceTableStateStore.class");
         assertNull(store, "UserPreferenceTableStateStore haengt an root und darf nicht ins Artefakt");
+    }
+
+    @Test
+    @DisplayName("Karte 2086: nur ch.plaintext.boot.table im Artefakt - kein mitkompiliertes FacesMessages/StabileApi")
+    void nurDasEigenePaket() throws Exception {
+        java.nio.file.Path wurzel = java.nio.file.Path.of(
+                TableSettings.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        List<String> fremd;
+        try (var dateien = java.nio.file.Files.walk(wurzel)) {
+            fremd = dateien.filter(d -> d.toString().endsWith(".class"))
+                    .map(d -> wurzel.relativize(d).toString().replace('\\', '/'))
+                    .filter(d -> !d.startsWith("ch/plaintext/boot/table/"))
+                    .toList();
+        }
+        assertTrue(fremd.isEmpty(), "Klassen ausserhalb ch/plaintext/boot/table: " + fremd);
+        assertNull(CL.getResource("ch/plaintext/boot/plugins/jsf/FacesMessages.class"));
+        assertNull(CL.getResource("ch/plaintext/arch/StabileApi.class"));
     }
 
     @Test

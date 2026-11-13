@@ -133,7 +133,10 @@ class PlaintextModulgrenzenTest {
             "plaintext-root-pageguard",
             "plaintext-root-webapp",
             // Karte 1515: der ModulLader gehoert zur Huelle (nur JDK); die Modul-Ansicht prueft mit seinem Parser.
-            "plaintext-root-lader");
+            "plaintext-root-lader",
+            // Karte 2086: ch.plaintext.boot.table (TableSettings & Co.) wohnt nur noch hier, root-common
+            // haengt davon ab — fuer die Apps dieselbe Basis wie vorher aus root-common.
+            "plaintext-root-tablesettings");
 
     /**
      * Lower bounds of the scan set, measured on 22./23.09.2026 on the six reactors (classes /

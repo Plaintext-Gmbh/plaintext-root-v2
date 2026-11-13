@@ -38,6 +38,21 @@ public final class TableSettingsTexte {
         return args.length == 0 ? muster : MessageFormat.format(muster, args);
     }
 
+    /**
+     * Kurzes Growl fuer gelungene Aenderungen: globale FacesMessage, die das globalGrowl des
+     * Templates per autoUpdate zeigt; ohne Faces-Kontext still. Gleiche Wirkung wie
+     * {@code FacesMessages.info} aus root-common, aber ohne dessen Abhaengigkeit: dieses Paket
+     * liegt seit Karte 2086 nur noch im eigenstaendigen Artefakt plaintext-root-tablesettings.
+     * Die Architekturregel {@code meldungenNurUeberFacesMessages} nimmt genau diese Klasse aus.
+     */
+    public static void growl(String text) {
+        var faces = jakarta.faces.context.FacesContext.getCurrentInstance();
+        if (faces != null) {
+            faces.addMessage(null, new jakarta.faces.application.FacesMessage(
+                    jakarta.faces.application.FacesMessage.SEVERITY_INFO, text, null));
+        }
+    }
+
     /** Label des Dreifach-Modus-Schalters je Modus (0 anpassen, 1 Verschieben, 2 Vergroessern). */
     public static String modusLabel(int modus) {
         return switch (modus) {

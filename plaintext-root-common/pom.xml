@@ -21,6 +21,13 @@
             <artifactId>plaintext-root-interfaces</artifactId>
         </dependency>
 
+        <!-- Karte 2086: ch.plaintext.boot.table (TableSettings & Co.) wohnt nur dort, nicht mehr
+             als zweite Kopie hier. Die Ablage UserPreferenceTableStateStore bleibt in common. -->
+        <dependency>
+            <groupId>ch.plaintext.v2</groupId>
+            <artifactId>plaintext-root-tablesettings</artifactId>
+        </dependency>
+
         <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
