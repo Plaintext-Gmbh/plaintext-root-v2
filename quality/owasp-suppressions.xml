@@ -81,4 +81,59 @@
       ==========================================================================================
     -->
 
+    <!--
+      FALSE POSITIVE: Spring-AI-MCP-Artefakte (org.springframework.ai/mcp-*,
+      spring-ai-starter-mcp-server-*, spring-ai-autoconfigure-mcp-server-*,
+      io.modelcontextprotocol/mcp, mcp-core, mcp-json-jackson3)
+
+      OWASP Dependency-Check ordnet diese JARs wegen des Kurznamens "mcp" der
+      VMware-CPE-Familie zu (cpe:2.3:a:vmware:ace|player|workstation|tools|vmrc|...).
+      Gemeldet werden dadurch ausschliesslich VMware-Produktluecken von 2009-2010
+      (CVE-2009-15xx/37xx/48xx, CVE-2010-11xx/42xx) — Format-String- und
+      Buffer-Overflows in vmware-vmrc.exe, vmnc.dll, VMware Tools, vmrun usw.
+
+      Fakten, die den Pfad als nicht ausnutzbar belegen:
+        * Die Artefakte sind Spring-AI-Model-Context-Protocol-Bibliotheken (2025,
+          GroupIds org.springframework.ai / io.modelcontextprotocol) und enthalten
+          keinerlei VMware-Code; "mcp" steht hier fuer das Model Context Protocol.
+        * Die CVE-Beschreibungen betreffen Binaerdateien des VMware Workstation/
+          Player/ACE-Produkts von 2009-2010, die in diesen JARs nicht existieren.
+        * Die gleichen Treffer erscheinen doppelt (mcp-spring-webmvc und
+          spring-ai-starter-mcp-server-webmvc melden dieselbe VMware-CPE-Familie).
+
+      Massnahme: Root-Cause-Suppression der falschen VMware-CPE-Zuordnung
+      ausschliesslich fuer die MCP-Artefakte. Echte Treffer gegen Spring AI oder
+      das Model-Context-Protocol bleiben voll gescannt.
+    -->
+    <suppress>
+        <notes><![CDATA[
+            Spring-AI-MCP-JARs werden faelschlich als VMware-Produkte (2009/2010-CVEs)
+            erkannt; siehe Kommentarblock oben. Root-Cause-Suppression der CPE-Zuordnung.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/(org\.springframework\.ai|io\.modelcontextprotocol)/[a-z0-9.-]*mcp[a-z0-9.-]*@.*$</packageUrl>
+        <cpe>cpe:/a:vmware</cpe>
+    </suppress>
+
+    <!--
+      FALSE POSITIVE: io.micrometer:micrometer-registry-prometheus
+
+      OWASP Dependency-Check ordnet diese Java-Client-Bibliothek (Metrik-Registry,
+      die im Prometheus-Textformat exportiert) der CPE cpe:2.3:a:prometheus:prometheus
+      zu. Gemeldet wird dadurch CVE-2026-42154 (CVSS 7.5) — eine Luecke des
+      Prometheus-SERVERS (Versionen <3.5.3 / 3.6.0-3.11.2), nicht der Java-Registry.
+
+      Fakten:
+        * Das JAR ist die Micrometer-Registry-Bibliothek; der Prometheus-Server
+          wird von uns nicht als Abhaengigkeit gebunden (PROD nutzt den Server
+          separat, ausserhalb des App-Klassenpfads).
+        * vulnerableSoftware der CVE nennt ausschliesslich cpe:2.3:a:prometheus:prometheus.
+    -->
+    <suppress>
+        <notes><![CDATA[
+            micrometer-registry-prometheus wird faelschlich dem Prometheus-Server
+            zugeordnet; die CVE betrifft den Server, nicht die Java-Registry.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/io\.micrometer/micrometer-registry-prometheus@.*$</packageUrl>
+        <cpe>cpe:/a:prometheus:prometheus</cpe>
+    </suppress>
 </suppressions>
