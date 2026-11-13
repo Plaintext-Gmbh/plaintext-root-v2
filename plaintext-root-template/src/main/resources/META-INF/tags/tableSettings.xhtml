@@ -108,13 +108,19 @@
                                        ? (fn:startsWith(tabelle, ':') ? fn:substring(tabelle, 1, -1) : tabelle)
                                        : tabelleDomId}"/>
     <!-- Texte des Bedienbereichs (Karte 1853 Runde 6, mehrsprachig de/en/fr/it); die Growl-
-         Meldungen aus TableSettings laufen ueber dasselbe Bundle (TableSettings#text). -->
-    <f:loadBundle basename="ch.plaintext.boot.table.tablesettings" var="ts"/>
+         Meldungen aus TableSettings laufen ueber dasselbe Bundle (TableSettings#text). Per
+         anzeige.texte statt f:loadBundle: letzteres folgt der ViewRoot-Locale (fest de) und
+         blieb fuer Sprache=en-Benutzer deutsch (claude2-Befund). T() nicht nutzbar — Jakarta
+         EL kennt es nicht (SpEL, tomcat-embed-el belegt). -->
+    <c:set var="ts" value="#{anzeige.texte}"/>
 
     <!-- Die Klammer um alles: sie traegt die data-Attribute und ist zugleich der Suchraum des
          Skripts. Ohne sie muesste js/table-settings.js die zusammengehoerigen Teile ueber IDs
          finden — und zwei Bedienbereiche auf einer Seite waeren nicht auseinanderzuhalten. -->
-    <h:panelGroup layout="block" styleClass="pt-tablesettings-wrap"
+    <!-- Klasse statt :has() am CSS: die Tabelle ist kein direktes Geschwister des Wraps
+         (Panel/Dialog/remoteCommand liegen dazwischen), der alte Selektor griff nie. -->
+    <h:panelGroup layout="block"
+                  styleClass="pt-tablesettings-wrap#{anzeige.paginatorOben ? ' pt-ts-paginator-oben' : ''}"
                   id="#{ptSettingsId}-bereich"
                   binding="#{anzeige.reihenfolgeZiel}"
                   a:data-pt-tablesettings="#{ptTabelleDom}"
@@ -150,7 +156,11 @@
 
         <!-- Das schwebende Panel: Schalter zuoberst, dann Profil, dann die drei Reiter.
              dismissable: Klick ausserhalb schliesst (Mockup Variante A). -->
-        <p:overlayPanel for="#{ptSettingsId}-oeffnen" id="#{ptSettingsId}-panel"
+        <!-- Kein for: PF wuerde den Click-Handler am Oeffner binden und nach einem colReorder-
+             Re-Render des Wraps das ersetzte Element referenzieren (Befund claude2). Das Panel
+             oeffnet die Delegation in js/table-settings.js (document-Klick auf .pt-ts-oeffner,
+             ueberlebt Teil-Updates, CSP ohne unsafe-inline). -->
+        <p:overlayPanel id="#{ptSettingsId}-panel"
                         widgetVar="#{ptSettingsId}PanelWv"
                         styleClass="pt-ts-panel" dismissable="true"
                         hideEffect="fade" showEffect="fade">
@@ -210,12 +220,12 @@
                                 <p:selectBooleanCheckbox id="#{ptSettingsId}-paginatorOben" value="#{anzeige.paginatorOben}"
                                                          itemLabel="#{ts['paginator.oben']}">
                                     <p:ajax process="@this" listener="#{anzeige.onPaginatorChange(tabelle)}"
-                                            update="#{tabelle} #{ptSettingsId}-paginator"/>
+                                            update="#{tabelle} #{ptSettingsId}-paginator #{anzeige.reihenfolgeZielClientId}"/>
                                 </p:selectBooleanCheckbox>
                                 <p:selectBooleanCheckbox id="#{ptSettingsId}-paginatorUnten" value="#{anzeige.paginatorUnten}"
                                                          itemLabel="#{ts['paginator.unten']}">
                                     <p:ajax process="@this" listener="#{anzeige.onPaginatorChange(tabelle)}"
-                                            update="#{tabelle} #{ptSettingsId}-paginator"/>
+                                            update="#{tabelle} #{ptSettingsId}-paginator #{anzeige.reihenfolgeZielClientId}"/>
                                 </p:selectBooleanCheckbox>
                             </h:panelGroup>
                         </h:panelGroup>

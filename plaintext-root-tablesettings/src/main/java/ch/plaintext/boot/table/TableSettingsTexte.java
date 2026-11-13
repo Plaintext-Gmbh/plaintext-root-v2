@@ -27,6 +27,18 @@ public final class TableSettingsTexte {
     private TableSettingsTexte() {
     }
 
+    /**
+     * Das Bundle in der Sprache der Seite — mit dem UserPreferences-Vorrang aus
+     * {@link #locale()} (Karte 1853 Runde 6, claude2-Befund: {@code f:loadBundle} folgt der
+     * ViewRoot-Locale, die in den Apps fest auf de steht, und blieb fuer language=en-Benutzer
+     * deutsch). Das Tag bindet es ueber {@code anzeige.texte} (Getter in {@link TableSettings}),
+     * damit keine Bohne noetig ist (funktioniert auch im eigenstaendigen tablesettings-Artefakt
+     * ohne Spring-Scan).
+     */
+    public static ResourceBundle bundle() {
+        return ResourceBundle.getBundle(BUNDLE, locale(), TableSettingsTexte.class.getClassLoader());
+    }
+
     /** Text zum Schluessel, mit {@link MessageFormat}-Parametern ({0}, {1}, ...). */
     public static String text(String key, Object... args) {
         String muster;
@@ -48,8 +60,11 @@ public final class TableSettingsTexte {
     public static void growl(String text) {
         var faces = jakarta.faces.context.FacesContext.getCurrentInstance();
         if (faces != null) {
+            // Detail leer statt null — sonst liefert FacesMessage.getDetail() die
+            // Zusammenfassung und PrimeFaces zeigt Titel und Text doppelt
+            // (claude2-Befund zu Karte 1853).
             faces.addMessage(null, new jakarta.faces.application.FacesMessage(
-                    jakarta.faces.application.FacesMessage.SEVERITY_INFO, text, null));
+                    jakarta.faces.application.FacesMessage.SEVERITY_INFO, text, ""));
         }
     }
 

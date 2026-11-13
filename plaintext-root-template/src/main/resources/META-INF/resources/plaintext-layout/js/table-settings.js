@@ -241,10 +241,70 @@
         }
     });
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', sicherEinrichten);
-    } else {
+    /*
+     * Karte 1853 (claude2-Befund): Panel-Oeffner. EIN Listener am document statt PF-AutoBinding
+     * am Element: der colReorder-Re-Render des Wraps ersetzt den Oeffner, PF('...PanelWv').target
+     * zeigt danach auf das alte Element (Hoehe 0, oeffnet nicht). Die Delegation ueberlebt
+     * Teil-Updates und ist CSP-konform (kein on...-Attribut).
+     */
+    document.addEventListener('click', function (e) {
+        var oeffner = e.target && e.target.closest ? e.target.closest('.pt-ts-oeffner') : null;
+        if (!oeffner) {
+            return;
+        }
+        var wrap = oeffner.closest('[data-pt-settings-id]');
+        if (!wrap || !window.PF) {
+            return;
+        }
+        var panel = PF(wrap.getAttribute('data-pt-settings-id') + 'PanelWv');
+        if (panel) {
+            e.preventDefault();
+            if (typeof panel.isVisible === 'function' && panel.isVisible()) {
+                panel.hide();
+            } else if (typeof panel.show === 'function') {
+                panel.show(oeffner.id);
+                var panelEl = panel.jq ? panel.jq[0] : null;
+                if (panelEl && window.requestAnimationFrame) {
+                    requestAnimationFrame(function () {
+                        panelEl.style.setProperty('--pt-ts-panel-oben',
+                            Math.round(panelEl.getBoundingClientRect().top) + 'px');
+                    });
+                }
+            }
+        }
+    });
+
+    /* Karte 1853 (claude2, gemessen an 1280x720): PF 16 schliesst ein OverlayPanel bei
+       JEDEM Fenster-Scroll/Resize (handleViewportChange). Das Panel der Tabelleinstellungen
+       soll nur per Toggle (Oeffner) oder dismissable (Klick draussen) schliessen — ragt der
+       Inhalt, scrollt der eigene Container (max-height), nicht die Seite. PF bindet den
+       Handler beim Widget-Init an window, ein Eigenschafts-Override am Objekt greift nicht:
+       Deshalb der Prototyp, nur fuer .pt-ts-panel. Laeuft in sicherEinrichten (nach PF). */
+    function patchViewportSchliessen() {
+        var proto = PrimeFaces.widget.OverlayPanel && PrimeFaces.widget.OverlayPanel.prototype;
+        if (proto && !proto.__ptTsKeinViewportSchliessen) {
+            proto.__ptTsKeinViewportSchliessen = true;
+            var orig = proto.handleViewportChange;
+            proto.handleViewportChange = function () {
+                if (this.jq && this.jq[0]
+                        && this.jq[0].classList.contains('pt-ts-panel')) {
+                    return;
+                }
+                if (typeof orig === 'function') {
+                    return orig.apply(this, arguments);
+                }
+            };
+        }
+    }
+
+    function einrichtenMitPatch() {
+        patchViewportSchliessen();
         sicherEinrichten();
     }
-    new MutationObserver(sicherEinrichten).observe(document.body, {childList: true, subtree: true});
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', einrichtenMitPatch);
+    } else {
+        einrichtenMitPatch();
+    }
+    new MutationObserver(einrichtenMitPatch).observe(document.body, {childList: true, subtree: true});
 })();

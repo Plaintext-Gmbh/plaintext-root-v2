@@ -75,8 +75,16 @@
     box-shadow: 0 4px 18px rgba(15, 23, 42, 0.14);
 }
 
+/* Karte 1853 (claude2-Befund, gemessen an 1280x720): Das Panel darf nie ueber die
+   Fensterunterkante ragen. PrimeFaces schliesst ein OverlayPanel bei JEDER Fensterbewegung
+   (handleViewportChange) — ragt der Inhalt unten hinaus, scrollt der Benutzer die Seite,
+   um ihn zu sehen, und das Panel klappt zu. Die Grenze folgt der tatsaechlichen Lage
+   (--pt-ts-panel-oben = Abstand des Panels vom Fensterrand, von der Delegation gesetzt):
+   Dann scrollt der INNERE Container, ohne handleViewportChange. */
 .pt-ts-panel .ui-overlaypanel-content {
     padding: 12px 14px;
+    max-height: calc(100vh - var(--pt-ts-panel-oben, 2rem) - 1rem);
+    overflow-y: auto;
 }
 
 .pt-ts-profilzeile {
@@ -419,16 +427,17 @@
 /* ── Runde 6 (Karte 1853, Design-Feedback Daniel 13.11.) ─────────────────── */
 
 /* (1) Der Oeffner steht GENAU ueber dem Tabellenkopf — auch wenn die Tabelle einen Paginator
-   oben traegt: dann rutscht die Toolbar per CSS unter den Paginator (Hoehe als Variable,
-   Theme kann sie ueberschreiben). Ohne Paginator oben bleibt alles wie es war. */
-.pt-tablesettings-wrap:has(+ .ui-datatable .ui-paginator-top) .pt-ts-toolbar {
+   oben traegt: dann rutscht die Toolbar unter den Paginator (Hoehe als Variable, Theme kann
+   sie ueberschreiben). Klasse am Wrap statt :has(): die Tabelle ist kein direktes Geschwister
+   (Panel/Dialog/remoteCommand dazwischen), :has(+ .ui-datatable) griff deshalb nie. */
+.pt-ts-paginator-oben .pt-ts-toolbar {
     position: relative;
-    top: var(--pt-ts-paginator-hoehe, 2.6rem);
+    top: calc(var(--pt-ts-paginator-hoehe, 4.75rem) / 2);
     z-index: 2;
 }
 
-.pt-tablesettings-wrap:has(+ .ui-datatable .ui-paginator-top) + .ui-datatable {
-    margin-top: calc(-1 * var(--pt-ts-paginator-hoehe, 2.6rem));
+.pt-ts-paginator-oben ~ .ui-datatable {
+    margin-top: calc(-1 * var(--pt-ts-paginator-hoehe, 4.75rem) / 2);
 }
 
 /* (7) Ansicht-Reiter: Paginator-Checkboxen untereinander, darunter «Zeilen pro Seite» —

@@ -330,6 +330,24 @@ class TableSettingsTest {
     }
 
     @Test
+    @DisplayName("bundle(): liefert das Bundle in der Benutzer-Sprache (en), nicht der ViewRoot-Locale (de)")
+    void bundleBenutzerSprache() {
+        FacesContext faces = Mockito.mock(FacesContext.class);
+        jakarta.faces.application.Application app = Mockito.mock(jakarta.faces.application.Application.class);
+        jakarta.faces.component.UIViewRoot viewRoot = Mockito.mock(jakarta.faces.component.UIViewRoot.class);
+        Mockito.when(faces.getApplication()).thenReturn(app);
+        Mockito.when(faces.getViewRoot()).thenReturn(viewRoot);
+        Mockito.when(viewRoot.getLocale()).thenReturn(Locale.GERMAN);
+        Mockito.when(app.evaluateExpressionGet(eq(faces), eq("#{userPreferencesBackingBean.language}"), eq(String.class)))
+                .thenReturn("en");
+
+        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
+            holder.when(FacesContext::getCurrentInstance).thenReturn(faces);
+            assertThat(TableSettingsTexte.bundle().getString("modus.anpassen")).isEqualTo("Adjust columns");
+        }
+    }
+
+    @Test
     @DisplayName("text(): Benutzer-Sprache (userPreferences.language=en) hat Vorrang vor ViewRoot de")
     void textBenutzerSpracheVorViewRoot() {
         FacesContext faces = Mockito.mock(FacesContext.class);
