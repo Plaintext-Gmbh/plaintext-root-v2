@@ -389,4 +389,42 @@ class UserPreferencesBackingBeanTest {
         assertEquals("testfile", theme.getFile());
         assertEquals("#FF0000", theme.getColor());
     }
+
+    // ==================== Karte 2042: plaintext.i18n.default-language ====================
+
+    @Test
+    void anonym_bekommtDieStandardsprache_ohneDatensatz() {
+        SecurityContextHolder.clearContext();
+        ReflectionTestUtils.setField(bean, "defaultLanguage", "en");
+
+        bean.init();
+
+        assertEquals("en", bean.getLanguage());
+        verifyNoInteractions(storage);
+    }
+
+    @Test
+    void anonym_ohneEinstellung_bleibtDeutsch() {
+        SecurityContextHolder.clearContext();
+
+        bean.init();
+
+        assertEquals("de", bean.getLanguage());
+    }
+
+    @Test
+    void neuerBenutzer_bekommtDieStandardsprache_bestehenderBehaeltSeine() {
+        ReflectionTestUtils.setField(bean, "defaultLanguage", "en");
+        when(storage.findByUniqueId("test@example.com")).thenReturn(null);
+        bean.init();
+        assertEquals("en", bean.getLanguage());
+
+        existingPrefs.setLanguage("fr");
+        UserPreferencesBackingBean zweite = new UserPreferencesBackingBean();
+        ReflectionTestUtils.setField(zweite, "storage", storage);
+        ReflectionTestUtils.setField(zweite, "defaultLanguage", "en");
+        when(storage.findByUniqueId("test@example.com")).thenReturn(existingPrefs);
+        zweite.init();
+        assertEquals("fr", zweite.getLanguage());
+    }
 }

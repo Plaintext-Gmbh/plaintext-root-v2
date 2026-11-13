@@ -16,6 +16,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.primefaces.PrimeFaces;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -67,6 +68,10 @@ public class UserPreferencesBackingBean implements Serializable {
 
     @Autowired
     private transient UserPrefsSimpleStorage storage;
+
+    /** Sprache vor der Anmeldung und fuer neue Benutzer (Karte 2042: die oeffentliche Demo spricht Englisch). */
+    @Value("${plaintext.i18n.default-language:de}")
+    private String defaultLanguage = "de";
 
     /**
      * Single source of truth for all user preference data.
@@ -142,6 +147,7 @@ public class UserPreferencesBackingBean implements Serializable {
     private void laden(String username) {
         if (username == null) {
             prefs = new UserPreference();
+            prefs.setLanguage(defaultLanguage);
             return;
         }
         prefs = storage.findByUniqueId(username);
@@ -171,6 +177,7 @@ public class UserPreferencesBackingBean implements Serializable {
         } else {
             prefs = new UserPreference();
             prefs.setUniqueId(username);
+            prefs.setLanguage(defaultLanguage);
             save();
         }
     }

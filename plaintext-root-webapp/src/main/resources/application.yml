@@ -155,6 +155,10 @@ plaintext:
     # straight to that provider (default false = status quo). With two or more providers it does not.
     # Never after ?error or ?logout, so a failed or ended sign-in does not loop.
     auto-redirect-single-idp: ${PLAINTEXT_LOGIN_AUTO_REDIRECT_SINGLE_IDP:false}
+  i18n:
+    # Card 2042: language before login and for users without saved preferences (de, en, fr, it).
+    # Saved user preferences win. Default de = status quo.
+    default-language: ${PLAINTEXT_I18N_DEFAULT_LANGUAGE:de}
   security:
     # Signing key for the persistent remember-me cookie. Leave blank in dev
     # (an ephemeral key is generated + WARN-logged). MUST be a stable secret in
