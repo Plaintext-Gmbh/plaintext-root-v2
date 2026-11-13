@@ -38,7 +38,7 @@ Shared utilities used across modules.
 | `TableSettings` / `TableColumn` (`ch.plaintext.boot.table`) | Java side of `pt:tableSettings`: column visibility, widths and named profiles of one table (Karte 1077; until 1.668.0 in `plaintext-root-web`) |
 | `AblageAuswahl` / `AblageEinsatz` (`ch.plaintext.boot.ablage`) | Java side of `pt:dateiAblage`: choose a file store, browse folders, open, download, upload and save, with `ordnerVerwaltung="true"` also create, rename/move and delete folders (Karte 1475), configured per place of use (stores with read/write roles, root folder, file types, size limit); every check runs here, not in the tag (Karte 1440) |
 | `TableState` / `TableColumnProfile` | What a user set up on a table — plain data, stored as JSON |
-| `TableStateStore` / `UserPreferenceTableStateStore` | Storage seam and the shipped implementation: per user and tenant in `UserPreference.tabellenStaende` |
+| `TableStateStore` / `UserPreferenceTableStateStore` | Storage seam (in `plaintext-root-tablesettings`, card 2086) and the shipped implementation (`ch.plaintext.boot.tablestore`, AutoConfiguration, only without an app-own `TableStateStore` bean): per user and tenant in `UserPreference.tabellenStaende` |
 
 ### plaintext-root-jpa
 

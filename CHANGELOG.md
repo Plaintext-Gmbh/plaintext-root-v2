@@ -12,6 +12,27 @@ exhaustive.
 
 ## [Unreleased]
 
+### Changed
+- **`ch.plaintext.boot.table` lives only in `plaintext-root-tablesettings`** (Karte 2086). Until now the package was
+  compiled twice (into `plaintext-root-common` and into the standalone `plaintext-root-tablesettings`, which also
+  picked up `FacesMessages` and `StabileApi` through the source path). `plaintext-root-common` now depends on
+  `plaintext-root-tablesettings`; class names and packages are unchanged. The arch rule `modulgrenze` counts
+  `plaintext-root-tablesettings` as a base module like root-common. **Consumers with `root-common-api` allowlist
+  entries pointing at `ch.plaintext.boot.table.*`** (guild: 9 lines) must delete them on the bump - the rule no
+  longer sees those edges as root-common, and the orphan check fails otherwise.
+- **The shipped table store is an AutoConfiguration** (Karte 2086): `UserPreferenceTableStateStore` moved to
+  `ch.plaintext.boot.tablestore` and is registered by `TableStateStoreAutoConfiguration` only when the app has no
+  `TableStateStore` bean of its own (`@ConditionalOnMissingBean`) - an own bean replaces it without property,
+  exclude or `@Primary`. User and tenant come from the new `TableStateOwner` bean (backed by `PlaintextSecurity`).
+
+### Added
+- **`TableSettings` covers what the inventory app needs** (Karte 2086): `PagingVorgabe` (paginator top/bottom/
+  both/off as page default), `displayPriority`/`prioAmEnde`, `pageValue`/`pageFlag`/`setPageValue` (stored in
+  `TableState.pageState` and in profiles), `setSpaltenBedingung` (`SpalteGerendert`), `setNachProfilwechsel`
+  (`NachProfilwechsel`), `neuAufsetzen`, `TableColumn.listenLabel`/`waehlbar`/`verschiebbar` with the factories
+  `ausBlock`, `blockPlatzhalter`, `knopfSpalte`, and `TableState.expandedRows` (`expand`/`collapse`/`isExpanded`).
+  All additive; existing constructors and pages behave as before.
+
 ## [3.0.0] - 2026-11-08
 
 ### Changed

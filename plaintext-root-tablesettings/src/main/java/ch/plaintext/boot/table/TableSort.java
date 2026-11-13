@@ -9,6 +9,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Eine sortierte Spalte im gespeicherten Stand (Karte 1346).
@@ -43,4 +45,18 @@ public class TableSort implements Serializable {
 
     /** Absteigend sortiert? Sonst aufsteigend. */
     private boolean descending;
+
+    /** Tiefe Kopie fuer Profil und Stand; {@code null} bleibt "nie sortiert". */
+    static List<TableSort> kopie(List<TableSort> sortBy) {
+        if (sortBy == null) {
+            return null; // NOSONAR - null bleibt "nie sortiert"
+        }
+        List<TableSort> kopie = new ArrayList<>();
+        for (TableSort sort : sortBy) {
+            if (sort != null) {
+                kopie.add(new TableSort(sort.getColumn(), sort.getField(), sort.isDescending()));
+            }
+        }
+        return kopie;
+    }
 }

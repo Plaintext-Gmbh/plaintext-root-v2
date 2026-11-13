@@ -107,6 +107,10 @@ public class PlaintextArchitectureTest {
     @ArchTest
     static final ArchRule meldungenNurUeberFacesMessages = noClasses()
             .that().areNotAssignableTo(FacesMessages.class)
+            // Karte 2086: ch.plaintext.boot.table liegt nur noch im eigenstaendigen Artefakt
+            // plaintext-root-tablesettings (Inventar, ohne root-common) und kann FacesMessages
+            // nicht erreichen; TableSettingsTexte.growl kapselt den Aufruf dort genauso.
+            .and().doNotHaveFullyQualifiedName("ch.plaintext.boot.table.TableSettingsTexte")
             .should().callMethod(jakarta.faces.context.FacesContext.class, "addMessage",
                     String.class, jakarta.faces.application.FacesMessage.class)
             .because("FacesMessages.info/warn/error/meldung/feld statt FacesContext.addMessage "

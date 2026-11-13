@@ -8,19 +8,18 @@
         Karte 1904: der Tabellen-Bedienbereich pt:tableSettings als EIGENSTAENDIGES Artefakt -
         fuer Anwendungen, die plaintext-root-template/-common NICHT einbinden koennen (eigenes
         Theme, root v1, z. B. das Inventar mit dem Oblique-Theme und PrimeFaces 15).
-
-        Gebaut wird aus DENSELBEN Quellen wie in root (keine Kopie, kein Drift):
-          - Java: ch.plaintext.boot.table aus plaintext-root-common (ohne
-            UserPreferenceTableStateStore - der haengt an root; die App stellt ihren TableStateStore)
-          - Tag + JS + CSS aus plaintext-root-template
+        Karte 2086: das Paket ch.plaintext.boot.table (TableSettings, TableState, TableStateStore,
+        die Texte) WOHNT hier und nur hier - plaintext-root-common haengt von diesem Artefakt ab,
+        statt eine zweite Kopie zu kompilieren. Die Ablage UserPreferenceTableStateStore bleibt in
+        root-common (Paket ch.plaintext.boot.tablestore, per AutoConfiguration und nur ohne eigene
+        TableStateStore-Bean der App).
+          - Tag + JS + CSS kommen unveraendert aus plaintext-root-template (einzige Quelle)
           - eigenes Taglib (META-INF/plaintext-tablesettings.taglib.xml) im Namensraum
             http://plaintext.ch/ui - Mojarra fuehrt Taglibs mit gleichem Namensraum zusammen.
-
+            In root-v2-Apps liegt das Tag damit zweimal im Klassenpfad (Template und dieses JAR),
+            byte-gleich aus derselben Quelle; Mojarra nimmt das erste, beide sind dasselbe.
         Alle Abhaengigkeiten sind provided: die Anwendung bringt PrimeFaces (15 oder 16), Faces,
-        Jackson und slf4j selbst mit. Geprueft: das Paket kompiliert gegen PF 15.0.19 und 16.0.1.
-
-        NICHT zusammen mit plaintext-root-template einbinden (doppeltes Tag) - root-v2-Apps
-        bekommen pt:tableSettings schon ueber das Template.
+        Jackson und slf4j selbst mit. Keine Abhaengigkeit auf root (auch nicht auf StabileApi).
     -->
     <parent>
         <groupId>ch.plaintext.v2</groupId>
@@ -30,7 +29,7 @@
 
     <artifactId>plaintext-root-tablesettings</artifactId>
     <name>plaintext-root-tablesettings</name>
-    <description>pt:tableSettings eigenstaendig: Tag, JS, CSS und ch.plaintext.boot.table (ohne root-Abhaengigkeit)</description>
+    <description>pt:tableSettings: ch.plaintext.boot.table (einzige Heimat), Tag, JS, CSS - ohne root-Abhaengigkeit</description>
 
     <dependencies>
         <dependency>
@@ -109,59 +108,6 @@
             </resource>
         </resources>
         <plugins>
-            <!-- Java aus plaintext-root-common (einzige Quelle), nur das Paket ch.plaintext.boot.table. -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>table-quellen-aus-common</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>add-source</goal>
-                        </goals>
-                        <configuration>
-                            <sources>
-                                <source>${project.basedir}/../plaintext-root-common/src/main/java</source>
-                            </sources>
-                        </configuration>
-                    </execution>
-                    <!-- i18n-Bundle dazu (Karte 1853 Runde 6): die Texte wohnen als Ressourcen
-                         in plaintext-root-common und muessen im eigenstaendigen Artefakt mit. -->
-                    <execution>
-                        <id>table-bundle-aus-common</id>
-                        <phase>generate-resources</phase>
-                        <goals>
-                            <goal>add-resource</goal>
-                        </goals>
-                        <configuration>
-                            <resources>
-                                <resource>
-                                    <directory>${project.basedir}/../plaintext-root-common/src/main/resources</directory>
-                                    <includes>
-                                        <include>ch/plaintext/boot/table/*.properties</include>
-                                    </includes>
-                                </resource>
-                            </resources>
-                        </configuration>
-                    </execution>
-                    <!-- Dieselben Tests wie in plaintext-root-common, soweit sie ohne root auskommen:
-                         die Quellen sind identisch, also gilt hier dieselbe Pruefung (und das
-                         JaCoCo-Gate misst echte Abdeckung statt einer Ausnahme). -->
-                    <execution>
-                        <id>table-tests-aus-common</id>
-                        <phase>generate-test-sources</phase>
-                        <goals>
-                            <goal>add-test-source</goal>
-                        </goals>
-                        <configuration>
-                            <sources>
-                                <source>${project.basedir}/../plaintext-root-common/src/test/java</source>
-                            </sources>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -176,19 +122,6 @@
                         </path>
                     </annotationProcessorPaths>
                     <compilerArgs combine.self="override"/>
-                    <includes>
-                        <include>ch/plaintext/boot/table/**</include>
-                    </includes>
-                    <excludes>
-                        <exclude>ch/plaintext/boot/table/UserPreferenceTableStateStore.java</exclude>
-                    </excludes>
-                    <testIncludes>
-                        <testInclude>ch/plaintext/boot/table/TablesettingsArtefaktTest.java</testInclude>
-                        <testInclude>ch/plaintext/boot/table/TableSettingsTest.java</testInclude>
-                        <testInclude>ch/plaintext/boot/table/TableSettingsPaginatorTest.java</testInclude>
-                        <testInclude>ch/plaintext/boot/table/TableSettingsSortierungTest.java</testInclude>
-                        <testInclude>ch/plaintext/boot/table/TableSettingsSpaltenauswahlTest.java</testInclude>
-                    </testIncludes>
                 </configuration>
             </plugin>
         </plugins>

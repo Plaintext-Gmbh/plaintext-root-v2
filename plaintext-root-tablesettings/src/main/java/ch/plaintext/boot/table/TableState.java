@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -115,4 +116,53 @@ public class TableState implements Serializable {
      * {@code null} = an — so verhaelt sich der Bestand vor dem Schalter (Karte 1853).
      */
     private Boolean resizeEnabled;
+
+    /**
+     * Was eine Seite ausser Spalten und Breiten noch merkt (Karte 2086): Filter, Schalter ueber der
+     * Tabelle. Flache Zeichenkettenablage, Schluessel vergibt die Seite
+     * ({@link TableSettings#pageValue}, {@link TableSettings#setPageValue}); wandert mit ins Profil.
+     */
+    private Map<String, String> pageState = new LinkedHashMap<>();
+
+    /**
+     * Obergrenze fuer {@link #expandedRows}: der Stand ist ein Datensatz je Benutzer und Seite;
+     * beim Ueberlauf faellt der aelteste Eintrag weg (der Knoten startet dann wieder zugeklappt).
+     */
+    public static final int MAX_EXPANDED = 2000;
+
+    /**
+     * Aufgeklappte Zeilen einer Baum- oder Expansionstabelle, als Zeilenschluessel der Seite
+     * (Karte 2086). Gehoert in den Stand, nicht ins Profil: ein Profil beschreibt eine Ansicht,
+     * nicht den Punkt, an dem jemand im Baum steht.
+     */
+    private List<String> expandedRows = new ArrayList<>();
+
+    /** Hat der Benutzer je selbst auf- oder zugeklappt? Unterscheidet "nie angefasst" von "alles zu". */
+    private boolean expandedInitialized;
+
+    /** Merkt eine aufgeklappte Zeile und haelt dabei {@link #MAX_EXPANDED} ein. */
+    public void expand(String rowKey) {
+        if (rowKey == null || rowKey.isBlank()) {
+            return;
+        }
+        expandedInitialized = true;
+        expandedRows.remove(rowKey);
+        expandedRows.add(rowKey);
+        while (expandedRows.size() > MAX_EXPANDED) {
+            expandedRows.remove(0);
+        }
+    }
+
+    /** Vergisst eine aufgeklappte Zeile. */
+    public void collapse(String rowKey) {
+        if (rowKey != null && !rowKey.isBlank()) {
+            expandedInitialized = true;
+            expandedRows.remove(rowKey);
+        }
+    }
+
+    /** Ist die Zeile aufgeklappt? */
+    public boolean isExpanded(String rowKey) {
+        return rowKey != null && expandedRows.contains(rowKey);
+    }
 }

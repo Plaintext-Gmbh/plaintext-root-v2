@@ -1,9 +1,12 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-package ch.plaintext.boot.table;
+package ch.plaintext.boot.tablestore;
 
-import ch.plaintext.PlaintextSecurity;
+import ch.plaintext.boot.table.TableColumn;
+import ch.plaintext.boot.table.TableSettings;
+import ch.plaintext.boot.table.TableSort;
+import ch.plaintext.boot.table.TableStateOwner;
 import ch.plaintext.boot.plugins.jsf.userprofile.UserPreference;
 import ch.plaintext.boot.plugins.jsf.userprofile.UserPreferencesBackingBean;
 import ch.plaintext.boot.plugins.jsf.userprofile.UserPrefsSimpleStorage;
@@ -62,12 +65,12 @@ class TabellenStandZweiBenutzerTest {
 
     private JsonAblage ablage;
 
-    private PlaintextSecurity security;
+    private TableStateOwner security;
 
     @BeforeEach
     void setUp() {
         ablage = new JsonAblage();
-        security = mock(PlaintextSecurity.class);
+        security = mock(TableStateOwner.class);
         when(security.getMandat()).thenReturn("guild42");
     }
 
