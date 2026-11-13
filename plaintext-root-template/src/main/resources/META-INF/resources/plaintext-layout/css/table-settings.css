@@ -369,19 +369,6 @@
     margin: 0;
 }
 
-/* (5) Ansicht-Reiter: eine Zeile, kein Umbruch vor «Zeilen pro Seite». */
-.pt-tablesettings-paginator {
-    display: flex;
-    align-items: center;
-    flex-wrap: nowrap;
-    gap: 8px;
-    white-space: nowrap;
-}
-
-.pt-tablesettings-paginator .pt-tablesettings-hint {
-    margin-left: 4px;
-}
-
 /* (6) Spalten-Reiter: die Sprung-Buttons «ganz nach oben/unten» sind WEG
    (Karte 1853, Runde 5, Daniel 16:21, Punkt 4). PF 16 heisst die Spalte
    ui-orderlist-controls-right mit ui-orderlist-button-move-* — die alte Regel auf
@@ -427,4 +414,89 @@
 /* Unter dem Mobil-Umbruch bleibt das Regler-Symbol klebrig-rechts; die Breitenregel
    oben (padding-right 1rem) greift nicht — das Symbol braucht seinen Platz. */
 @media (max-width: 768px) {
+}
+
+/* ── Runde 6 (Karte 1853, Design-Feedback Daniel 13.11.) ─────────────────── */
+
+/* (1) Der Oeffner steht GENAU ueber dem Tabellenkopf — auch wenn die Tabelle einen Paginator
+   oben traegt: dann rutscht die Toolbar per CSS unter den Paginator (Hoehe als Variable,
+   Theme kann sie ueberschreiben). Ohne Paginator oben bleibt alles wie es war. */
+.pt-tablesettings-wrap:has(+ .ui-datatable .ui-paginator-top) .pt-ts-toolbar {
+    position: relative;
+    top: var(--pt-ts-paginator-hoehe, 2.6rem);
+    z-index: 2;
+}
+
+.pt-tablesettings-wrap:has(+ .ui-datatable .ui-paginator-top) + .ui-datatable {
+    margin-top: calc(-1 * var(--pt-ts-paginator-hoehe, 2.6rem));
+}
+
+/* (7) Ansicht-Reiter: Paginator-Checkboxen untereinander, darunter «Zeilen pro Seite» —
+   zwei ruhige Zeilen statt einer gequetschten. */
+.pt-tablesettings-paginator {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    white-space: normal;
+}
+
+.pt-ts-paginator-zeile,
+.pt-ts-seitengroesse-zeile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pt-ts-paginator-boxen {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* (9) Auch die Pfeile hoch/runter sind WEG (Daniel 13.11.): die Reihenfolge aendert sich
+   nur noch per Griff. A11y-Hinweis: ohne Buttons gibt es keine Tastatur-Alternative zum
+   Ziehen — Daniels Entscheid, in Karte 1853 vermerkt. */
+.pt-ts-reihenfolge .ui-orderlist-button-move-up,
+.pt-ts-reihenfolge .ui-orderlist-button-move-down {
+    display: none;
+}
+
+/* Der Dreifach-Modus-Schalter: im inaktiven Zustand schlicht, im aktiven Modus akzentuiert,
+   damit sichtbar ist, dass die Tabelle gerade ziehbar ist. */
+.pt-ts-modus .ui-button-text {
+    min-width: 9.5rem;
+}
+
+.pt-ts-schalterzeile .pt-ts-modus {
+    border-radius: var(--border-radius, 6px);
+}
+
+/* (6) Papierkorb im Profil: nur das Symbol, rot — Auswahl, Neu und Papierkorb stehen so
+   in EINER Zeile (Daniel 13.11.). */
+.pt-ts-papierkorb {
+    width: 2.2rem;
+    padding: 0;
+    justify-content: center;
+}
+
+.pt-ts-papierkorb .ui-button-icon-left {
+    position: static;
+    margin: 0;
+}
+
+/* (10) Breiten-Reiter ruhiger: Bloecke mit klarer Zeilenfolge, Labels oben, Werte darunter. */
+.pt-tablesettings-breitenblock {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.pt-tablesettings-breitenblock .pt-tablesettings-label {
+    margin-right: 0;
+}
+
+.pt-tablesettings-breitenblock .pt-tablesettings-hint {
+    margin-left: 0;
 }

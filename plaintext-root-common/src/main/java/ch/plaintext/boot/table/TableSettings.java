@@ -205,9 +205,6 @@ public class TableSettings implements Serializable {
     @Setter
     private String newProfileName = "";
 
-    /** Letzte Rueckmeldung an den Benutzer (Profil angelegt, Breite verteilt, ...). */
-    @Getter
-    private String meldung = "";
 
     public TableSettings(String page, boolean mitBreiten) {
         this(page, mitBreiten, VORGABE_ZEILEN);
@@ -311,7 +308,7 @@ public class TableSettings implements Serializable {
             state.getColumnVisible().put(column.getKey(), column.isRequired());
         }
         persist();
-        meldung = "Alle abwählbaren Spalten sind ausgeblendet.";
+        growl(text("meldung.alleAus"));
     }
 
     /** Gehoert die Spalte zu den Pflichtspalten — nicht abschaltbar, bleibt bei «Alle aus» sichtbar? */
@@ -443,7 +440,8 @@ public class TableSettings implements Serializable {
         log.debug("[TableSettings:{}] onColReorder EINTRITT | tabelle={}", page, tabelle);
         UIData data = tabelleFinden(tabelle);
         log.debug("[TableSettings:{}] onColReorder | tabelleGefunden={}", page, data != null);
-        List<String> feldReihenfolge = data != null ? reihenfolgeAusColumnOrderFeld(data) : List.of();
+        List<String> feldReihenfolge = data != null
+                ? TableReihenfolgeRequest.ausColumnOrderFeld(data, this::keyFromHeader) : List.of();
         log.debug("[TableSettings:{}] onColReorder | feldReihenfolge={}", page, feldReihenfolge);
         if (!feldReihenfolge.isEmpty()) {
             state.setColumnOrder(mergeSichtbar(feldReihenfolge));
@@ -467,7 +465,7 @@ public class TableSettings implements Serializable {
         sichtbar.add(to, gezogen);
         state.setColumnOrder(mergeSichtbar(sichtbar));
         persist();
-        growl("Spaltenreihenfolge wurde geändert.");
+        growl(text("meldung.reihenfolgeGeaendert"));
         reihenfolgeAnwenden(tabelle);
         log.debug("[TableSettings:{}] onColReorder | from={} | to={}", page, from, to);
     }
@@ -480,10 +478,10 @@ public class TableSettings implements Serializable {
             // Formular, also ist auch ihr _values bei jedem POST dabei (alter Stand), und
             // das columnOrder der Tabelle ebenso. Nur das Behavior-Event sagt, was gemeint
             // ist (gemessen: claude1, Inventar-Pilot 3.19/3.20).
-            String event = eventAusRequest();
-            List<String> keys = switch (event) {
-                case "reorder" -> reihenfolgeAusOrderListValuesFeld();
-                case "colReorder" -> data != null ? reihenfolgeAusColumnOrderFeld(data) : List.of();
+            List<String> keys = switch (TableReihenfolgeRequest.event()) {
+                case "reorder" -> TableReihenfolgeRequest.ausOrderListValuesFeld(getSpaltenReihenfolge());
+                case "colReorder" -> data != null
+                        ? TableReihenfolgeRequest.ausColumnOrderFeld(data, this::keyFromHeader) : List.of();
                 default -> List.of();
             };
             if (keys.isEmpty()) {
@@ -500,84 +498,6 @@ public class TableSettings implements Serializable {
         }
     }
 
-    /** Das Behavior-Event des Requests ({@code jakarta.faces.behavior.event}), leer wenn keins. */
-    private String eventAusRequest() {
-        FacesContext faces = FacesContext.getCurrentInstance();
-        if (faces == null || faces.getExternalContext() == null) {
-            return "";
-        }
-        String event = faces.getExternalContext().getRequestParameterMap()
-                .get("jakarta.faces.behavior.event");
-        return event != null ? event : "";
-    }
-
-    /**
-     * Liest die Reihenfolge aus dem versteckten {@code <id>_values}-Select der Reihenfolge-Liste
-     * (p:orderList im Panel). Der Browser sendet alle Eintraege in ihrer neuen Ordnung als
-     * Mehrfach-Parameter. Erkannte wird das Feld daran, dass alle Werte bekannte Spalten-Keys sind.
-     */
-    private List<String> reihenfolgeAusOrderListValuesFeld() {
-        FacesContext faces = FacesContext.getCurrentInstance();
-        if (faces == null || faces.getExternalContext() == null) {
-            return List.of();
-        }
-        java.util.Set<String> bekannteKeys = new java.util.HashSet<>();
-        for (TableColumn column : getOrderedColumns()) {
-            bekannteKeys.add(column.getKey());
-        }
-        for (Map.Entry<String, String[]> eintrag
-                : faces.getExternalContext().getRequestParameterValuesMap().entrySet()) {
-            if (!eintrag.getKey().endsWith("_values")) {
-                continue;
-            }
-            String[] werte = eintrag.getValue();
-            if (werte == null || werte.length == 0 || !bekannteKeys.containsAll(java.util.Arrays.asList(werte))) {
-                continue;
-            }
-            List<String> keys = new ArrayList<>();
-            for (String wert : werte) {
-                keys.add(wert);
-            }
-            return keys;
-        }
-        return List.of();
-    }
-
-    /**
-     * Liest die neue Spaltenreihenfolge aus dem versteckten {@code <clientId>_columnOrder}-Feld
-     * des DataTable-Requests (kommagetrennte Client-Ids der gerenderten Spaltenköpfe). Die Ids
-     * sind die Client-Ids der UIColumn-Kinder — bei Spalten ohne explizite Id generische
-     * j_idt-Ids, die sich NICHT über SearchExpressions auflösen lassen. Der Abgleich laeuft
-     * deshalb direkt ueber die Kinder der Tabelle.
-     */
-    private List<String> reihenfolgeAusColumnOrderFeld(UIData data) {
-        FacesContext faces = FacesContext.getCurrentInstance();
-        if (faces == null || faces.getExternalContext() == null) {
-            return List.of();
-        }
-        String wert = faces.getExternalContext().getRequestParameterMap()
-                .get(data.getClientId(faces) + "_columnOrder");
-        if (wert == null || wert.isBlank()) {
-            return List.of();
-        }
-        Map<String, String> clientIdZuKey = new HashMap<>();
-        for (UIComponent kind : data.getChildren()) {
-            if (kind instanceof UIColumn col) {
-                String key = keyFromHeader(col.getHeaderText());
-                if (key != null && !key.isBlank()) {
-                    clientIdZuKey.put(col.getClientId(faces), key);
-                }
-            }
-        }
-        List<String> keys = new ArrayList<>();
-        for (String thId : wert.split(",")) {
-            String key = clientIdZuKey.get(thId.trim());
-            if (key != null) {
-                keys.add(key);
-            }
-        }
-        return keys;
-    }
 
     /**
      * Setzt die sichtbaren Schluessel in ihre Positionen in der bisherigen Gesamtreihenfolge
@@ -654,7 +574,43 @@ public class TableSettings implements Serializable {
         kinder.addAll(gemischt);
     }
 
-    // ── Schalter «Verschieben» / «Grösse aendern» (Karte 1853) ─────────────
+    // ── Modus-Dreifach-Schalter (Karte 1853, Runde 6, Daniel 13.11.) ─────────
+
+    /**
+     * Der Modus des Dreifach-Schalters: 0 = «Spalten anpassen» (beide aus), 1 = «Verschieben»
+     * (Spaltenkoepfe ziehbar), 2 = «Vergroessern» (Spaltenbreiten ziehbar). Die Seite bindet
+     * weiterhin draggableColumns/resizableColumns an {@link #isVerschiebenAktiv()} und
+     * {@link #isGroesseAendernAktiv()} — der Schalter setzt genau diese beiden Stellungen.
+     */
+    public int getModus() {
+        if (isVerschiebenAktiv()) {
+            return 1;
+        }
+        return isGroesseAendernAktiv() ? 2 : 0;
+    }
+
+    /** Ein Klick rotiert: anpassen (0) -> Verschieben (1) -> Vergroessern (2) -> anpassen (0). */
+    public void modusWechseln() {
+        int naechster = (getModus() + 1) % 3;
+        state.setMoveEnabled(naechster == 1);
+        state.setResizeEnabled(naechster == 2);
+        persist();
+    }
+
+    /** Label des Dreifach-Schalters je Modus — Weiterleitung an {@link TableSettingsTexte}. */
+    public String getModusLabel() {
+        return TableSettingsTexte.modusLabel(getModus());
+    }
+
+    /** Tooltip des Dreifach-Schalters je Modus. */
+    public String getModusTitel() {
+        return TableSettingsTexte.modusTitel(getModus());
+    }
+
+    /** Icon des Dreifach-Schalters je Modus. */
+    public String getModusIcon() {
+        return TableSettingsTexte.modusIcon(getModus());
+    }
 
     /** Schalter «Verschieben»: duerfen die Spaltenkoepfe per Ziehen umgeordnet werden? Vorgabe: aus. */
     public boolean isVerschiebenAktiv() {
@@ -666,13 +622,6 @@ public class TableSettings implements Serializable {
     }
 
     public void onVerschiebenChange() {
-        persist();
-    }
-
-    /** Der «Fertig»-Knopf im Panel (Runde 4, Karte 1853): beendet den Zieh-Modus nach dem Verschieben. */
-    public void verschiebenBeenden() {
-        state.setMoveEnabled(false);
-        meldung = "Verschieben beendet — die Reihenfolge ist gespeichert.";
         persist();
     }
 
@@ -757,7 +706,7 @@ public class TableSettings implements Serializable {
         }
         state.getColumnWidths().put(key, event.getWidth() + "px");
         persist();
-        growl("Spaltenbreite wurde geändert.");
+        growl(text("meldung.breiteGeaendert"));
         log.debug("[TableSettings:{}] onColumnResize | column={} | width={}px", page, key, event.getWidth());
     }
 
@@ -780,7 +729,7 @@ public class TableSettings implements Serializable {
         // wieder der Summe ihrer Spalten.
         state.setTotalWidth(null);
         persist();
-        growl("Spaltenbreite wurde gespeichert.");
+        growl(text("meldung.breiteGespeichert"));
     }
 
     /** Kurzes Growl-Overlay fuer gelungene Aenderungen (Runde 4, Karte 1853) — globale
@@ -789,6 +738,11 @@ public class TableSettings implements Serializable {
      *  Architekturregel meldungenNurUeberFacesMessages). */
     private void growl(String text) {
         FacesMessages.info(text);
+    }
+
+    /** Text des Bedienbereichs in der Sprache der Seite — Weiterleitung an {@link TableSettingsTexte}. */
+    String text(String key, Object... args) {
+        return TableSettingsTexte.text(key, args);
     }
 
     /** Gesamtbreite fuer das Eingabefeld; ohne eigene Angabe die aktuelle Summe als Vorschlag. */
@@ -850,7 +804,7 @@ public class TableSettings implements Serializable {
     }
 
     public String getBreitenKnopfText() {
-        return isBreiteAbweichend() ? "Setzen" : "Aus Spalten rechnen";
+        return isBreiteAbweichend() ? text("breiten.knopf.setzen") : text("breiten.knopf.rechnen");
     }
 
     /** Ein Knopf, zwei Aufgaben — je nachdem, ob eine abweichende Breite dasteht. */
@@ -860,7 +814,7 @@ public class TableSettings implements Serializable {
         } else {
             state.setTotalWidth(null);
             persist();
-            meldung = "Gesamtbreite folgt wieder den Spalten.";
+            growl(text("meldung.gesamtbreiteFolgt"));
         }
     }
 
@@ -900,10 +854,9 @@ public class TableSettings implements Serializable {
             // Die Untergrenze hat die Rechnung gesprengt: der Wert im Feld
             // waere gelogen, also folgt die Breite wieder den Spalten.
             state.setTotalWidth(null);
-            meldung = "Bei " + ziel + " px waeren " + amMinimum + " Spalten zu schmal — "
-                    + "kleinstmoegliche Breite ist " + gesetzt + " px.";
+            growl(text("meldung.zuSchmal", ziel, amMinimum, gesetzt));
         } else {
-            meldung = "Spalten auf " + ziel + " px verteilt.";
+            growl(text("meldung.verteilt", ziel));
         }
         persist();
     }
@@ -913,7 +866,7 @@ public class TableSettings implements Serializable {
         state.getColumnWidths().clear();
         state.setTotalWidth(null);
         persist();
-        meldung = "Spaltenbreiten zurueckgesetzt.";
+        growl(text("meldung.breitenReset"));
     }
 
     // ── Paginator und Seitengroesse (Karte 1336) ───────────────────────────
@@ -1257,7 +1210,7 @@ public class TableSettings implements Serializable {
         }
         TableColumnProfile profile = state.getProfiles().get(selectedProfile);
         if (profile == null) {
-            meldung = profilMeldung(selectedProfile, "gibt es nicht mehr.");
+            growl(profilMeldung(selectedProfile, "meldung.profil.gibtEsNichtMehr"));
             selectedProfile = "";
             return;
         }
@@ -1271,7 +1224,7 @@ public class TableSettings implements Serializable {
         state.setSortBy(kopie(profile.getSortBy()));
         state.setActiveProfile(selectedProfile);
         save();
-        meldung = profilMeldung(selectedProfile, "angewendet.");
+        growl(profilMeldung(selectedProfile, "meldung.profil.angewendet"));
         log.info("[TableSettings:{}] applyProfile | name={}", page, selectedProfile);
     }
 
@@ -1292,19 +1245,19 @@ public class TableSettings implements Serializable {
     }
 
     /** Rueckmeldung zu einem Profil, z. B. {@code Profil 'Kurz' angelegt.} */
-    private static String profilMeldung(String name, String zustand) {
-        return "Profil '" + name + "' " + zustand;
+    private String profilMeldung(String name, String zustandKey) {
+        return text("meldung.profil", name, text(zustandKey));
     }
 
     /** Legt ein Profil unter dem im Dialog eingegebenen Namen an. */
     public void createProfile() {
         if (newProfileName == null || newProfileName.isBlank()) {
-            meldung = "Bitte einen Profilnamen eingeben.";
+            growl(text("meldung.profilNameFehlt"));
             return;
         }
         String name = newProfileName.trim();
         if (state.getProfiles().containsKey(name)) {
-            meldung = profilMeldung(name, "gibt es schon.");
+            growl(profilMeldung(name, "meldung.profil.gibtEsSchon"));
             return;
         }
         selectedProfile = name;
@@ -1312,19 +1265,19 @@ public class TableSettings implements Serializable {
         writeActiveProfile();
         save();
         newProfileName = "";
-        meldung = profilMeldung(name, "angelegt.");
+        growl(profilMeldung(name, "meldung.profil.angelegt"));
         log.info("[TableSettings:{}] createProfile | name={}", page, name);
     }
 
     /** Entfernt das gewaehlte Profil; der laufende Stand bleibt, wie er ist. */
     public void deleteProfile() {
         if (!isProfileActive()) {
-            meldung = "Kein Profil gewaehlt.";
+            growl(text("meldung.keinProfil"));
             return;
         }
         String name = selectedProfile;
         if (state.getProfiles().remove(name) == null) {
-            meldung = profilMeldung(name, "gibt es nicht mehr.");
+            growl(profilMeldung(name, "meldung.profil.gibtEsNichtMehr"));
             return;
         }
         if (name.equals(state.getActiveProfile())) {
@@ -1332,7 +1285,7 @@ public class TableSettings implements Serializable {
         }
         save();
         ensureProfile();
-        meldung = profilMeldung(name, "geloescht.");
+        growl(profilMeldung(name, "meldung.profil.geloescht"));
         log.info("[TableSettings:{}] deleteProfile | name={}", page, name);
     }
 
@@ -1420,8 +1373,7 @@ public class TableSettings implements Serializable {
         }
         // Karte 1904: Kopftexte kommen uebersetzt (#{i18n.t('Benutzername')} -> "Username"), das Label ist deutsch.
         for (TableColumn column : columns) {
-            String u = column.getLabel() == null ? null
-                    : uebersetzer != null ? uebersetzer.apply(column.getLabel()) : perI18nBean(column.getLabel());
+            String u = TableSettingsTexte.uebersetzeLabel(column.getLabel(), uebersetzer);
             if (u != null && u.trim().toLowerCase(Locale.ROOT).equals(h)) {
                 return column.getKey();
             }
@@ -1436,36 +1388,34 @@ public class TableSettings implements Serializable {
         this.uebersetzer = uebersetzer;
     }
 
-    /** Label per {@code #{i18n.t(...)}}; ohne Kompilier-Abhaengigkeit, v1-Apps ohne die Bean liefern null. */
-    private static String perI18nBean(String label) {
-        FacesContext faces = FacesContext.getCurrentInstance();
-        try {
-            String literal = label.replace("\\", "\\\\").replace("'", "\\'");
-            return faces == null ? null
-                    : faces.getApplication().evaluateExpressionGet(faces, "#{i18n.t('" + literal + "')}", String.class);
-        } catch (RuntimeException e) { // NOSONAR - keine i18n-Bean oder kein Eintrag: Label bleibt unuebersetzt
-            return null;
-        }
-    }
-
     private int defaultWidth(String key) {
         return columns.stream()
                 .filter(c -> c.getKey().equals(key))
                 .findFirst()
-                .map(TableColumn::getDefaultWidth)
+                .map(this::vorgabeBreite)
                 .orElse(0);
+    }
+
+    /** Vorgaben rendern seit Runde 6 breiter (Daniel 13.11., «Spalten per Default breiter»):
+     *  Faktor auf die konfigurierte Defaultbreite — gespeicherte Breiten bleiben unangetastet.
+     *  Eine Stelle, damit widthStyle, Summe und Verteilen konsistent bleiben. */
+    private static final double DEFAULT_BREITE_FAKTOR = 1.3;
+
+    private int vorgabeBreite(TableColumn column) {
+        return column.getDefaultWidth() > 0
+                ? (int) Math.round(column.getDefaultWidth() * DEFAULT_BREITE_FAKTOR) : 0;
     }
 
     /** Gespeicherte Pixelbreite einer Spalte, sonst die Vorgabe. */
     private int breiteVon(TableColumn column) {
         String gespeichert = state.getColumnWidths().get(column.getKey());
         if (gespeichert == null || gespeichert.isBlank()) {
-            return column.getDefaultWidth();
+            return vorgabeBreite(column);
         }
         try {
             return Math.round(Float.parseFloat(gespeichert.replace("px", "").trim()));
         } catch (NumberFormatException e) {
-            return column.getDefaultWidth();
+            return vorgabeBreite(column);
         }
     }
 

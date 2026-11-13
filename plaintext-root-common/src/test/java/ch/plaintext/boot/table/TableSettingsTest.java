@@ -14,6 +14,7 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -73,16 +74,16 @@ class TableSettingsTest {
     @Test
     @DisplayName("Breitenstil kommt aus dem Stand, sonst aus der Vorgabe; die Summe folgt den sichtbaren Spalten")
     void breitenUndSumme() {
-        assertThat(anzeige.widthStyle("name")).isEqualTo("width:160px;");
-        assertThat(anzeige.spaltenSumme()).isEqualTo(270);   // name + team, extra ist aus
+        assertThat(anzeige.widthStyle("name")).isEqualTo("width:208px;");   // 160 x 1.3 (Runde 6)
+        assertThat(anzeige.spaltenSumme()).isEqualTo(351);   // 208 + 143, extra ist aus
 
         anzeige.getState().getColumnWidths().put("name", "300px");
         assertThat(anzeige.widthStyle("name")).isEqualTo("width:300px;");
-        assertThat(anzeige.spaltenSumme()).isEqualTo(410);
-        assertThat(anzeige.getTabellenBreite()).isEqualTo("width: 410px;");
+        assertThat(anzeige.spaltenSumme()).isEqualTo(443);
+        assertThat(anzeige.getTabellenBreite()).isEqualTo("width: 443px;");
 
         anzeige.setVisibleColumns(List.of("name", "team", "extra"));
-        assertThat(anzeige.spaltenSumme()).isEqualTo(610);
+        assertThat(anzeige.spaltenSumme()).isEqualTo(703);   // 300 + 143 + 260
     }
 
     @Test
@@ -127,7 +128,6 @@ class TableSettingsTest {
         anzeige.createProfile();
 
         assertThat(anzeige.getProfileNames()).containsExactly("Breit", TableSettings.PROFILE_DEFAULT);
-        assertThat(anzeige.getMeldung()).contains("gibt es schon");
     }
 
     @Test
@@ -174,7 +174,6 @@ class TableSettingsTest {
         assertThat(anzeige.getState().getColumnWidths())
                 .containsEntry("name", "320px")
                 .containsEntry("team", "220px");
-        assertThat(anzeige.getMeldung()).contains("540");
     }
 
     @Test
@@ -184,7 +183,7 @@ class TableSettingsTest {
 
         assertThat(anzeige.getState().getTotalWidth()).isNull();
         assertThat(anzeige.isBreiteAbweichend()).isFalse();
-        assertThat(anzeige.getTabellenBreite()).isEqualTo("width: 270px;");
+        assertThat(anzeige.getTabellenBreite()).isEqualTo("width: 351px;");
     }
 
     @Test
@@ -272,15 +271,80 @@ class TableSettingsTest {
         return faces;
     }
 
-    @org.junit.jupiter.api.Test
-    @org.junit.jupiter.api.DisplayName("Karte 1904: breite(key) liefert gespeicherte Breite, sonst Vorgabe, ohne Breiten null")
+    @Test
+    @DisplayName("Karte 1904: breite(key) liefert gespeicherte Breite, sonst skalierte Vorgabe, ohne Breiten null")
     void breiteFuerDasWidthAttribut() {
         TableSettings mit = new TableSettings("t1904", true);
         mit.init(null, java.util.List.of(new TableColumn("a", "A", 120), new TableColumn("b", "B", 0)));
-        org.junit.jupiter.api.Assertions.assertEquals("120px", mit.breite("a"));
+        // breite() und widthStyle liefern bei einer Vorgabe dieselbe Breite
+        String ausWidthStyle = mit.widthStyle("a").replace("width:", "").replace(";", "");
+        org.junit.jupiter.api.Assertions.assertEquals(ausWidthStyle, mit.breite("a"));
         org.junit.jupiter.api.Assertions.assertNull(mit.breite("b"));
+        // eine gespeicherte Breite kommt unskaliert zurueck
+        mit.getState().getColumnWidths().put("a", "200px");
+        org.junit.jupiter.api.Assertions.assertEquals("200px", mit.breite("a"));
         TableSettings ohne = new TableSettings("t1904b", false);
         ohne.init(null, java.util.List.of(new TableColumn("a", "A", 120)));
         org.junit.jupiter.api.Assertions.assertNull(ohne.breite("a"));
+    }
+
+    @Test
+    @DisplayName("Dreifach-Schalter: anpassen -> Verschieben -> Vergroessern -> anpassen, gespeichert")
+    void modusRotiertUndPersistiert() {
+        assertThat(anzeige.getModus()).isEqualTo(2);   // Vorgabe: Groesse an (bisheriges Verhalten)
+
+        anzeige.modusWechseln();
+        assertThat(anzeige.getModus()).isEqualTo(0);
+        assertThat(anzeige.isVerschiebenAktiv()).isFalse();
+        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();
+
+        anzeige.modusWechseln();
+        assertThat(anzeige.getModus()).isEqualTo(1);
+        assertThat(anzeige.isVerschiebenAktiv()).isTrue();
+        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();
+
+        anzeige.modusWechseln();
+        assertThat(anzeige.getModus()).isEqualTo(2);
+        assertThat(anzeige.isVerschiebenAktiv()).isFalse();
+        assertThat(anzeige.isGroesseAendernAktiv()).isTrue();
+
+        Mockito.verify(store, Mockito.atLeastOnce()).save(eq("testpage"), any(TableState.class));
+    }
+
+    @Test
+    @DisplayName("Modus-Label und -Icon folgen dem Zustand")
+    void modusLabelUndIcon() {
+        assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.vergroessern"));
+        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrow-h-right");
+        anzeige.modusWechseln();
+        assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.anpassen"));
+        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-sliders-h");
+    }
+
+    @Test
+    @DisplayName("text(): Bundle-Aufloesung mit Locale, Fallback ohne Faces-Kontext")
+    void textAusBundle() {
+        assertThat(anzeige.text("meldung.reihenfolgeGeaendert")).isEqualTo("Spaltenreihenfolge wurde geändert.");
+        assertThat(anzeige.text("meldung.verteilt", 540)).isEqualTo("Spalten auf 540 px verteilt.");
+        assertThat(anzeige.text("gibts.nicht")).isEqualTo("gibts.nicht");   // Fallback: der Schluessel
+    }
+
+    @Test
+    @DisplayName("text(): Benutzer-Sprache (userPreferences.language=en) hat Vorrang vor ViewRoot de")
+    void textBenutzerSpracheVorViewRoot() {
+        FacesContext faces = Mockito.mock(FacesContext.class);
+        jakarta.faces.application.Application app = Mockito.mock(jakarta.faces.application.Application.class);
+        jakarta.faces.component.UIViewRoot viewRoot = Mockito.mock(jakarta.faces.component.UIViewRoot.class);
+        Mockito.when(faces.getApplication()).thenReturn(app);
+        Mockito.when(faces.getViewRoot()).thenReturn(viewRoot);
+        Mockito.when(viewRoot.getLocale()).thenReturn(Locale.GERMAN);
+        Mockito.when(app.evaluateExpressionGet(eq(faces), eq("#{userPreferencesBackingBean.language}"), eq(String.class)))
+                .thenReturn("en");
+
+        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
+            holder.when(FacesContext::getCurrentInstance).thenReturn(faces);
+            assertThat(TableSettingsTexte.text("modus.anpassen")).isEqualTo("Adjust columns");
+            assertThat(TableSettingsTexte.text("meldung.reihenfolgeGeaendert")).isEqualTo("Column order changed.");
+        }
     }
 }

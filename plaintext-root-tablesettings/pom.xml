@@ -126,6 +126,25 @@
                             </sources>
                         </configuration>
                     </execution>
+                    <!-- i18n-Bundle dazu (Karte 1853 Runde 6): die Texte wohnen als Ressourcen
+                         in plaintext-root-common und muessen im eigenstaendigen Artefakt mit. -->
+                    <execution>
+                        <id>table-bundle-aus-common</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>add-resource</goal>
+                        </goals>
+                        <configuration>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/../plaintext-root-common/src/main/resources</directory>
+                                    <includes>
+                                        <include>ch/plaintext/boot/table/*.properties</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
                     <!-- Dieselben Tests wie in plaintext-root-common, soweit sie ohne root auskommen:
                          die Quellen sind identisch, also gilt hier dieselbe Pruefung (und das
                          JaCoCo-Gate misst echte Abdeckung statt einer Ausnahme). -->

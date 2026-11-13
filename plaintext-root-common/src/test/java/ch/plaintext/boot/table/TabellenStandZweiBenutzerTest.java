@@ -105,7 +105,7 @@ class TabellenStandZweiBenutzerTest {
         // ── B meldet sich an: nichts von A ─────────────────────────────────
         TableSettings b = sitzung("bruno@guild42.ch");
         assertThat(b.getVisibleColumns()).containsExactly("nr", "name", "typ");
-        assertThat(b.widthStyle("nr")).isEqualTo("width:80px;");
+        assertThat(b.widthStyle("nr")).isEqualTo("width:104px;");   // 80 x 1.3 (Runde 6)
         assertThat(b.getPaginatorPosition()).isEqualTo("both");
         assertThat(b.getRows()).isEqualTo(200);
         assertThat(b.getProfileNames()).containsExactly(TableSettings.PROFILE_DEFAULT);

@@ -147,11 +147,35 @@ class TabellenstandZweiBenutzerPlaywrightIT {
             idKopf(seite).waitFor(new Locator.WaitForOptions()
                     .setState(com.microsoft.playwright.options.WaitForSelectorState.HIDDEN));
 
-            // Reihenfolge ueber die Pfeile der Liste (Tastatur-Alternative zum Griff): "Vorname"
-            // eine Stelle nach oben, vor "Benutzername".
-            spaltenZeile(seite, "vorname").locator(".pt-ts-spaltenlabel").click();
-            seite.locator(".pt-ts-reihenfolge .ui-orderlist-button-move-up").click();
-            TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder() != null
+            // Reihenfolge per Griff (Runde 6, Punkt 9 — die Pfeil-Buttons sind entfernt):
+            // "Vorname" eine Stelle nach oben, vor "Benutzername".
+            // Regressionsschutz (Daniel Punkt 3, Karte 1853): nach jedem Toggle bleibt das
+            // Panel offen und der Reiter «Spalten» aktiv — sonst verdeckt der Griff-Klick
+            // unten einen echten Fehler statt ihn zu zeigen.
+            assertTrue(seite.locator(".pt-ts-panel").isVisible(),
+                    "Panel muss nach dem Sichtbarkeits-Toggle offen bleiben");
+            assertTrue(seite.locator(".pt-ts-panel .ui-tabs-header[aria-selected='true'], "
+                            + ".pt-ts-panel li.ui-state-active").innerText().contains("Spalten"),
+                    "Reiter «Spalten» muss nach dem Toggle aktiv bleiben");
+            Locator griff = spaltenZeile(seite, "vorname").locator(".pt-ts-griff");
+            griff.waitFor(new Locator.WaitForOptions()
+                    .setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
+            var griffBox = griff.boundingBox();
+            assertNotNull(griffBox, "Griff der Zeile «Vorname» sichtbar");
+            var zielBox = spaltenZeile(seite, "username").boundingBox();
+            assertNotNull(zielBox, "Zeile «Benutzername» sichtbar");
+            seite.mouse().move(griffBox.x + griffBox.width / 2, griffBox.y + griffBox.height / 2);
+            seite.mouse().down();
+            for (int i = 1; i <= 10; i++) {
+                seite.mouse().move(zielBox.x + 20,
+                        zielBox.y + (griffBox.y - zielBox.y) * i / 10.0 + griffBox.height / 2);
+                seite.waitForTimeout(60);
+            }
+            seite.waitForTimeout(300);
+            seite.mouse().up();
+            seite.waitForTimeout(2500);   // reorder-Ajax abwarten
+
+TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder() != null
                     && st.getColumnOrder().indexOf("vorname") >= 0
                     && st.getColumnOrder().indexOf("vorname") < st.getColumnOrder().indexOf("username"));
             assertEquals(Boolean.FALSE, mitReihenfolge.getColumnVisible().get("id"),

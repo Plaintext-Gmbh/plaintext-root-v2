@@ -1,7 +1,13 @@
 # `pt:tableSettings` einsetzen — Anleitung für KIs
 
-Stand: Karte 1853, Fix-Runde 4 (11.11.2026). Repo: `Plaintext-Gmbh/plaintext-root-v2`
+Stand: Karte 1853, Runde 6 (13.11.2026). Repo: `Plaintext-Gmbh/plaintext-root-v2`
 (Tag + CSS + JS in `plaintext-root-template`, Java in `plaintext-root-common`).
+
+Runde 6 (13.11.): Widget mehrsprachig (de/en/fr/it, Bundle
+`ch.plaintext.boot.table.tablesettings`, Basis = de), Meldungen als Growl (FacesMessages,
+globalGrowl des Templates — kein Meldungs-Panel mehr), Dreifach-Modus-Schalter, Papierkorb
+im Profil, Hoch/Runter-Buttons der Reihenfolge-Liste entfernt (nur Griff), Paginator- und
+Breiten-Layout aufgeraeumt, Vorgabe-Spaltenbreiten x1.3 (gespeicherte Breiten unveraendert).
 
 Diese Datei erklärt zwei Dinge: wie man den Bedienbereich einer Tabelle einbaut und wie
 das Speichern pro Person funktioniert (und wo die bekannten Fallstricke liegen).
@@ -26,9 +32,11 @@ Pflicht-Attribute: `anzeige` (das `TableSettings`-Objekt der Seite), `tabelle` (
 für Ajax-Updates, **mit führendem Doppelpunkt**, also `:fm:tbl`). Optional: `settingsId`
 (nur bei zwei Bedienbereichen auf einer Seite), `legend`, `tabelleDomId`.
 
-Die drei Verdrahtungszeilen an der Tabelle sind Pflicht — ohne sie bleiben die Schalter
-«Verschieben»/«Grösse ändern» im Panel wirkungslos (das Tag kann fremde Komponenten nur
-anbieten). Breiten wirken, wenn die Seite zusätzlich bindet: `style`/`tableStyle` aus
+Die drei Verdrahtungszeilen an der Tabelle sind Pflicht — ohne sie bleibt der Modus-Schalter
+im Panel wirkungslos (das Tag kann fremde Komponenten nur anbieten). Seit Runde 6 (13.11.)
+ist der Schalter ein Dreifach-Umschalter: «Spalten anpassen» (beide aus) -> «Verschieben»
+(draggableColumns an) -> «Vergroessern» (resizableColumns an) -> zurueck. Er setzt genau die
+beiden Eigenschaften, die hier gebunden werden. Breiten wirken, wenn die Seite zusätzlich bindet: `style`/`tableStyle` aus
 `#{anzeige.spaltenBreiteStyle()}` (siehe JavaDoc `TableSettings`), Paginierung wie im
 Tag-Kopfkommentar beschrieben.
 

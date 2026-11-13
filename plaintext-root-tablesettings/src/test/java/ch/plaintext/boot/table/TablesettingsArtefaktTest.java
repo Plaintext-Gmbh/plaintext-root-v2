@@ -60,6 +60,16 @@ class TablesettingsArtefaktTest {
     }
 
     @Test
+    @DisplayName("Das i18n-Bundle ist dabei (Runde 6) — sonst zeigt das Widget still nur Schluessel")
+    void i18nBundleImArtefakt() throws IOException {
+        String basis = lies("ch/plaintext/boot/table/tablesettings.properties");
+        assertTrue(basis.contains("modus.anpassen"), basis);
+        assertNotNull(CL.getResource("ch/plaintext/boot/table/tablesettings_en.properties"));
+        assertNotNull(CL.getResource("ch/plaintext/boot/table/tablesettings_fr.properties"));
+        assertNotNull(CL.getResource("ch/plaintext/boot/table/tablesettings_it.properties"));
+    }
+
+    @Test
     @DisplayName("Keine weiteren Tags oder Layout-Dateien aus dem Template (sonst Kollision mit dem Theme)")
     void nichtsWeiteresAusDemTemplate() {
         assertNull(CL.getResource("META-INF/plaintext.taglib.xml"), "Template-Taglib gehoert nicht hierher");
