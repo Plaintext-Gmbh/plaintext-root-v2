@@ -698,7 +698,7 @@ public class TableSettings implements Serializable {
 
     /** Haelt Breiten und Reihenfolge fest (Ansicht-Reiter, Karte 1853 Runde 7); wandert mit ins Profil. */
     public void festerStandErfassen() {
-        state.setFesterStand(FesterStand.aus(state));
+        state.setFesterStand(FesterStand.aus(state, getOrderedColumns().stream().map(TableColumn::getKey).toList()));
         persist();
         growl(text("meldung.festerStand.erfasst"));
     }

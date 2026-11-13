@@ -34,9 +34,14 @@ public record FesterStand(Map<String, String> columnWidths, List<String> columnO
         columnOrder = columnOrder == null ? null : new ArrayList<>(columnOrder);
     }
 
-    /** Haelt den laufenden Stand fest. */
-    static FesterStand aus(TableState state) {
-        return new FesterStand(state.getColumnWidths(), state.getColumnOrder(), state.getTotalWidth());
+    /**
+     * Haelt den laufenden Stand fest. Die Reihenfolge kommt von aussen und ist die TATSAECHLICHE
+     * (nie {@code null}): ein nie verschobener Stand hat {@code columnOrder = null}, und das
+     * Umordnen tut bei {@code null} nichts - der Doppelklick liesse die Tabelle sonst in der
+     * gezogenen Reihenfolge stehen.
+     */
+    static FesterStand aus(TableState state, List<String> reihenfolge) {
+        return new FesterStand(state.getColumnWidths(), reihenfolge, state.getTotalWidth());
     }
 
     /** Setzt Breiten, Gesamtbreite und Reihenfolge des laufenden Stands genau auf diesen. */

@@ -180,27 +180,7 @@ class TabellenstandZweiBenutzerPlaywrightIT {
             assertTrue(seite.locator(".pt-ts-panel .ui-tabs-header[aria-selected='true'], "
                             + ".pt-ts-panel li.ui-state-active").innerText().contains("Spalten"),
                     "Reiter «Spalten» muss nach dem Toggle aktiv bleiben");
-            Locator griff = spaltenZeile(seite, "vorname").locator(".pt-ts-griff");
-            griff.waitFor(new Locator.WaitForOptions()
-                    .setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
-            var griffBox = griff.boundingBox();
-            assertNotNull(griffBox, "Griff der Zeile «Vorname» sichtbar");
-            var zielBox = spaltenZeile(seite, "username").boundingBox();
-            assertNotNull(zielBox, "Zeile «Benutzername» sichtbar");
-            double startX = griffBox.x + griffBox.width / 2;
-            double startY = griffBox.y + griffBox.height / 2;
-            double zielX = zielBox.x + 20;
-            double zielY = zielBox.y + 4;   // Oberkante der Zielzeile + 4 px (claude2-Messung)
-            seite.mouse().move(startX, startY);
-            seite.mouse().down();
-            for (int i = 1; i <= 12; i++) {
-                seite.mouse().move(startX + (zielX - startX) * i / 12.0,
-                        startY + (zielY - startY) * i / 12.0);
-                seite.waitForTimeout(50);
-            }
-            seite.waitForTimeout(300);
-            seite.mouse().up();
-            seite.waitForTimeout(2500);   // reorder-Ajax abwarten
+            griffZiehen(seite, "vorname", "username");
 
             // Diagnose: DOM-Reihenfolge nach Drag + Server-Stand
             Object dom = seite.evaluate("""
@@ -281,13 +261,52 @@ TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder()
             seite.click("[id$='anz-festhalten']");
             warteAufStand(seite, CARLA, st -> st.getFesterStand() != null
                     && st.getProfiles().values().stream().anyMatch(pr -> pr.getFesterStand() != null));
+            seite.locator(".pt-ts-panel .ui-tabs-nav li").filter(new Locator.FilterOptions().setHasText("Spalten")).click();
+            griffZiehen(seite, "vorname", "username");
+            warteAufStand(seite, CARLA, st -> st.getColumnOrder() != null
+                    && st.getColumnOrder().indexOf("vorname") < st.getColumnOrder().indexOf("username"));
+            java.util.List<String> gezogen = seite.locator("#fm\\:tbl thead th .ui-column-title").allInnerTexts();
+            assertTrue(gezogen.indexOf("Vorname") < gezogen.indexOf("Benutzername"), "Ziehen wirkt nicht: " + gezogen);
+
             seite.locator("#fm\\:anz-modus").dblclick();
             seite.locator(".ui-growl-message").filter(new Locator.FilterOptions()
                     .setHasText(java.util.regex.Pattern.compile("festen Stand gesetzt|fixed layout"))).first().waitFor();
             seite.waitForTimeout(800);   // ein faelschlich ausgeloester Einzelklick kaeme nach 300 ms
             TableState danach = userPrefs.findByUniqueId(CARLA).getTabellenStaende().get(SCHLUESSEL);
             assertEquals(Boolean.TRUE, danach.getMoveEnabled(), "Doppelklick hat den Modus gewechselt: " + danach);
+            // claude2-Befund: Growl kam, die Tabelle stand aber erst nach dem Neuladen richtig.
+            java.util.List<String> zurueck = seite.locator("#fm\\:tbl thead th .ui-column-title").allInnerTexts();
+            assertTrue(zurueck.indexOf("Benutzername") < zurueck.indexOf("Vorname"),
+                    "Doppelklick stellt die Reihenfolge nicht ohne Neuladen her: " + zurueck);
         }
+    }
+
+    /**
+     * Zieht im Reiter «Spalten» die Zeile {@code von} am Griff vor die Zeile {@code vor}
+     * (Runde 6, Punkt 9 - die Pfeil-Buttons sind entfernt) und wartet den reorder-Ajax ab.
+     */
+    private static void griffZiehen(Page seite, String von, String vor) {
+        Locator griff = spaltenZeile(seite, von).locator(".pt-ts-griff");
+        griff.waitFor(new Locator.WaitForOptions()
+                .setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
+        var griffBox = griff.boundingBox();
+        assertNotNull(griffBox, "Griff der Zeile " + von + " sichtbar");
+        var zielBox = spaltenZeile(seite, vor).boundingBox();
+        assertNotNull(zielBox, "Zeile " + vor + " sichtbar");
+        double startX = griffBox.x + griffBox.width / 2;
+        double startY = griffBox.y + griffBox.height / 2;
+        double zielX = zielBox.x + 20;
+        double zielY = zielBox.y + 4;   // Oberkante der Zielzeile + 4 px (claude2-Messung)
+        seite.mouse().move(startX, startY);
+        seite.mouse().down();
+        for (int i = 1; i <= 12; i++) {
+            seite.mouse().move(startX + (zielX - startX) * i / 12.0,
+                startY + (zielY - startY) * i / 12.0);
+            seite.waitForTimeout(50);
+        }
+        seite.waitForTimeout(300);
+        seite.mouse().up();
+        seite.waitForTimeout(2500);   // reorder-Ajax abwarten
     }
 
     /**

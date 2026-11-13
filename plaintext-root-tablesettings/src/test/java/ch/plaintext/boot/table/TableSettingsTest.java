@@ -361,6 +361,17 @@ class TableSettingsTest {
     }
 
     @Test
+    @DisplayName("Runde 7: nie verschoben - der feste Stand haelt die Markup-Reihenfolge fest, nicht null")
+    void festerStandOhneVerschiebenHaeltReihenfolgeFest() {
+        anzeige.festerStandErfassen();
+        anzeige.getState().setColumnOrder(java.util.List.of("extra", "team", "name"));
+
+        anzeige.festerStandHerstellen(":fm:tbl");
+
+        assertThat(anzeige.getState().getColumnOrder()).containsExactly("name", "team", "extra");
+    }
+
+    @Test
     @DisplayName("Runde 7: ohne festen Stand aendert der Doppelklick nichts")
     void festerStandFehlt() {
         anzeige.getState().getColumnWidths().put("name", "300px");

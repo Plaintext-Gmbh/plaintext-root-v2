@@ -364,9 +364,12 @@
         <p:remoteCommand name="#{ptSettingsId}ModusWechseln" process="@this"
                          action="#{anzeige.modusWechseln()}"
                          update="#{tabelle} #{ptSettingsId}-panelInhalt"/>
+        <!-- Der Wrap muss mit: die Reihenfolge greift erst in seinem preRenderComponent (wie beim
+             reorder der Liste) - sonst meldet das Growl den festen Stand, die Tabelle zeigt ihn
+             aber erst nach dem Neuladen (claude2-Befund, Runde 7). -->
         <p:remoteCommand name="#{ptSettingsId}FesterStand" process="@this"
                          action="#{anzeige.festerStandHerstellen(tabelle)}"
-                         update="#{tabelle} #{ptSettingsId}-panelInhalt"/>
+                         update="#{anzeige.reihenfolgeZielClientId} #{tabelle} #{ptSettingsId}-panelInhalt"/>
 
         <!-- Skript und Stil IMMER laden (Runde 7): Oeffner und Modus-Knopf laufen ueber das Skript,
              auch auf Seiten ohne Spaltenbreiten. Die Griffe im Spaltenkopf (Verschieben: Symbol
