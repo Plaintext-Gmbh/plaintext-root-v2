@@ -69,6 +69,7 @@ class TabellenstandZweiBenutzerPlaywrightIT {
 
     private static final String ANNA = "pw-tabelle-anna";
     private static final String BRUNO = "pw-tabelle-bruno";
+    private static final String CARLA = "pw-tabelle-carla";   // Runde 7, eigener Stand
     private static final String PASSWORT = "Playwright-2026!";
 
     /** Ablageschluessel: Mandant + "/" + Seitenschluessel von MyUserBackingBean. */
@@ -103,6 +104,7 @@ class TabellenstandZweiBenutzerPlaywrightIT {
         // Rollen OHNE "ROLE_"-Praefix: MyUserDetailsService setzt es selbst davor.
         benutzerAnlegen(ANNA);
         benutzerAnlegen(BRUNO);
+        benutzerAnlegen(CARLA);
     }
 
     private void benutzerAnlegen(String name) {
@@ -239,6 +241,52 @@ TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder()
             java.util.List<String> koepfe = seite.locator("#fm\\:tbl thead th .ui-column-title").allInnerTexts();
             assertTrue(koepfe.indexOf("Vorname") >= 0 && koepfe.indexOf("Vorname") < koepfe.indexOf("Benutzername"),
                     "A hat nach neuer Anmeldung die alte Reihenfolge: " + koepfe);
+        }
+    }
+
+    @Test
+    @DisplayName("Runde 7: Modus-Knopf outline nur in Adjust, Kopf-Griffe je Modus, fester Stand per Doppelklick")
+    void runde7ModusGriffeUndFesterStand() {
+        try (BrowserContext c = neuerKontext()) {
+            Page seite = benutzerverwaltung(c, CARLA);
+            seite.click("#fm\\:anz-oeffnen");
+            seite.locator(".pt-ts-panel").waitFor();
+            Locator modus = seite.locator("#fm\\:anz-modus");
+
+            // Vorgabe = Resize (2): gefuellt, Resize-Viereck mit Zeichen im Kopf (Punkt 4/7).
+            assertFalse(modus.getAttribute("class").contains("ui-button-outlined"), "Resize muss gefuellt sein");
+            assertEquals("\"\u2194\"", seite.evaluate("""
+                    () => getComputedStyle(document.querySelector('#fm\\\\:tbl thead th .ui-column-resizer'), '::after').content
+                    """), "Resize-Viereck ohne Zeichen");
+
+            // Klick -> Adjust (0): outline, keine Griffe.
+            modus.click();
+            warteAufStand(seite, CARLA, st -> Boolean.FALSE.equals(st.getResizeEnabled()) && !Boolean.TRUE.equals(st.getMoveEnabled()));
+            seite.locator("#fm\\:anz-modus.ui-button-outlined").waitFor();
+            assertEquals(0, seite.locator("#fm\\:tbl thead th .ui-column-resizer, #fm\\:tbl thead th.ui-draggable-column").count(),
+                    "Adjust: kein Griff im Kopf");
+
+            // Klick -> Reorder (1): gefuellt, Verschiebe-Viereck links am Titel.
+            seite.locator("#fm\\:anz-modus").click();
+            warteAufStand(seite, CARLA, st -> Boolean.TRUE.equals(st.getMoveEnabled()));
+            seite.locator("#fm\\:tbl thead th.ui-draggable-column").first().waitFor();
+            assertFalse(seite.locator("#fm\\:anz-modus").getAttribute("class").contains("ui-button-outlined"),
+                    "Reorder muss gefuellt sein");
+            Object griff = seite.evaluate("""
+                    () => getComputedStyle(document.querySelector('#fm\\\\:tbl thead th.ui-draggable-column .ui-column-title'), '::before').content
+                    """);
+            assertTrue(griff != null && !"none".equals(griff) && !"normal".equals(griff), "Reorder: kein Griff im Kopf, content=" + griff);
+
+            // Fester Stand: festhalten (Ansicht), Doppelklick stellt her, ohne den Modus zu wechseln.
+            seite.click("[id$='anz-festhalten']");
+            warteAufStand(seite, CARLA, st -> st.getFesterStand() != null
+                    && st.getProfiles().values().stream().anyMatch(pr -> pr.getFesterStand() != null));
+            seite.locator("#fm\\:anz-modus").dblclick();
+            seite.locator(".ui-growl-message").filter(new Locator.FilterOptions()
+                    .setHasText(java.util.regex.Pattern.compile("festen Stand gesetzt|fixed layout"))).first().waitFor();
+            seite.waitForTimeout(800);   // ein faelschlich ausgeloester Einzelklick kaeme nach 300 ms
+            TableState danach = userPrefs.findByUniqueId(CARLA).getTabellenStaende().get(SCHLUESSEL);
+            assertEquals(Boolean.TRUE, danach.getMoveEnabled(), "Doppelklick hat den Modus gewechselt: " + danach);
         }
     }
 
