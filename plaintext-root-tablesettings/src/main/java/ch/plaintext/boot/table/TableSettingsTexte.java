@@ -27,6 +27,18 @@ public final class TableSettingsTexte {
     private TableSettingsTexte() {
     }
 
+    /**
+     * Das Bundle in der Sprache der Seite — mit dem UserPreferences-Vorrang aus
+     * {@link #locale()} (Karte 1853 Runde 6, claude2-Befund: {@code f:loadBundle} folgt der
+     * ViewRoot-Locale, die in den Apps fest auf de steht, und blieb fuer language=en-Benutzer
+     * deutsch). Das Tag bindet es ueber {@code anzeige.texte} (Getter in {@link TableSettings}),
+     * damit keine Bohne noetig ist (funktioniert auch im eigenstaendigen tablesettings-Artefakt
+     * ohne Spring-Scan).
+     */
+    public static ResourceBundle bundle() {
+        return ResourceBundle.getBundle(BUNDLE, locale(), TableSettingsTexte.class.getClassLoader());
+    }
+
     /** Text zum Schluessel, mit {@link MessageFormat}-Parametern ({0}, {1}, ...). */
     public static String text(String key, Object... args) {
         String muster;

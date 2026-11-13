@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -799,6 +800,17 @@ public class TableSettings implements Serializable {
     /** Text des Bedienbereichs in der Sprache der Seite — Weiterleitung an {@link TableSettingsTexte}. */
     String text(String key, Object... args) {
         return TableSettingsTexte.text(key, args);
+    }
+
+    /**
+     * Das Text-Bundle des Bedienbereichs in der Sprache der Seite (Karte 1853 Runde 6,
+     * claude2-Befund: {@code f:loadBundle} folgt der ViewRoot-Locale, fest de, und blieb fuer
+     * language=en-Benutzer deutsch). Das Tag bindet es per {@code #{anzeige.texte}} — Jakarta
+     * EL kennt {@code T()} nicht (SpEL), eine Bohne wuerde im 1904-Artefakt ohne Spring-Scan
+     * brechen.
+     */
+    public ResourceBundle getTexte() {
+        return TableSettingsTexte.bundle();
     }
 
     /** Gesamtbreite fuer das Eingabefeld; ohne eigene Angabe die aktuelle Summe als Vorschlag. */

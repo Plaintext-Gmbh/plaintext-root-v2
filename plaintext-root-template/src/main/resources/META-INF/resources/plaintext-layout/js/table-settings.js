@@ -241,6 +241,32 @@
         }
     });
 
+    /*
+     * Karte 1853 (claude2-Befund): Panel-Oeffner. EIN Listener am document statt PF-AutoBinding
+     * am Element: der colReorder-Re-Render des Wraps ersetzt den Oeffner, PF('...PanelWv').target
+     * zeigt danach auf das alte Element (Hoehe 0, oeffnet nicht). Die Delegation ueberlebt
+     * Teil-Updates und ist CSP-konform (kein on...-Attribut).
+     */
+    document.addEventListener('click', function (e) {
+        var oeffner = e.target && e.target.closest ? e.target.closest('.pt-ts-oeffner') : null;
+        if (!oeffner) {
+            return;
+        }
+        var wrap = oeffner.closest('[data-pt-settings-id]');
+        if (!wrap || !window.PF) {
+            return;
+        }
+        var panel = PF(wrap.getAttribute('data-pt-settings-id') + 'PanelWv');
+        if (panel) {
+            e.preventDefault();
+            if (typeof panel.isVisible === 'function' && panel.isVisible()) {
+                panel.hide();
+            } else if (typeof panel.show === 'function') {
+                panel.show(oeffner.id);
+            }
+        }
+    });
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', sicherEinrichten);
     } else {
