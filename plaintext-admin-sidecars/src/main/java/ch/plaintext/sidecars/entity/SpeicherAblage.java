@@ -30,6 +30,12 @@ public class SpeicherAblage extends SuperModel {
 
     /** Art der Ablage: Git-Repository, Schreiben = Commit + Push (Karte 1471). */
     public static final String ART_GIT = "GIT";
+    /**
+     * Art der Ablage: Ordner im Dateisystem des Servers (Karte 2096). {@link #pfad} ist der Unterordner
+     * unter der vom Betreiber gesetzten Basis {@code plaintext.ablagen.lokal.basis}; Adresse, Benutzer
+     * und Passwort entfallen (leer).
+     */
+    public static final String ART_LOKAL = "LOKAL";
 
     @Column(name = "name", length = 40, nullable = false)
     private String name;

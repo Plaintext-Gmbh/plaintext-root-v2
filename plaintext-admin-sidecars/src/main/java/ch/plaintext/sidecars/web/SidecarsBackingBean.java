@@ -270,6 +270,11 @@ public class SidecarsBackingBean implements Serializable {
         ablageBestehend = false;
     }
 
+    /** Karte 2096: Art «Lokale Datei» nur waehlbar, wenn der Betreiber eine Basis gesetzt hat. */
+    public boolean isLokalVerfuegbar() {
+        return ablagen != null && ablagen.lokalVerfuegbar();
+    }
+
     public void ablageSpeichern() {
         try {
             SpeicherAblage a = ablagen.speichere(abName, abArt, abUrl, abBenutzer, abPasswort, abPfad, abZweig);

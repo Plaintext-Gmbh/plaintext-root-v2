@@ -88,16 +88,17 @@ public class SpeicherAblagenMcpTools {
     @McpTool(name = "set_speicher_ablage", description = "Richtet eine Speicher-Ablage ein oder ändert sie: "
             + "name (a-z, 0-9, -), url (Nextcloud-Adresse, z. B. https://home.plaintext.ch, bzw. https-Adresse des Git-Repos), "
             + "benutzer, passwort (App-Passwort bzw. Git-Token, nur schreiben; leer = unverändert, beim Anlegen Pflicht), "
-            + "pfad (Ordner in der Nextcloud bzw. Unterordner im Repo, bei Git leer = Wurzel), art (NEXTCLOUD = Standard, GIT), "
+            + "pfad (Ordner in der Nextcloud bzw. Unterordner im Repo, bei Git leer = Wurzel), art (NEXTCLOUD = Standard, GIT, LOKAL = Ordner auf dem Server: pfad ist dann der Unterordner unter "
+            + "plaintext.ablagen.lokal.basis, url/benutzer/passwort entfallen), "
             + "zweig (nur GIT, z. B. main). Bei GIT ist jedes Schreiben ein Commit mit dem angemeldeten Benutzer als Autor "
             + "und ein Push ohne Force; ein abgelehnter Push wird als Konflikt gemeldet. Prüft danach sofort. "
             + "Erfordert scope=ADMIN und die Rolle ROOT.")
     public String setSpeicherAblage(@McpToolParam(description = "Name der Ablage") String name,
-                                    @McpToolParam(description = "Nextcloud-Adresse bzw. https-Adresse des Git-Repos") String url,
-                                    @McpToolParam(description = "Benutzer") String benutzer,
+                                    @McpToolParam(required = false, description = "Nextcloud-Adresse bzw. https-Adresse des Git-Repos (nicht bei LOKAL)") String url,
+                                    @McpToolParam(required = false, description = "Benutzer (nicht bei LOKAL)") String benutzer,
                                     @McpToolParam(required = false, description = "App-Passwort bzw. Git-Token; leer = unverändert") String passwort,
                                     @McpToolParam(required = false, description = "Ordner in der Nextcloud bzw. Unterordner im Repo, z. B. Projekte/drawio") String pfad,
-                                    @McpToolParam(required = false, description = "NEXTCLOUD (Standard) oder GIT") String art,
+                                    @McpToolParam(required = false, description = "NEXTCLOUD (Standard), GIT oder LOKAL") String art,
                                     @McpToolParam(required = false, description = "Nur GIT: Zweig, z. B. main") String zweig) {
         String v = pruefe("set_speicher_ablage", true);
         if (v != null) {

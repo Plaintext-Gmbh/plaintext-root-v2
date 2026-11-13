@@ -12,6 +12,15 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+- **File store type «Lokale Datei» (`LOKAL`)** (Karte 2096): `ch.plaintext.boot.ablage.LokaleDateiAblage` implements
+  `DateiAblage` on a folder of the server's file system, confined to a base the operator sets with
+  `plaintext.ablagen.lokal.basis` (no `..`, no symlink leading outside, atomic writes). Under *Root → Sidecars →
+  Speicher-Ablagen* the new type only asks for the sub-folder below that base - never an absolute path, so an admin
+  cannot read the server's file system through it. Without the property the type is off (greyed out in the form,
+  rejected by `set_speicher_ablage`). Non-breaking: existing NEXTCLOUD/GIT stores are unchanged; apps without
+  `plaintext-admin-sidecars` can use `LokaleDateiAblage` directly behind their own `DateiAblagenRegister`.
+
 ### Changed
 - **`ch.plaintext.boot.table` lives only in `plaintext-root-tablesettings`** (Karte 2086). Until now the package was
   compiled twice (into `plaintext-root-common` and into the standalone `plaintext-root-tablesettings`, which also

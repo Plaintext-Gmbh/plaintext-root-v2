@@ -47,8 +47,11 @@ class SpeicherAblageServiceTest {
         when(repo.findByDeletedFalseOrderByNameAsc()).thenAnswer(i -> db.stream().filter(s -> !Boolean.TRUE.equals(s.getDeleted())).toList());
         when(repo.findFirstByNameAndDeletedFalse(anyString())).thenAnswer(i -> db.stream()
                 .filter(s -> !Boolean.TRUE.equals(s.getDeleted()) && s.getName().equals(i.getArgument(0))).findFirst());
-        return new SpeicherAblageService(repo, new SidecarCrypto(), erlaubt, NextcloudAblage.standardClient(), klone);
+        return new SpeicherAblageService(repo, new SidecarCrypto(), erlaubt, NextcloudAblage.standardClient(), klone, lokalBasis);
     }
+
+    /** Karte 2096: Basis der lokalen Ablagen; {@code null} = Art LOKAL aus. */
+    Path lokalBasis;
 
     @Test
     @DisplayName("Einrichten: Passwort verschlüsselt, sofort geprüft, über das Register nutzbar")
@@ -135,5 +138,41 @@ class SpeicherAblageServiceTest {
         assertThatThrownBy(() -> service("").speichere("g", "GIT", "http://127.0.0.1:1/r.git", "u", "t", "", "main"))
                 .hasMessageContaining("interne Adresse");
         assertThat(db).isEmpty();
+    }
+
+    // ---------- Karte 2096: Art LOKAL ----------
+
+    @Test
+    @DisplayName("LOKAL: Unterordner der Basis, ohne Adresse/Passwort, sofort geprüft und über das Register nutzbar")
+    void lokalEinrichtenUndNutzen() throws Exception {
+        lokalBasis = klone.resolve("lokal-basis");
+        SpeicherAblageService svc = service("");
+        assertThat(svc.lokalVerfuegbar()).isTrue();
+        SpeicherAblage a = svc.speichere("notizen", "LOKAL", null, null, null, "notizen", null);
+        assertThat(a.getOk()).isTrue();
+        assertThat(a.getArt()).isEqualTo(SpeicherAblage.ART_LOKAL);
+        assertThat(a.getUrl()).isEmpty();
+        assertThat(a.hatPasswort()).isFalse();
+
+        DateiAblage d = svc.ablage("notizen").orElseThrow();
+        d.schreibe("anna.md", "# Notiz".getBytes(StandardCharsets.UTF_8), "text/markdown");
+        assertThat(java.nio.file.Files.readString(lokalBasis.resolve("notizen/anna.md"))).isEqualTo("# Notiz");
+    }
+
+    @Test
+    @DisplayName("LOKAL ohne Basis ist aus; ein Unterordner kann die Basis nicht verlassen")
+    void lokalOhneBasisUndAusbruch() {
+        lokalBasis = null;
+        SpeicherAblageService aus = service("");
+        assertThat(aus.lokalVerfuegbar()).isFalse();
+        assertThatThrownBy(() -> aus.speichere("notizen", "LOKAL", null, null, null, "", null))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("plaintext.ablagen.lokal.basis");
+
+        lokalBasis = klone.resolve("lokal-basis");
+        SpeicherAblageService an = service("");
+        assertThatThrownBy(() -> an.speichere("notizen", "LOKAL", null, null, null, "../raus", null))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageStartingWith("Pfad:");
+        assertThatThrownBy(() -> an.speichere("notizen", "SFTP", null, null, null, "", null))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("LOKAL");
     }
 }
