@@ -12,6 +12,14 @@ exhaustive.
 
 ## [Unreleased]
 
+### Fixed
+- **pt:tableSettings: Wrap-Binding request-gebunden (JSF1104, session-scoped Beans)** (Karte 2097). `TableSettings`
+  kept the wrap component bound via `binding="#{anzeige.reihenfolgeZiel}"` in a field; in a session-scoped backing
+  bean the getter returned the component of the PREVIOUS request and JSF re-attached it with its children (JSF1104
+  in development, «create profile» only on the second click, buttons/grips missing after a mode switch). The
+  component now lives in `FacesContext.getAttributes()` under a per-instance key; without a FacesContext the getter
+  returns `null`. Tag unchanged.
+
 ### Changed
 - **`ch.plaintext.boot.table` lives only in `plaintext-root-tablesettings`** (Karte 2086). Until now the package was
   compiled twice (into `plaintext-root-common` and into the standalone `plaintext-root-tablesettings`, which also
