@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -28,6 +29,11 @@ import java.util.stream.Stream;
  *
  * <p>Geschrieben wird atomar (Temp-Datei im Zielordner, dann {@code move}): ein Leser sieht nie
  * eine halbe Datei, auch nicht beim Autosave im Sekundentakt.</p>
+ *
+ * <p><b>Restrisiko (Review claude1, #42):</b> Zwischen Prüfung und Zugriff kann jemand mit Shell-Zugang
+ * auf dem Server einen Pfadteil gegen einen Symlink tauschen (TOCTOU). Ohne {@code openat}/{@code O_NOFOLLOW}
+ * ist das in Java nicht ganz zu schliessen; die Ablage selbst legt nie Links an, und über die API lassen sich
+ * keine anlegen.</p>
  */
 public final class LokaleDateiAblage implements DateiAblage {
 
@@ -48,16 +54,29 @@ public final class LokaleDateiAblage implements DateiAblage {
     /**
      * Ablage im Unterordner einer vom Betreiber gesetzten Basis.
      *
+     * <p>Die Wurzel liegt <i>real</i> unter der Basis: ist {@code basis/<unterordner>} selbst ein Symlink
+     * nach draussen, wird abgewiesen, bevor etwas angelegt wird (Review claude1, #42).</p>
+     *
      * @param basis {@code null} = lokale Ablagen sind ausgeschaltet
-     * @param unterordner relativ zur Basis, leer = die Basis selbst
+     * @param unterordner relativ zur Basis, Pflicht: eine Ablage sieht nie die ganze Basis und damit nie
+     *                    die anderen lokalen Ablagen
      */
     public static LokaleDateiAblage unter(String name, Path basis, String unterordner) throws IOException {
         if (basis == null) {
             throw new IOException("Lokale Ablagen sind aus: plaintext.ablagen.lokal.basis ist nicht gesetzt.");
         }
         String u = normiere(unterordner, true);
-        Path b = basis.toAbsolutePath().normalize();
-        return new LokaleDateiAblage(name, u.isEmpty() ? b : b.resolve(u));
+        if (u.isEmpty()) {
+            throw new IOException("Bitte einen Unterordner angeben.");
+        }
+        Path basisReal = Files.createDirectories(basis.toAbsolutePath().normalize()).toRealPath();
+        LokaleDateiAblage basisAblage = new LokaleDateiAblage(name, basisReal);
+        basisAblage.legeOrdnerAn(u);   // datei() prueft real gegen die Basis, bevor etwas angelegt wird
+        LokaleDateiAblage a = new LokaleDateiAblage(name, basisAblage.datei(u, false));
+        if (!a.wurzel.startsWith(basisReal)) {
+            throw new IOException(UNGUELTIG);
+        }
+        return a;
     }
 
     @Override
@@ -67,7 +86,7 @@ public final class LokaleDateiAblage implements DateiAblage {
 
     /** Probe für «Prüfen»: schreiben, lesen, löschen. Die Meldung nennt bewusst keinen Server-Pfad. */
     public String pruefe() throws IOException {
-        Path probe = wurzel.resolve(TEMP_PRAEFIX + "probe");
+        Path probe = Files.createTempFile(wurzel, TEMP_PRAEFIX, ".probe");   // exklusiv neu, folgt keinem Link
         Files.writeString(probe, "ok");
         try {
             if (!"ok".equals(Files.readString(probe))) {
@@ -113,7 +132,7 @@ public final class LokaleDateiAblage implements DateiAblage {
         return Files.exists(datei(pfad, true));
     }
 
-    /** Wie die Git-Ablage: ein fehlender Ordner ist leer; Pfade relativ zur Ablage. */
+    /** Wie die Git-Ablage: ein fehlender Ordner ist leer; Pfade relativ zur Ablage. Symlinks erscheinen nicht. */
     @Override
     public List<AblageEintrag> liste(String ordner) throws IOException {
         Path d = datei(ordner == null ? "" : ordner, true);
@@ -123,12 +142,12 @@ public final class LokaleDateiAblage implements DateiAblage {
         }
         try (Stream<Path> s = Files.list(d)) {
             for (Path p : s.sorted().toList()) {
-                if (p.getFileName().toString().startsWith(TEMP_PRAEFIX)) {
-                    continue;
+                BasicFileAttributes at = Files.readAttributes(p, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                if (p.getFileName().toString().startsWith(TEMP_PRAEFIX) || at.isSymbolicLink()) {
+                    continue;   // halbe Schreibvorgaenge und Links (deren Ziel kann draussen liegen) zeigen wir nicht
                 }
-                boolean istOrdner = Files.isDirectory(p, LinkOption.NOFOLLOW_LINKS);
-                l.add(new AblageEintrag(wurzel.relativize(p).toString().replace('\\', '/'), istOrdner,
-                        istOrdner ? -1 : Files.size(p), Files.getLastModifiedTime(p, LinkOption.NOFOLLOW_LINKS).toInstant()));
+                l.add(new AblageEintrag(wurzel.relativize(p).toString().replace('\\', '/'), at.isDirectory(),
+                        at.isDirectory() ? -1 : at.size(), at.lastModifiedTime().toInstant()));
             }
         }
         return l;

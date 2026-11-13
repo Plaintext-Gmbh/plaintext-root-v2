@@ -116,4 +116,24 @@ class LokaleDateiAblageTest {
         assertThat(meldung).doesNotContain(tmp.toString());
         assertThat(ablage().liste("")).isEmpty();
     }
+
+    @Test
+    void unterordnerAlsSymlinkNachDraussenWirdAbgewiesen_undNichtsWirdDraussenAngelegt() throws IOException {
+        Path draussen = Files.createDirectories(tmp.resolve("draussen"));
+        Files.createDirectories(tmp.resolve("basis"));
+        Files.createSymbolicLink(tmp.resolve("basis/demo"), draussen);
+        assertThatThrownBy(() -> LokaleDateiAblage.unter("x", tmp.resolve("basis"), "demo")).isInstanceOf(IOException.class);
+        assertThatThrownBy(() -> LokaleDateiAblage.unter("x", tmp.resolve("basis"), "demo/tief")).isInstanceOf(IOException.class);
+        assertThat(draussen.resolve("tief")).doesNotExist();
+    }
+
+    @Test
+    void leererUnterordnerIstVerboten_undListeZeigtKeineLinks() throws IOException {
+        assertThatThrownBy(() -> LokaleDateiAblage.unter("x", tmp.resolve("basis"), "")).hasMessageContaining("Unterordner");
+        LokaleDateiAblage a = ablage();
+        Path draussen = Files.createDirectories(tmp.resolve("draussen"));
+        Files.createSymbolicLink(tmp.resolve("basis/demo/link"), draussen);
+        a.schreibe("echt.md", b("x"), null);
+        assertThat(a.liste("")).extracting(AblageEintrag::pfad).containsExactly("echt.md");
+    }
 }

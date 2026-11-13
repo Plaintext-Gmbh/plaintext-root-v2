@@ -252,7 +252,7 @@
                     <p:outputLabel for="abPasswort"
                                    value="#{sidecarsBean.ablageBestehend ? 'App-Passwort bzw. Token (leer lassen = unverändert)' : 'App-Passwort bzw. Token'}"/>
                     <p:password id="abPasswort" value="#{sidecarsBean.abPasswort}" redisplay="false" feedback="false" autocomplete="new-password"/>
-                    <p:outputLabel for="abPfad" value="Pfad (Ordner in der Nextcloud bzw. im Repo, bei Git leer = Wurzel; bei Lokale Datei: Unterordner der Server-Basis)"/>
+                    <p:outputLabel for="abPfad" value="Pfad (Ordner in der Nextcloud bzw. im Repo, bei Git leer = Wurzel; bei Lokale Datei: Unterordner der Server-Basis, Pflicht)"/>
                     <p:inputText id="abPfad" value="#{sidecarsBean.abPfad}" placeholder="z. B. Projekte/drawio"/>
                     <p:outputLabel for="abZweig" value="Zweig (nur Git)"/>
                     <p:inputText id="abZweig" value="#{sidecarsBean.abZweig}" placeholder="main"/>
