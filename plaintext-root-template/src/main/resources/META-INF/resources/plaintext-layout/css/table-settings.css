@@ -75,8 +75,16 @@
     box-shadow: 0 4px 18px rgba(15, 23, 42, 0.14);
 }
 
+/* Karte 1853 (claude2-Befund, gemessen an 1280x720): Das Panel darf nie ueber die
+   Fensterunterkante ragen. PrimeFaces schliesst ein OverlayPanel bei JEDER Fensterbewegung
+   (handleViewportChange) — ragt der Inhalt unten hinaus, scrollt der Benutzer die Seite,
+   um ihn zu sehen, und das Panel klappt zu. Die Grenze folgt der tatsaechlichen Lage
+   (--pt-ts-panel-oben = Abstand des Panels vom Fensterrand, von der Delegation gesetzt):
+   Dann scrollt der INNERE Container, ohne handleViewportChange. */
 .pt-ts-panel .ui-overlaypanel-content {
     padding: 12px 14px;
+    max-height: calc(100vh - var(--pt-ts-panel-oben, 2rem) - 1rem);
+    overflow-y: auto;
 }
 
 .pt-ts-profilzeile {
@@ -219,7 +227,7 @@
 
    Lage: oben rechts auf der Hoehe des Titels. "top" steht bewusst NICHT hier - PrimeFaces setzt
    nach jedem Ziehen top:0px inline; der Abstand nach oben kommt deshalb aus margin-top. */
-.pt-tablesettings-breiten thead th {
+.pt-tablesettings-breiten.ui-datatable-resizable thead th {
     position: relative;
     /* Karte 1336, Abstand Strich/Eingabe: das Theme hat an den Kopfzellen keine senkrechten
        Raender, nur 1rem Innenabstand - die Striche des alten Anfassers lagen damit 2 bis 3 px
@@ -229,8 +237,7 @@
     padding-right: 32px !important;
 }
 
-.pt-tablesettings-breiten thead th .ui-column-resizer,
-.ui-datatable thead th .pt-tablesettings-setzen {
+.pt-tablesettings-breiten thead th .ui-column-resizer {
     position: absolute;
     right: 4px;
     width: 20px;
@@ -251,15 +258,9 @@
     top: 0;
 }
 
-.ui-datatable thead th .pt-tablesettings-setzen {
-    top: 0;
-    cursor: pointer;
-}
-
 /* Das Zeichen im Viereck: Pfeil in beide Richtungen - "hier geht es um die Breite". Als
    ::after, weil PrimeFaces den Anfasser mit einem &nbsp; als Inhalt anlegt. */
-.pt-tablesettings-breiten thead th .ui-column-resizer::after,
-.ui-datatable thead th .pt-tablesettings-setzen::after {
+.pt-tablesettings-breiten thead th .ui-column-resizer::after {
     content: "\2194";
     position: absolute;
     inset: 0;
@@ -269,14 +270,12 @@
     color: var(--pt-tablesettings-hint, #64748b);
 }
 
-.pt-tablesettings-breiten thead th .ui-column-resizer:hover,
-.ui-datatable thead th .pt-tablesettings-setzen:hover {
+.pt-tablesettings-breiten thead th .ui-column-resizer:hover {
     background: var(--pt-tablesettings-akzent-bg, #dbeafe);
     border-color: var(--pt-tablesettings-akzent-hell, #60a5fa);
 }
 
-.pt-tablesettings-breiten thead th .ui-column-resizer:hover::after,
-.ui-datatable thead th .pt-tablesettings-setzen:hover::after {
+.pt-tablesettings-breiten thead th .ui-column-resizer:hover::after {
     color: var(--pt-tablesettings-akzent, #2563eb);
 }
 
@@ -302,9 +301,7 @@
         padding-right: 1rem !important;
     }
 
-    .pt-tablesettings-breiten thead th .ui-column-resizer,
-    .pt-tablesettings-breiten thead th .pt-tablesettings-setzen,
-    .pt-tablesettings-breitenblock {
+    .pt-tablesettings-breiten thead th .ui-column-resizer {
         display: none !important;
     }
 }
@@ -419,16 +416,17 @@
 /* ── Runde 6 (Karte 1853, Design-Feedback Daniel 13.11.) ─────────────────── */
 
 /* (1) Der Oeffner steht GENAU ueber dem Tabellenkopf — auch wenn die Tabelle einen Paginator
-   oben traegt: dann rutscht die Toolbar per CSS unter den Paginator (Hoehe als Variable,
-   Theme kann sie ueberschreiben). Ohne Paginator oben bleibt alles wie es war. */
-.pt-tablesettings-wrap:has(+ .ui-datatable .ui-paginator-top) .pt-ts-toolbar {
+   oben traegt: dann rutscht die Toolbar unter den Paginator (Hoehe als Variable, Theme kann
+   sie ueberschreiben). Klasse am Wrap statt :has(): die Tabelle ist kein direktes Geschwister
+   (Panel/Dialog/remoteCommand dazwischen), :has(+ .ui-datatable) griff deshalb nie. */
+.pt-ts-paginator-oben .pt-ts-toolbar {
     position: relative;
-    top: var(--pt-ts-paginator-hoehe, 2.6rem);
+    top: calc(var(--pt-ts-paginator-hoehe, 4.75rem) / 2);
     z-index: 2;
 }
 
-.pt-tablesettings-wrap:has(+ .ui-datatable .ui-paginator-top) + .ui-datatable {
-    margin-top: calc(-1 * var(--pt-ts-paginator-hoehe, 2.6rem));
+.pt-ts-paginator-oben ~ .ui-datatable {
+    margin-top: calc(-1 * var(--pt-ts-paginator-hoehe, 4.75rem) / 2);
 }
 
 /* (7) Ansicht-Reiter: Paginator-Checkboxen untereinander, darunter «Zeilen pro Seite» —
@@ -485,18 +483,55 @@
     margin: 0;
 }
 
-/* (10) Breiten-Reiter ruhiger: Bloecke mit klarer Zeilenfolge, Labels oben, Werte darunter. */
-.pt-tablesettings-breitenblock {
+/* ── Runde 7 (Karte 1853, Daniel 13.11.) ─────────────────────────────────── */
+
+/* (4) Verschiebe-Griff im Spaltenkopf: im Modus Reorder traegt jeder ziehbare Kopf links am Titel
+   dasselbe Symbol wie der Modus-Knopf (pi-arrow-right-arrow-left), als Viereck wie das
+   Resize-Viereck rechts. PrimeFaces setzt ui-draggable-column nur in diesem Modus - ein eigener
+   Schalter ist nicht noetig. Die Klasse pt-ts-tabelle setzt table-settings.js. */
+.pt-ts-tabelle thead th.ui-draggable-column {
+    cursor: move;
+}
+
+.pt-ts-tabelle thead th.ui-draggable-column .ui-column-title::before {
+    content: "\e9fc";
+    font-family: primeicons;
+    font-weight: normal;
+    font-style: normal;
+    display: inline-block;
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+    border: 1px solid var(--pt-tablesettings-rand, #94a3b8);
+    border-radius: 3px;
+    background: var(--pt-tablesettings-bg, #f8fafc);
+    color: var(--pt-tablesettings-hint, #64748b);
+    font-size: 11px;
+    line-height: 18px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.pt-ts-tabelle thead th.ui-draggable-column:hover .ui-column-title::before {
+    background: var(--pt-tablesettings-akzent-bg, #dbeafe);
+    border-color: var(--pt-tablesettings-akzent-hell, #60a5fa);
+    color: var(--pt-tablesettings-akzent, #2563eb);
+}
+
+/* (2) Fester Stand im Ansicht-Reiter: unter Paginator und Seitengroesse, durch eine Linie
+   getrennt. */
+.pt-ts-fester-stand {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--content-border-color, #e2e8f0);
 }
 
-.pt-tablesettings-breitenblock .pt-tablesettings-label {
-    margin-right: 0;
-}
-
-.pt-tablesettings-breitenblock .pt-tablesettings-hint {
+.pt-ts-fester-stand .pt-tablesettings-hint {
     margin-left: 0;
+    flex-basis: 100%;
 }

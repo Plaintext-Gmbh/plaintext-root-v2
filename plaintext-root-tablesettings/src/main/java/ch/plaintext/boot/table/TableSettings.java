@@ -15,11 +15,9 @@ import org.primefaces.component.api.ColumnAware;
 import org.primefaces.component.api.UIColumn;
 import org.primefaces.component.api.UITable;
 import org.primefaces.event.ColumnResizeEvent;
-import org.primefaces.event.ReorderEvent;
 import org.primefaces.event.ToggleEvent;
 import org.primefaces.event.data.PageEvent;
 import org.primefaces.event.data.SortEvent;
-import org.primefaces.expression.SearchExpressionUtils;
 import org.primefaces.model.SortMeta;
 import org.primefaces.model.SortOrder;
 import org.primefaces.model.Visibility;
@@ -28,15 +26,15 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -182,21 +180,44 @@ public class TableSettings implements Serializable {
      * Meldung per relativer Id erreichen, und das Tag kennt die Form-Id nicht fuer absolute Ids.
      * Das reorder-Ajax braucht den Wrap aber als Update-Ziel, weil das preRenderComponent dort
      * die neue Ordnung aus dem Request liest und speichert (Karte 1853, Panel-Weg).
+     *
+     * <p><b>Request-gebunden</b> (Karte 2097, Jakarta Faces 3.1.5): die Komponente liegt in
+     * {@link FacesContext#getAttributes()}, nicht in einem Feld. Im Feld eines session-scoped Beans
+     * (Inventar) lieferte der Getter beim naechsten Seitenaufbau die Komponente des VORIGEN Requests,
+     * JSF baute sie samt Panel und Knoepfen wieder ein: JSF1104, «Profil anlegen» erst beim zweiten
+     * Klick, nach Modus-Wechsel fehlende Knoepfe/Griffe. Ohne FacesContext: {@code null}.</p>
      */
-    private transient UIComponent reihenfolgeZiel;
-
     public UIComponent getReihenfolgeZiel() {
-        return reihenfolgeZiel;
+        FacesContext faces = FacesContext.getCurrentInstance();
+        return faces == null ? null : (UIComponent) faces.getAttributes().get(zielSchluessel());
     }
 
     public void setReihenfolgeZiel(UIComponent reihenfolgeZiel) {
-        this.reihenfolgeZiel = reihenfolgeZiel;
+        FacesContext faces = FacesContext.getCurrentInstance();
+        if (faces != null) {
+            faces.getAttributes().put(zielSchluessel(), reihenfolgeZiel);
+        }
     }
 
     /** ClientId des Wraps — Ziel des reorder-Updates; leer, solange das Tag nicht gerendert wurde. */
     public String getReihenfolgeZielClientId() {
-        return reihenfolgeZiel != null ? reihenfolgeZiel.getClientId() : "";
+        UIComponent ziel = getReihenfolgeZiel();
+        return ziel != null ? ziel.getClientId() : "";
     }
+
+    /**
+     * Schluessel je Instanz (Identitaet, nicht equals): zwei Bedienbereiche im selben Request
+     * treffen sich nicht. Lazy, weil ein Stand aus einer Session vor Karte 2097 das Feld nicht
+     * kennt und es nach der Deserialisierung {@code null} waere.
+     */
+    private String zielSchluessel() {
+        if (zielSchluessel == null) {
+            zielSchluessel = TableSettings.class.getName() + ".reihenfolgeZiel." + UUID.randomUUID();
+        }
+        return zielSchluessel;
+    }
+
+    private String zielSchluessel;
 
     /** Die Spalten der Seite, in Tabellenreihenfolge. Bei dynamischen Spalten via {@link #setColumns} nachgefuehrt. */
     @Getter
@@ -547,18 +568,15 @@ public class TableSettings implements Serializable {
                 sichtbar.add(column.getKey());
             }
         }
-        int from = event instanceof ReorderEvent re ? re.getFromIndex() : -1;
-        int to = event instanceof ReorderEvent re2 ? re2.getToIndex() : -1;
-        if (from < 0 || to < 0 || from >= sichtbar.size() || to >= sichtbar.size() || from == to) {
+        List<String> verschoben = TableKomponenten.verschoben(sichtbar, event);
+        if (verschoben == null) {
             return;
         }
-        String gezogen = sichtbar.remove(from);
-        sichtbar.add(to, gezogen);
-        state.setColumnOrder(mergeSichtbar(sichtbar));
+        state.setColumnOrder(mergeSichtbar(verschoben));
         persist();
         growl(text("meldung.reihenfolgeGeaendert"));
         reihenfolgeAnwenden(tabelle);
-        log.debug("[TableSettings:{}] onColReorder | from={} | to={}", page, from, to);
+        log.debug("[TableSettings:{}] onColReorder | ueber from/to | {}", page, verschoben);
     }
 
     /** Persistiert die im Request mitgelieferte neue Reihenfolge, falls sie vom Stand abweicht. */
@@ -669,6 +687,33 @@ public class TableSettings implements Serializable {
     /** Icon des Dreifach-Schalters je Modus. */
     public String getModusIcon() {
         return TableSettingsTexte.modusIcon(getModus());
+    }
+
+    /** Haelt Breiten und Reihenfolge fest (Ansicht-Reiter, Karte 1853 Runde 7); wandert mit ins Profil. */
+    public void festerStandErfassen() {
+        state.setFesterStand(FesterStand.aus(state, getOrderedColumns().stream().map(TableColumn::getKey).toList()));
+        persist();
+        growl(text("meldung.festerStand.erfasst"));
+    }
+
+    public boolean isFesterStandErfasst() {
+        return state.getFesterStand() != null;
+    }
+
+    /** Doppelklick auf den Modus-Knopf: Breiten und Reihenfolge genau auf den festen Stand. */
+    public void festerStandHerstellen(String tabelle) {
+        if (state.getFesterStand() == null) {
+            growl(text("meldung.festerStand.fehlt"));
+            return;
+        }
+        state.getFesterStand().anwenden(state);
+        persist();
+        UIData data = tabelleFinden(tabelle);
+        if (data != null) {
+            TableKomponenten.pfReihenfolgeVergessen(data);   // sonst gilt PFs Kopf-Zug-Ordnung weiter
+            reihenfolgeAnwenden(data);
+        }
+        growl(text("meldung.festerStand.hergestellt"));
     }
 
     /** Schalter «Verschieben»: duerfen die Spaltenkoepfe per Ziehen umgeordnet werden? Vorgabe: aus. */
@@ -801,6 +846,17 @@ public class TableSettings implements Serializable {
         return TableSettingsTexte.text(key, args);
     }
 
+    /**
+     * Das Text-Bundle des Bedienbereichs in der Sprache der Seite (Karte 1853 Runde 6,
+     * claude2-Befund: {@code f:loadBundle} folgt der ViewRoot-Locale, fest de, und blieb fuer
+     * language=en-Benutzer deutsch). Das Tag bindet es per {@code #{anzeige.texte}} — Jakarta
+     * EL kennt {@code T()} nicht (SpEL), eine Bohne wuerde im 1904-Artefakt ohne Spring-Scan
+     * brechen.
+     */
+    public ResourceBundle getTexte() {
+        return TableSettingsTexte.bundle();
+    }
+
     /** Gesamtbreite fuer das Eingabefeld; ohne eigene Angabe die aktuelle Summe als Vorschlag. */
     public Integer getGesamtBreite() {
         Integer gesetzt = state.getTotalWidth();
@@ -886,31 +942,16 @@ public class TableSettings implements Serializable {
                 sichtbar.put(column.getKey(), breiteVon(column));
             }
         }
-        if (ziel == null || sichtbar.isEmpty()) {
+        TableKomponenten.Verteilung v = ziel == null ? null : TableKomponenten.verteilen(sichtbar, ziel, MIN_SPALTE_PX);
+        if (v == null) {
             return;
         }
-        int alt = sichtbar.values().stream().mapToInt(Integer::intValue).sum();
-        if (alt <= 0) {
-            return;
-        }
-
-        int gesetzt = 0;
-        int amMinimum = 0;
-        for (Map.Entry<String, Integer> e : sichtbar.entrySet()) {
-            int neu = Math.round((float) e.getValue() * ziel / alt);
-            if (neu < MIN_SPALTE_PX) {
-                neu = MIN_SPALTE_PX;
-                amMinimum++;
-            }
-            state.getColumnWidths().put(e.getKey(), neu + "px");
-            gesetzt += neu;
-        }
-
-        if (gesetzt > ziel) {
+        v.breiten().forEach((key, breite) -> state.getColumnWidths().put(key, breite + "px"));
+        if (v.summe() > ziel) {
             // Die Untergrenze hat die Rechnung gesprengt: der Wert im Feld
             // waere gelogen, also folgt die Breite wieder den Spalten.
             state.setTotalWidth(null);
-            growl(text("meldung.zuSchmal", ziel, amMinimum, gesetzt));
+            growl(text("meldung.zuSchmal", ziel, v.amMinimum(), v.summe()));
         } else {
             growl(text("meldung.verteilt", ziel));
         }
@@ -1231,6 +1272,7 @@ public class TableSettings implements Serializable {
         state.setRowsPerPage(profile.getRowsPerPage());
         state.setSortBy(TableSort.kopie(profile.getSortBy()));
         state.setPageState(new LinkedHashMap<>(profile.getPageState()));
+        state.setFesterStand(profile.getFesterStand());
         state.setActiveProfile(selectedProfile);
         save();
         growl(profilMeldung(selectedProfile, "meldung.profil.angewendet"));
@@ -1336,6 +1378,7 @@ public class TableSettings implements Serializable {
         profile.setRowsPerPage(state.getRowsPerPage());
         profile.setSortBy(TableSort.kopie(state.getSortBy()));
         profile.setPageState(new LinkedHashMap<>(state.getPageState()));
+        profile.setFesterStand(state.getFesterStand());
         state.getProfiles().put(name, profile);
     }
 

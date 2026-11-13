@@ -69,6 +69,7 @@ class TabellenstandZweiBenutzerPlaywrightIT {
 
     private static final String ANNA = "pw-tabelle-anna";
     private static final String BRUNO = "pw-tabelle-bruno";
+    private static final String CARLA = "pw-tabelle-carla";   // Runde 7, eigener Stand
     private static final String PASSWORT = "Playwright-2026!";
 
     /** Ablageschluessel: Mandant + "/" + Seitenschluessel von MyUserBackingBean. */
@@ -103,6 +104,7 @@ class TabellenstandZweiBenutzerPlaywrightIT {
         // Rollen OHNE "ROLE_"-Praefix: MyUserDetailsService setzt es selbst davor.
         benutzerAnlegen(ANNA);
         benutzerAnlegen(BRUNO);
+        benutzerAnlegen(CARLA);
     }
 
     private void benutzerAnlegen(String name) {
@@ -130,6 +132,9 @@ class TabellenstandZweiBenutzerPlaywrightIT {
         // ── A: Vorgabe sehen (Positivkontrolle), dann "ID" ausblenden ──────
         try (BrowserContext a = neuerKontext()) {
             Page seite = benutzerverwaltung(a, ANNA);
+            int vpBreite = Integer.parseInt(System.getProperty("diag.vp.breite", "1600"));
+            int vpHoehe = Integer.parseInt(System.getProperty("diag.vp.hoehe", "900"));
+            seite.setViewportSize(vpBreite, vpHoehe);   // genug Platz, damit das Panel nicht ragt (claude2-Befund)
             assertTrue(idKopf(seite).isVisible(), "Vorgabe: die Spalte ID muss zu Beginn sichtbar sein");
 
             // Karte 1904: pt:tableSettings - Oeffner, Reiter "Spalten", Schalter der Zeile "ID".
@@ -137,6 +142,15 @@ class TabellenstandZweiBenutzerPlaywrightIT {
             // Tabelle (<id>-oeffnen); den Regler-Klon im Spaltenkopf (.pt-ts-regler) gibt es nicht mehr.
             seite.click("#fm\\:anz-oeffnen");
             seite.locator(".pt-ts-panel").waitFor();
+            seite.evaluate("""
+                    () => {
+                      window.__hidelog = [];
+                      const k = Object.keys(PrimeFaces.widgets).find(k => /PanelWv$/.test(k));
+                      const w = PF(k);
+                      const h = w.hide.bind(w);
+                      w.hide = function () { window.__hidelog.push(new Error().stack); return h(); };
+                    }
+                    """);
             seite.locator(".pt-ts-panel .ui-tabs-nav li").filter(new Locator.FilterOptions().setHasText("Spalten")).click();
             Locator zeileId = spaltenZeile(seite, "id");
             zeileId.locator(".pt-ts-schalter-sichtbar").click();
@@ -152,28 +166,28 @@ class TabellenstandZweiBenutzerPlaywrightIT {
             // Regressionsschutz (Daniel Punkt 3, Karte 1853): nach jedem Toggle bleibt das
             // Panel offen und der Reiter «Spalten» aktiv — sonst verdeckt der Griff-Klick
             // unten einen echten Fehler statt ihn zu zeigen.
+            Object hideLog = seite.evaluate("""
+                    () => (window.__hidelog || []).join(' ||| ')
+                    """);
+            try { java.nio.file.Files.writeString(java.nio.file.Path.of("/tmp/diag-hide.txt"),
+                    "hideLog=" + hideLog); } catch (java.io.IOException ignored) { }
+            // PF 16 schliesst ein OverlayPanel bei jedem window-scroll/resize
+            // (handleViewportChange, im hideLog als Ausloeser belegt) — fuer .pt-ts-panel
+            // neutralisiert (Prototyp-Patch in table-settings.js). Playwright scrollt fuer
+            // einen Klick die Seite; das Panel muss trotzdem offen bleiben.
             assertTrue(seite.locator(".pt-ts-panel").isVisible(),
-                    "Panel muss nach dem Sichtbarkeits-Toggle offen bleiben");
+                    "Panel muss nach dem Sichtbarkeits-Toggle offen bleiben (hideLog=" + hideLog + ")");
             assertTrue(seite.locator(".pt-ts-panel .ui-tabs-header[aria-selected='true'], "
                             + ".pt-ts-panel li.ui-state-active").innerText().contains("Spalten"),
                     "Reiter «Spalten» muss nach dem Toggle aktiv bleiben");
-            Locator griff = spaltenZeile(seite, "vorname").locator(".pt-ts-griff");
-            griff.waitFor(new Locator.WaitForOptions()
-                    .setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
-            var griffBox = griff.boundingBox();
-            assertNotNull(griffBox, "Griff der Zeile «Vorname» sichtbar");
-            var zielBox = spaltenZeile(seite, "username").boundingBox();
-            assertNotNull(zielBox, "Zeile «Benutzername» sichtbar");
-            seite.mouse().move(griffBox.x + griffBox.width / 2, griffBox.y + griffBox.height / 2);
-            seite.mouse().down();
-            for (int i = 1; i <= 10; i++) {
-                seite.mouse().move(zielBox.x + 20,
-                        zielBox.y + (griffBox.y - zielBox.y) * i / 10.0 + griffBox.height / 2);
-                seite.waitForTimeout(60);
-            }
-            seite.waitForTimeout(300);
-            seite.mouse().up();
-            seite.waitForTimeout(2500);   // reorder-Ajax abwarten
+            griffZiehen(seite, "vorname", "username");
+
+            // Diagnose: DOM-Reihenfolge nach Drag + Server-Stand
+            Object dom = seite.evaluate("""
+                    () => Array.from(document.querySelectorAll('.pt-ts-reihenfolge li.ui-orderlist-item'))
+                        .map(li => li.getAttribute('data-item-value')).join(',')
+                    """);
+            try { java.nio.file.Files.writeString(java.nio.file.Path.of("/tmp/diag-reihenfolge.txt"), "dom=" + dom + "\n"); } catch (java.io.IOException ignored) { }
 
 TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder() != null
                     && st.getColumnOrder().indexOf("vorname") >= 0
@@ -208,6 +222,122 @@ TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder()
             assertTrue(koepfe.indexOf("Vorname") >= 0 && koepfe.indexOf("Vorname") < koepfe.indexOf("Benutzername"),
                     "A hat nach neuer Anmeldung die alte Reihenfolge: " + koepfe);
         }
+    }
+
+    @Test
+    @DisplayName("Runde 7: Modus-Knopf outline nur in Adjust, Kopf-Griffe je Modus, fester Stand per Doppelklick")
+    void runde7ModusGriffeUndFesterStand() {
+        try (BrowserContext c = neuerKontext()) {
+            Page seite = benutzerverwaltung(c, CARLA);
+            seite.click("#fm\\:anz-oeffnen");
+            seite.locator(".pt-ts-panel").waitFor();
+            Locator modus = seite.locator("#fm\\:anz-modus");
+
+            // Vorgabe = Resize (2): gefuellt, Resize-Viereck mit Zeichen im Kopf (Punkt 4/7).
+            assertFalse(modus.getAttribute("class").contains("ui-button-outlined"), "Resize muss gefuellt sein");
+            assertEquals("\"\u2194\"", seite.evaluate("""
+                    () => getComputedStyle(document.querySelector('#fm\\\\:tbl thead th .ui-column-resizer'), '::after').content
+                    """), "Resize-Viereck ohne Zeichen");
+
+            // Klick -> Adjust (0): outline, keine Griffe.
+            modus.click();
+            warteAufStand(seite, CARLA, st -> Boolean.FALSE.equals(st.getResizeEnabled()) && !Boolean.TRUE.equals(st.getMoveEnabled()));
+            seite.locator("#fm\\:anz-modus.ui-button-outlined").waitFor();
+            assertEquals(0, seite.locator("#fm\\:tbl thead th .ui-column-resizer, #fm\\:tbl thead th.ui-draggable-column").count(),
+                    "Adjust: kein Griff im Kopf");
+
+            // Klick -> Reorder (1): gefuellt, Verschiebe-Viereck links am Titel.
+            seite.locator("#fm\\:anz-modus").click();
+            warteAufStand(seite, CARLA, st -> Boolean.TRUE.equals(st.getMoveEnabled()));
+            seite.locator("#fm\\:tbl thead th.ui-draggable-column").first().waitFor();
+            assertFalse(seite.locator("#fm\\:anz-modus").getAttribute("class").contains("ui-button-outlined"),
+                    "Reorder muss gefuellt sein");
+            Object griff = seite.evaluate("""
+                    () => getComputedStyle(document.querySelector('#fm\\\\:tbl thead th.ui-draggable-column .ui-column-title'), '::before').content
+                    """);
+            assertTrue(griff != null && !"none".equals(griff) && !"normal".equals(griff), "Reorder: kein Griff im Kopf, content=" + griff);
+
+            // Fester Stand: festhalten (Ansicht), Doppelklick stellt her, ohne den Modus zu wechseln.
+            seite.click("[id$='anz-festhalten']");
+            warteAufStand(seite, CARLA, st -> st.getFesterStand() != null
+                    && st.getProfiles().values().stream().anyMatch(pr -> pr.getFesterStand() != null));
+            // Im KOPF ziehen (Modus Reorder), nicht in der Liste: danach haelt PF die Ordnung selbst
+            // im View-State - genau der Fall, in dem der Doppelklick erst nach Reload wirkte (claude2).
+            // Panel zu, sonst liegt es ueber den Koepfen und der Zug trifft das Panel.
+            seite.click("#fm\\:anz-oeffnen");
+            seite.locator(".pt-ts-panel").waitFor(new Locator.WaitForOptions()
+                    .setState(com.microsoft.playwright.options.WaitForSelectorState.HIDDEN));
+            kopfZiehen(seite, "Vorname", "Benutzername");
+            warteAufStand(seite, CARLA, st -> st.getColumnOrder() != null
+                    && st.getColumnOrder().indexOf("vorname") < st.getColumnOrder().indexOf("username"));
+            java.util.List<String> gezogen = seite.locator("#fm\\:tbl thead th .ui-column-title").allInnerTexts();
+            assertTrue(gezogen.indexOf("Vorname") < gezogen.indexOf("Benutzername"), "Ziehen wirkt nicht: " + gezogen);
+
+            seite.click("#fm\\:anz-oeffnen");
+            seite.locator(".pt-ts-panel").waitFor();
+            seite.locator("#fm\\:anz-modus").dblclick();
+            seite.locator(".ui-growl-message").filter(new Locator.FilterOptions()
+                    .setHasText(java.util.regex.Pattern.compile("festen Stand gesetzt|fixed layout"))).first().waitFor();
+            seite.waitForTimeout(800);   // ein faelschlich ausgeloester Einzelklick kaeme nach 300 ms
+            TableState danach = userPrefs.findByUniqueId(CARLA).getTabellenStaende().get(SCHLUESSEL);
+            assertEquals(Boolean.TRUE, danach.getMoveEnabled(), "Doppelklick hat den Modus gewechselt: " + danach);
+            // claude2-Befund: Growl kam, die Tabelle stand aber erst nach dem Neuladen richtig.
+            java.util.List<String> zurueck = seite.locator("#fm\\:tbl thead th .ui-column-title").allInnerTexts();
+            assertTrue(zurueck.indexOf("Benutzername") < zurueck.indexOf("Vorname"),
+                    "Doppelklick stellt die Reihenfolge nicht ohne Neuladen her: " + zurueck);
+        }
+    }
+
+    /**
+     * Zieht im Tabellenkopf (Modus Reorder, jQuery-UI-draggable der PF-DataTable) die Spalte
+     * {@code von} auf die linke Haelfte von {@code vor} und wartet den colReorder-Ajax ab.
+     */
+    private static void kopfZiehen(Page seite, String von, String vor) {
+        var start = seite.locator("#fm\\:tbl thead th:has(.ui-column-title:text-is('" + von + "'))").boundingBox();
+        var ziel = seite.locator("#fm\\:tbl thead th:has(.ui-column-title:text-is('" + vor + "'))").boundingBox();
+        assertNotNull(start, "Kopf " + von + " sichtbar");
+        assertNotNull(ziel, "Kopf " + vor + " sichtbar");
+        double sx = start.x + start.width / 2;
+        double sy = start.y + 12;
+        double zx = ziel.x + 6;
+        double zy = ziel.y + 12;
+        seite.mouse().move(sx, sy);
+        seite.mouse().down();
+        for (int i = 1; i <= 15; i++) {
+            seite.mouse().move(sx + (zx - sx) * i / 15.0, sy + (zy - sy) * i / 15.0);
+            seite.waitForTimeout(40);
+        }
+        seite.waitForTimeout(300);
+        seite.mouse().up();
+        seite.waitForTimeout(2500);   // colReorder-Ajax abwarten
+    }
+
+    /**
+     * Zieht im Reiter «Spalten» die Zeile {@code von} am Griff vor die Zeile {@code vor}
+     * (Runde 6, Punkt 9 - die Pfeil-Buttons sind entfernt) und wartet den reorder-Ajax ab.
+     */
+    private static void griffZiehen(Page seite, String von, String vor) {
+        Locator griff = spaltenZeile(seite, von).locator(".pt-ts-griff");
+        griff.waitFor(new Locator.WaitForOptions()
+                .setState(com.microsoft.playwright.options.WaitForSelectorState.VISIBLE));
+        var griffBox = griff.boundingBox();
+        assertNotNull(griffBox, "Griff der Zeile " + von + " sichtbar");
+        var zielBox = spaltenZeile(seite, vor).boundingBox();
+        assertNotNull(zielBox, "Zeile " + vor + " sichtbar");
+        double startX = griffBox.x + griffBox.width / 2;
+        double startY = griffBox.y + griffBox.height / 2;
+        double zielX = zielBox.x + 20;
+        double zielY = zielBox.y + 4;   // Oberkante der Zielzeile + 4 px (claude2-Messung)
+        seite.mouse().move(startX, startY);
+        seite.mouse().down();
+        for (int i = 1; i <= 12; i++) {
+            seite.mouse().move(startX + (zielX - startX) * i / 12.0,
+                startY + (zielY - startY) * i / 12.0);
+            seite.waitForTimeout(50);
+        }
+        seite.waitForTimeout(300);
+        seite.mouse().up();
+        seite.waitForTimeout(2500);   // reorder-Ajax abwarten
     }
 
     /**

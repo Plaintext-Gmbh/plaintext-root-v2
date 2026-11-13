@@ -315,10 +315,91 @@ class TableSettingsTest {
     @DisplayName("Modus-Label und -Icon folgen dem Zustand")
     void modusLabelUndIcon() {
         assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.vergroessern"));
-        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrow-h-right");
+        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrows-h");
         anzeige.modusWechseln();
         assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.anpassen"));
         assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-sliders-h");
+    }
+
+    @Test
+    @DisplayName("Runde 7: Modus Verschieben hat ein eigenes Symbol, Resize kein erfundenes")
+    void modusIconsExistieren() {
+        anzeige.modusWechseln();   // 2 -> 0
+        anzeige.modusWechseln();   // 0 -> 1 Verschieben
+        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrow-right-arrow-left");
+        assertThat(anzeige.text("modus.anpassen")).isEqualTo("Anpassen");
+    }
+
+    @Test
+    @DisplayName("Runde 7: fester Stand - festhalten, verstellen, genau zurueck; wandert mit ins Profil")
+    void festerStandFesthaltenUndHerstellen() {
+        anzeige.getState().getColumnWidths().put("name", "180px");
+        anzeige.getState().setColumnOrder(java.util.List.of("team", "name", "extra"));
+        anzeige.getState().setTotalWidth(900);
+        assertThat(anzeige.isFesterStandErfasst()).isFalse();
+
+        anzeige.festerStandErfassen();
+        assertThat(anzeige.isFesterStandErfasst()).isTrue();
+        assertThat(anzeige.getState().getProfiles().get(TableSettings.PROFILE_DEFAULT).getFesterStand())
+                .isEqualTo(anzeige.getState().getFesterStand());
+
+        // verstellen: andere Breite, neue Spalte mit Breite, andere Reihenfolge, keine Gesamtbreite
+        anzeige.getState().getColumnWidths().put("name", "300px");
+        anzeige.getState().getColumnWidths().put("team", "77px");
+        anzeige.getState().setColumnOrder(java.util.List.of("extra", "name", "team"));
+        anzeige.getState().setTotalWidth(null);
+
+        anzeige.festerStandHerstellen(":fm:tbl");
+
+        assertThat(anzeige.getState().getColumnWidths()).containsExactly(java.util.Map.entry("name", "180px"));
+        assertThat(anzeige.getState().getColumnOrder()).containsExactly("team", "name", "extra");
+        assertThat(anzeige.getState().getTotalWidth()).isEqualTo(900);
+
+        // Der feste Stand bleibt unberuehrt, wenn danach weiter gezogen wird.
+        anzeige.getState().getColumnWidths().put("name", "222px");
+        assertThat(anzeige.getState().getFesterStand().columnWidths()).containsEntry("name", "180px");
+    }
+
+    @Test
+    @DisplayName("Runde 7: nie verschoben - der feste Stand haelt die Markup-Reihenfolge fest, nicht null")
+    void festerStandOhneVerschiebenHaeltReihenfolgeFest() {
+        anzeige.festerStandErfassen();
+        anzeige.getState().setColumnOrder(java.util.List.of("extra", "team", "name"));
+
+        anzeige.festerStandHerstellen(":fm:tbl");
+
+        assertThat(anzeige.getState().getColumnOrder()).containsExactly("name", "team", "extra");
+    }
+
+    @Test
+    @DisplayName("Runde 7: Restore vergisst PFs Kopf-Zug-Ordnung (displayPriority), Breite/Sichtbarkeit bleiben")
+    void pfReihenfolgeVergessen() {
+        org.primefaces.component.datatable.DataTable tabelle = Mockito.mock(org.primefaces.component.datatable.DataTable.class);
+        org.primefaces.model.ColumnMeta meta = new org.primefaces.model.ColumnMeta("fm:tbl:c1");
+        meta.setDisplayPriority(3);
+        meta.setWidth("120");
+        meta.setVisible(Boolean.FALSE);
+        Mockito.when(tabelle.getColumnMeta()).thenReturn(new java.util.HashMap<>(java.util.Map.of("fm:tbl:c1", meta)));
+
+        TableKomponenten.pfReihenfolgeVergessen(tabelle);
+
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<java.util.Map<String, org.primefaces.model.ColumnMeta>> neu =
+                org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
+        Mockito.verify(tabelle).setColumnMeta(neu.capture());
+        org.primefaces.model.ColumnMeta kopie = neu.getValue().get("fm:tbl:c1");
+        assertThat(kopie.getDisplayPriority()).isNull();
+        assertThat(kopie.getWidth()).isEqualTo("120");
+        assertThat(kopie.getVisible()).isFalse();
+        Mockito.verify(tabelle).setColumns(null);
+    }
+
+    @Test
+    @DisplayName("Runde 7: ohne festen Stand aendert der Doppelklick nichts")
+    void festerStandFehlt() {
+        anzeige.getState().getColumnWidths().put("name", "300px");
+        anzeige.festerStandHerstellen(":fm:tbl");
+        assertThat(anzeige.getState().getColumnWidths()).containsEntry("name", "300px");
     }
 
     @Test
@@ -327,6 +408,24 @@ class TableSettingsTest {
         assertThat(anzeige.text("meldung.reihenfolgeGeaendert")).isEqualTo("Spaltenreihenfolge wurde geändert.");
         assertThat(anzeige.text("meldung.verteilt", 540)).isEqualTo("Spalten auf 540 px verteilt.");
         assertThat(anzeige.text("gibts.nicht")).isEqualTo("gibts.nicht");   // Fallback: der Schluessel
+    }
+
+    @Test
+    @DisplayName("bundle(): liefert das Bundle in der Benutzer-Sprache (en), nicht der ViewRoot-Locale (de)")
+    void bundleBenutzerSprache() {
+        FacesContext faces = Mockito.mock(FacesContext.class);
+        jakarta.faces.application.Application app = Mockito.mock(jakarta.faces.application.Application.class);
+        jakarta.faces.component.UIViewRoot viewRoot = Mockito.mock(jakarta.faces.component.UIViewRoot.class);
+        Mockito.when(faces.getApplication()).thenReturn(app);
+        Mockito.when(faces.getViewRoot()).thenReturn(viewRoot);
+        Mockito.when(viewRoot.getLocale()).thenReturn(Locale.GERMAN);
+        Mockito.when(app.evaluateExpressionGet(eq(faces), eq("#{userPreferencesBackingBean.language}"), eq(String.class)))
+                .thenReturn("en");
+
+        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
+            holder.when(FacesContext::getCurrentInstance).thenReturn(faces);
+            assertThat(TableSettingsTexte.bundle().getString("modus.anpassen")).isEqualTo("Adjust");
+        }
     }
 
     @Test
@@ -343,8 +442,86 @@ class TableSettingsTest {
 
         try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
             holder.when(FacesContext::getCurrentInstance).thenReturn(faces);
-            assertThat(TableSettingsTexte.text("modus.anpassen")).isEqualTo("Adjust columns");
+            assertThat(TableSettingsTexte.text("modus.anpassen")).isEqualTo("Adjust");
             assertThat(TableSettingsTexte.text("meldung.reihenfolgeGeaendert")).isEqualTo("Column order changed.");
         }
+    }
+
+    // ── Karte 2097: Wrap-Binding request-gebunden ───────────────────────────
+
+    private static FacesContext request() {
+        FacesContext faces = Mockito.mock(FacesContext.class);
+        Mockito.when(faces.getAttributes()).thenReturn(new java.util.HashMap<>());
+        return faces;
+    }
+
+    @Test
+    @DisplayName("Karte 2097: in Request 1 gesetzt - Request 2 sieht die Komponente nicht (JSF1104)")
+    void reihenfolgeZielUeberlebtKeinenRequest() {
+        jakarta.faces.component.UIComponent wrap = Mockito.mock(jakarta.faces.component.UIComponent.class);
+        FacesContext request1 = request();
+        FacesContext request2 = request();
+        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
+            holder.when(FacesContext::getCurrentInstance).thenReturn(request1);
+            anzeige.setReihenfolgeZiel(wrap);
+
+            holder.when(FacesContext::getCurrentInstance).thenReturn(request2);
+            assertThat(anzeige.getReihenfolgeZiel()).isNull();
+            assertThat(anzeige.getReihenfolgeZielClientId()).isEmpty();
+        }
+        assertThat(anzeige.getReihenfolgeZiel()).isNull();   // ohne FacesContext
+    }
+
+    @Test
+    @DisplayName("Karte 2097: im selben Request liefert der Getter die Komponente und ihre ClientId")
+    void reihenfolgeZielImSelbenRequest() {
+        jakarta.faces.component.UIComponent wrap = Mockito.mock(jakarta.faces.component.UIComponent.class);
+        Mockito.when(wrap.getClientId()).thenReturn("fm:anz-bereich");
+        FacesContext request = request();
+        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
+            holder.when(FacesContext::getCurrentInstance).thenReturn(request);
+            anzeige.setReihenfolgeZiel(wrap);
+
+            assertThat(anzeige.getReihenfolgeZiel()).isSameAs(wrap);
+            assertThat(anzeige.getReihenfolgeZielClientId()).isEqualTo("fm:anz-bereich");
+        }
+    }
+
+    @Test
+    @DisplayName("Karte 2097: zwei TableSettings im selben Request kommen sich nicht in die Quere")
+    void zweiBereicheImSelbenRequest() {
+        TableSettings zweite = new TableSettings("testpage", true);
+        zweite.init(store, COLUMNS);
+        jakarta.faces.component.UIComponent wrapA = Mockito.mock(jakarta.faces.component.UIComponent.class);
+        jakarta.faces.component.UIComponent wrapB = Mockito.mock(jakarta.faces.component.UIComponent.class);
+        FacesContext request = request();
+        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
+            holder.when(FacesContext::getCurrentInstance).thenReturn(request);
+            anzeige.setReihenfolgeZiel(wrapA);
+            zweite.setReihenfolgeZiel(wrapB);
+
+            assertThat(anzeige.getReihenfolgeZiel()).isSameAs(wrapA);
+            assertThat(zweite.getReihenfolgeZiel()).isSameAs(wrapB);
+        }
+    }
+
+    @Test
+    @DisplayName("Ausgelagerte Rechnungen (Runde 7): Verteilen hebt aufs Minimum, from/to verschiebt")
+    void ausgelagerteRechnungen() {
+        java.util.Map<String, Integer> sichtbar = new java.util.LinkedHashMap<>();
+        sichtbar.put("a", 100);
+        sichtbar.put("b", 300);
+        TableKomponenten.Verteilung v = TableKomponenten.verteilen(sichtbar, 120, 44);
+        assertThat(v.breiten()).containsExactly(java.util.Map.entry("a", 44), java.util.Map.entry("b", 90));
+        assertThat(v.amMinimum()).isEqualTo(1);
+        assertThat(v.summe()).isEqualTo(134);
+        assertThat(TableKomponenten.verteilen(new java.util.LinkedHashMap<>(), 500, 44)).isNull();
+
+        org.primefaces.event.ReorderEvent event = Mockito.mock(org.primefaces.event.ReorderEvent.class);
+        Mockito.when(event.getFromIndex()).thenReturn(2);
+        Mockito.when(event.getToIndex()).thenReturn(0);
+        assertThat(TableKomponenten.verschoben(java.util.List.of("x", "y", "z"), event)).containsExactly("z", "x", "y");
+        Mockito.when(event.getToIndex()).thenReturn(2);
+        assertThat(TableKomponenten.verschoben(java.util.List.of("x", "y", "z"), event)).isNull();
     }
 }

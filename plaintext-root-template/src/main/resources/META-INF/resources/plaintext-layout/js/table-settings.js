@@ -1,14 +1,11 @@
 /*
  * Copyright (C) plaintext.ch, 2026.
  *
- * Verhalten des Bedienbereichs einer Tabelle (META-INF/tags/tableSettings.xhtml): das Viereck
- * in jedem Spaltenkopf - ziehen aendert die Breite, ein Klick setzt die Spalte auf die
- * eingestellte Breite (Karte 1336: ein Viereck statt Anfasser plus Knopf).
- *
- * WARUM ES DEN KLICK UEBERHAUPT GIBT:
- * Spalten von Hand zu ziehen trifft nie zweimal denselben Pixelwert. Wer drei Tabellen gleich
- * breit haben will, bekommt sie so nie gleich breit. Der Knopf setzt die Spalte auf eine ZAHL,
- * und Zahlen lassen sich wiederholen.
+ * Verhalten des Bedienbereichs einer Tabelle (META-INF/tags/tableSettings.xhtml): Tabellen fuer
+ * die Kopf-Griffe markieren, Modus-Knopf (Klick/Doppelklick), Panel-Oeffner, Spaltenschalter.
+ * Runde 7 (Karte 1853): der Klick auf das Viereck im Kopf (Spalte auf die Zielbreite setzen,
+ * Karte 1336) ist mit dem Reiter «Breiten» weggefallen - die Wiederholbarkeit, fuer die er da
+ * war, liefert jetzt der feste Stand (Ansicht festhalten, Doppelklick auf den Modus-Knopf).
  *
  * WARUM ALS EIGENE DATEI (Welle 4, CSP ohne 'unsafe-inline'):
  * Solange irgendwo ein Inline-<script> steht, muss die Content-Security-Policy
@@ -17,198 +14,71 @@
  *
  * ANBINDUNG UEBER data-ATTRIBUTE STATT UEBER FESTE IDs:
  * Der Rahmen des Bedienbereichs traegt data-pt-tablesettings="<DOM-Id der Tabelle>" und
- * data-pt-remote="<Name des p:remoteCommand>". Damit weiss dieses Skript nichts ueber
+ * data-pt-breiten="1" (Seite mit Spaltenbreiten). Damit weiss dieses Skript nichts ueber
  * Formularnamen — und zwei Bedienbereiche auf einer Seite stoeren sich nicht.
  *
  * WARUM EIN MutationObserver UND KEIN EINMALIGES EINRICHTEN:
- * Nach jedem PrimeFaces-Teilupdate ist der Tabellenkopf ein neuer DOM-Knoten; die Knoepfe waeren
- * weg. Der Beobachter setzt sie wieder — und ist gegen sich selbst gesichert (er fuegt nur ein,
- * wo noch keiner steht, und verdrahtet jeden Anfasser nur einmal, sonst loeste seine eigene
- * Aenderung ihn erneut aus).
+ * Nach jedem PrimeFaces-Teilupdate ist die Tabelle ein neuer DOM-Knoten; die Markierung waere
+ * weg. Der Beobachter setzt sie wieder (nur Klassen - keine Kind-Aenderung, die ihn erneut
+ * ausloeste).
  */
 (function () {
     'use strict';
 
-    var MIN_BREITE = 44;
-
-    /** Der Kopftext, wie ihn TableSettings.keyFromHeader auf der Serverseite erwartet. */
-    function kopfText(th) {
-        var titel = th.querySelector('.ui-column-title');
-        return ((titel ? titel.textContent : th.textContent) || '').trim();
-    }
-
     /**
-     * Zielbreite aus dem Feld im Bedienbereich. Bewusst aus dem DOM und nicht vom Bean: der Wert
-     * kann eben erst eingetippt und noch nicht abgeschickt worden sein.
-     *
-     * p:inputNumber rendert zwei Felder — das sichtbare (_input, formatiert, mit " px") und das
-     * versteckte (_hinput, roh). Beide werden akzeptiert; alles ausser Ziffern und Punkt faellt
-     * vorher weg.
+     * Markiert die Tabellen der Bedienbereiche fuer table-settings.css (Karte 1853 Runde 7):
+     * pt-ts-tabelle immer (Verschiebe-Griff an th.ui-draggable-column), pt-tablesettings-breiten
+     * bei Seiten mit Spaltenbreiten (Resize-Viereck, Mobil-Regel aus Karte 1077). Bis Runde 6
+     * hing das an einer Schalterzeile, die seit Runde 5 im OverlayPanel ausserhalb des Wraps
+     * liegt - gefunden wurde sie nie, die Griffe fehlten (Befund claude1/claude2, gemessen).
+     * Den Modus liest das CSS direkt an der Tabelle (ui-datatable-resizable, ui-draggable-column).
+     * Idempotent: nach jedem Teilupdate ist der Tabellenknoten neu, der Beobachter setzt nach.
      */
-    function zielBreite(rahmen) {
-        var felder = rahmen.querySelectorAll(
-            'input[id$="-targetWidth_input"], input[id$="-targetWidth_hinput"],'
-            + ' .pt-tablesettings-zielbreite input, input.pt-tablesettings-zielbreite');
-        for (var i = 0; i < felder.length; i++) {
-            var roh = (felder[i].value || '').replace(/[^0-9.]/g, '');
-            var w = parseFloat(roh);
-            if (!isNaN(w)) {
-                return Math.round(w);
-            }
-        }
-        return 0;
-    }
-
-    /** Setzt die Spalte auf die eingestellte Breite - dasselbe wie frueher der Klick auf den ↔-Knopf. */
-    function setzen(th, rahmen, remoteName) {
-        var ziel = zielBreite(rahmen);
-        if (ziel < MIN_BREITE) {
-            return;
-        }
-        var melde = window[remoteName];
-        if (typeof melde === 'function') {
-            melde([{name: 'sp', value: kopfText(th)}, {name: 'px', value: ziel}]);
-        }
-    }
-
-    /**
-     * EIN Viereck statt zwei (Karte 1336). Bis dahin standen im Spaltenkopf zwei kleine Vierecke
-     * nebeneinander: der Zieh-Anfasser von PrimeFaces und daneben der eigene ↔-Knopf. Jetzt
-     * uebernimmt der Anfasser beides: ziehen aendert die Breite frei (PrimeFaces, unveraendert),
-     * ein KLICK ohne Bewegung setzt die Spalte auf die eingestellte Spaltenbreite.
-     *
-     * Warum das ohne Eingriff in PrimeFaces geht: der Anfasser ist ein jQuery-UI-draggable. Das
-     * beginnt erst nach einer Bewegung zu ziehen, ein reiner Klick bleibt ein Klick. Nach einem
-     * echten Ziehen kommt trotzdem noch ein click-Ereignis an (die Maus wird ueber dem Anfasser
-     * losgelassen) - deshalb die Wegmessung ab mousedown. Der Doppelklick gehoert weiter
-     * PrimeFaces (Breite an den Inhalt anpassen); der verzoegerte Einzelklick weicht ihm aus.
-     */
-    function anfasserVerdrahten(anfasser, th, rahmen, remoteName) {
-        if (anfasser.getAttribute('data-pt-setzen')) {
-            return;
-        }
-        anfasser.setAttribute('data-pt-setzen', '1');
-        anfasser.title = 'Ziehen: Breite frei einstellen. Klicken: auf die eingestellte Spaltenbreite setzen.';
-        var startX = null;
-        var wartet = null;
-
-        // Kein preventDefault und kein stopPropagation hier - das Ziehen braucht mousedown.
-        anfasser.addEventListener('mousedown', function (e) {
-            startX = e.clientX;
-        });
-
-        anfasser.addEventListener('click', function (e) {
-            // Der Kopf sortiert bei jedem Klick auf ein span - auch auf den Anfasser.
-            e.preventDefault();
-            e.stopPropagation();
-            var gezogen = startX !== null && Math.abs(e.clientX - startX) > 3;
-            startX = null;
-            if (gezogen) {
-                return;
-            }
-            if (wartet) {
-                clearTimeout(wartet);
-            }
-            wartet = setTimeout(function () {
-                wartet = null;
-                setzen(th, rahmen, remoteName);
-            }, 250);
-        }, true);
-
-        anfasser.addEventListener('dblclick', function () {
-            if (wartet) {
-                clearTimeout(wartet);
-                wartet = null;
-            }
-        }, true);
-    }
-
-    /**
-     * Rueckfall fuer Spalten OHNE PrimeFaces-Anfasser (Tabelle ohne resizableColumns): dann ist
-     * das Viereck ein eigenes Element, das nur setzt. Es sieht aus wie der Anfasser, damit die
-     * Bedienung auf jeder Seite gleich aussieht.
-     */
-    function knopfAnhaengen(th, rahmen, remoteName) {
-        if (th.querySelector('.pt-tablesettings-setzen')) {
-            return;
-        }
-        var knopf = document.createElement('span');
-        knopf.className = 'pt-tablesettings-setzen';
-        knopf.title = 'Diese Spalte auf die eingestellte Spaltenbreite setzen';
-        th.appendChild(knopf);
-
-        // Der Kopf traegt selbst Handler fuer das Sortieren. Ohne dieses Abfangen in der
-        // Erfassungsphase sortiert ein Klick auf den Knopf zusaetzlich die Tabelle um.
-        knopf.addEventListener('mousedown', function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }, true);
-
-        knopf.addEventListener('click', function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            setzen(th, rahmen, remoteName);
-        }, true);
-    }
-
-    function kopfEinrichten(th, tabelle, rahmen, remoteName) {
-        var anfasser = th.querySelector(':scope > .ui-column-resizer');
-        if (anfasser) {
-            // Ein Rueckfall-Knopf aus einem frueheren Durchlauf (bevor PrimeFaces die Anfasser
-            // gesetzt hatte) waere jetzt das zweite Viereck - weg damit.
-            var alt = th.querySelector(':scope > .pt-tablesettings-setzen');
-            if (alt) {
-                alt.parentNode.removeChild(alt);
-            }
-            anfasserVerdrahten(anfasser, th, rahmen, remoteName);
-            return;
-        }
-        // Eine Tabelle mit resizableColumns bekommt ihre Anfasser vom PrimeFaces-Widget, je nach
-        // Ladezeitpunkt erst nach diesem Durchlauf. Dann nicht vorgreifen: der Beobachter kommt
-        // wieder, sobald sie da sind.
-        if (tabelle.classList.contains('ui-datatable-resizable')) {
-            return;
-        }
-        knopfAnhaengen(th, rahmen, remoteName);
-    }
-
     function einrichten() {
         var rahmen = document.querySelectorAll('[data-pt-tablesettings]');
         for (var i = 0; i < rahmen.length; i++) {
-            var r = rahmen[i];
-            var remoteName = r.getAttribute('data-pt-remote');
-            // Karte 1853 (Runde 5, Daniel 16:21): der Regler-Klon im Spaltenkopf ist WEG —
-            // der Oeffner bleibt allein in der Kopfleiste ueber der Tabelle (wie 11.11.).
-            if (!remoteName) {
-                continue;   // Seite ohne Spaltenbreiten - dann gibt es nichts zu setzen.
-            }
-            // Karte 1853 (Nachtrag Daniel): der Schalter «Grösse ändern» steuert die Griffe. Nur
-            // wenn er ein ist, bekommen die Köpfe das Viereck — bei aus hängt nichts im Kopf.
-            // Der Wert lebt an der Schalterzeile im Panel, weil sie bei jedem Kippen mitgerendert
-            // wird; der Rahmen selbst wird nicht aktualisiert.
-            var schalterZeile = r.querySelector('.pt-ts-schalterzeile');
-            var resizeAktiv = schalterZeile && schalterZeile.getAttribute('data-pt-resize') === '1';
-            var tabelle = document.getElementById(r.getAttribute('data-pt-tablesettings'));
+            var tabelle = document.getElementById(rahmen[i].getAttribute('data-pt-tablesettings'));
             if (!tabelle) {
                 continue;   // Tabelle (noch) nicht im DOM, z.B. ein Reiter, der zu ist.
             }
-            // Markierung fuer table-settings.css: unter dem Mobil-Umbruch setzt es die
-            // gespeicherten Breiten dieser Tabelle ausser Kraft (Entscheid 2, Karte 1077).
-            // Idempotent - nach jedem Teilupdate ist der Tabellenknoten neu, der Beobachter
-            // setzt die Klasse dann wieder.
-            tabelle.classList.add('pt-tablesettings-breiten');
-            if (!resizeAktiv) {
-                // Schalter aus: kein eigenes Symbol im Spaltenkopf (Punkt 4 des Nachtrags).
-                var alt = tabelle.querySelectorAll('.pt-tablesettings-setzen');
-                for (var x = 0; x < alt.length; x++) {
-                    alt[x].parentNode.removeChild(alt[x]);
-                }
-                continue;
+            tabelle.classList.add('pt-ts-tabelle');
+            if (rahmen[i].getAttribute('data-pt-breiten') === '1') {
+                tabelle.classList.add('pt-tablesettings-breiten');
             }
-            var koepfe = tabelle.querySelectorAll('thead th');
-            for (var k = 0; k < koepfe.length; k++) {
-                kopfEinrichten(koepfe[k], tabelle, r, remoteName);
-            }
+        }
+    }
+
+    /*
+     * Modus-Knopf (Runde 7, Punkt 3): Klick wechselt den Modus, Doppelklick stellt den festen
+     * Stand her. Der Klick wartet kurz, ob ein zweiter folgt - sonst wechselte ein Doppelklick
+     * zuerst zweimal den Modus. Beide laufen ueber p:remoteCommand des Tags
+     * (<settingsId>ModusWechseln / <settingsId>FesterStand); die settingsId steht in der Id des
+     * Knopfs (<settingsId>-modus). Delegation am document: der Knopf wird bei jedem Wechsel neu
+     * gerendert.
+     */
+    var modusWartet = null;
+    document.addEventListener('click', function (e) {
+        var knopf = e.target && e.target.closest ? e.target.closest('.pt-ts-modus') : null;
+        if (!knopf || !knopf.id) {
+            return;
+        }
+        e.preventDefault();
+        var settingsId = knopf.id.split(':').pop().replace(/-modus$/, '');
+        if (modusWartet) {
+            clearTimeout(modusWartet);
+            modusWartet = null;
+            aufrufen(settingsId + 'FesterStand');
+            return;
+        }
+        modusWartet = setTimeout(function () {
+            modusWartet = null;
+            aufrufen(settingsId + 'ModusWechseln');
+        }, 300);
+    });
+
+    function aufrufen(name) {
+        if (typeof window[name] === 'function') {
+            window[name]();
         }
     }
 
@@ -241,10 +111,70 @@
         }
     });
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', sicherEinrichten);
-    } else {
+    /*
+     * Karte 1853 (claude2-Befund): Panel-Oeffner. EIN Listener am document statt PF-AutoBinding
+     * am Element: der colReorder-Re-Render des Wraps ersetzt den Oeffner, PF('...PanelWv').target
+     * zeigt danach auf das alte Element (Hoehe 0, oeffnet nicht). Die Delegation ueberlebt
+     * Teil-Updates und ist CSP-konform (kein on...-Attribut).
+     */
+    document.addEventListener('click', function (e) {
+        var oeffner = e.target && e.target.closest ? e.target.closest('.pt-ts-oeffner') : null;
+        if (!oeffner) {
+            return;
+        }
+        var wrap = oeffner.closest('[data-pt-settings-id]');
+        if (!wrap || !window.PF) {
+            return;
+        }
+        var panel = PF(wrap.getAttribute('data-pt-settings-id') + 'PanelWv');
+        if (panel) {
+            e.preventDefault();
+            if (typeof panel.isVisible === 'function' && panel.isVisible()) {
+                panel.hide();
+            } else if (typeof panel.show === 'function') {
+                panel.show(oeffner.id);
+                var panelEl = panel.jq ? panel.jq[0] : null;
+                if (panelEl && window.requestAnimationFrame) {
+                    requestAnimationFrame(function () {
+                        panelEl.style.setProperty('--pt-ts-panel-oben',
+                            Math.round(panelEl.getBoundingClientRect().top) + 'px');
+                    });
+                }
+            }
+        }
+    });
+
+    /* Karte 1853 (claude2, gemessen an 1280x720): PF 16 schliesst ein OverlayPanel bei
+       JEDEM Fenster-Scroll/Resize (handleViewportChange). Das Panel der Tabelleinstellungen
+       soll nur per Toggle (Oeffner) oder dismissable (Klick draussen) schliessen — ragt der
+       Inhalt, scrollt der eigene Container (max-height), nicht die Seite. PF bindet den
+       Handler beim Widget-Init an window, ein Eigenschafts-Override am Objekt greift nicht:
+       Deshalb der Prototyp, nur fuer .pt-ts-panel. Laeuft in sicherEinrichten (nach PF). */
+    function patchViewportSchliessen() {
+        var proto = PrimeFaces.widget.OverlayPanel && PrimeFaces.widget.OverlayPanel.prototype;
+        if (proto && !proto.__ptTsKeinViewportSchliessen) {
+            proto.__ptTsKeinViewportSchliessen = true;
+            var orig = proto.handleViewportChange;
+            proto.handleViewportChange = function () {
+                if (this.jq && this.jq[0]
+                        && this.jq[0].classList.contains('pt-ts-panel')) {
+                    return;
+                }
+                if (typeof orig === 'function') {
+                    return orig.apply(this, arguments);
+                }
+            };
+        }
+    }
+
+    function einrichtenMitPatch() {
+        patchViewportSchliessen();
         sicherEinrichten();
     }
-    new MutationObserver(sicherEinrichten).observe(document.body, {childList: true, subtree: true});
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', einrichtenMitPatch);
+    } else {
+        einrichtenMitPatch();
+    }
+    new MutationObserver(einrichtenMitPatch).observe(document.body, {childList: true, subtree: true});
 })();

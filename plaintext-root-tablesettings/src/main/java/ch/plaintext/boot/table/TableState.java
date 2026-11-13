@@ -118,6 +118,12 @@ public class TableState implements Serializable {
     private Boolean resizeEnabled;
 
     /**
+     * Festgehaltener Spaltenstand (Karte 1853 Runde 7): im Ansicht-Reiter erfasst, per Doppelklick
+     * auf den Modus-Knopf wiederhergestellt. {@code null} = keiner erfasst.
+     */
+    private FesterStand festerStand;
+
+    /**
      * Was eine Seite ausser Spalten und Breiten noch merkt (Karte 2086): Filter, Schalter ueber der
      * Tabelle. Flache Zeichenkettenablage, Schluessel vergibt die Seite
      * ({@link TableSettings#pageValue}, {@link TableSettings#setPageValue}); wandert mit ins Profil.

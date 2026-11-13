@@ -21,7 +21,22 @@ exhaustive.
   rejected by `set_speicher_ablage`). Non-breaking: existing NEXTCLOUD/GIT stores are unchanged; apps without
   `plaintext-admin-sidecars` can use `LokaleDateiAblage` directly behind their own `DateiAblagenRegister`.
 
+### Fixed
+- **pt:tableSettings: Wrap-Binding request-gebunden (JSF1104, session-scoped Beans)** (Karte 2097). `TableSettings`
+  kept the wrap component bound via `binding="#{anzeige.reihenfolgeZiel}"` in a field; in a session-scoped backing
+  bean the getter returned the component of the PREVIOUS request and JSF re-attached it with its children (JSF1104
+  in development, «create profile» only on the second click, buttons/grips missing after a mode switch). The
+  component now lives in `FacesContext.getAttributes()` under a per-instance key; without a FacesContext the getter
+  returns `null`. Tag unchanged.
+
 ### Changed
+- **`pt:tableSettings` Runde 7** (Karte 1853): the «Breiten» tab is gone (widths are dragged in Resize mode;
+  the click-to-target-width on the header square went with it). New in the View tab: «save current layout» keeps
+  widths, total width and column order (`TableState.festerStand`, also stored in the profile); a double-click on
+  the mode button restores exactly that layout. Mode label «Adjust»/«Anpassen» (outline in that mode, filled in
+  Reorder/Resize), real icons for Reorder/Resize, and header grips per mode again - `table-settings.js` looked
+  for the mode row inside the wrap, where it has not been since Runde 5. Script and stylesheet now load even
+  without `mitBreiten`. The wrap attribute `data-pt-remote` is replaced by `data-pt-breiten`.
 - **`ch.plaintext.boot.table` lives only in `plaintext-root-tablesettings`** (Karte 2086). Until now the package was
   compiled twice (into `plaintext-root-common` and into the standalone `plaintext-root-tablesettings`, which also
   picked up `FacesMessages` and `StabileApi` through the source path). `plaintext-root-common` now depends on
