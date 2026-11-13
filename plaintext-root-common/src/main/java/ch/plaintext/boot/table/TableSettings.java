@@ -691,6 +691,13 @@ public class TableSettings implements Serializable {
 
     // ── Breiten ─────────────────────────────────────────────────────────────
 
+    /** Karte 1904: nur der Wert ({@code "120px"}) fuers {@code width}-Attribut; null ohne Breiten/Vorgabe. */
+    public String breite(String key) {
+        String stored = mitBreiten ? state.getColumnWidths().get(key) : null;
+        int fallback = mitBreiten ? defaultWidth(key) : 0;
+        return stored != null && !stored.isBlank() ? stored : fallback > 0 ? fallback + "px" : null;
+    }
+
     /**
      * Breite einer Spalte fuer das {@code style}-Attribut, z.B. {@code "width:180px;"}.
      * Leer, wenn die Seite ohne Breiten arbeitet oder die Spalte keine Vorgabe hat.
@@ -1411,7 +1418,34 @@ public class TableSettings implements Serializable {
                 return column.getKey();
             }
         }
+        // Karte 1904: Kopftexte kommen uebersetzt (#{i18n.t('Benutzername')} -> "Username"), das Label ist deutsch.
+        for (TableColumn column : columns) {
+            String u = column.getLabel() == null ? null
+                    : uebersetzer != null ? uebersetzer.apply(column.getLabel()) : perI18nBean(column.getLabel());
+            if (u != null && u.trim().toLowerCase(Locale.ROOT).equals(h)) {
+                return column.getKey();
+            }
+        }
         return null;
+    }
+
+    /** Uebersetzer fuer Labels (Tests setzen ihn); null = die i18n-Bean der App per EL. */
+    private transient java.util.function.UnaryOperator<String> uebersetzer;
+
+    void setUebersetzer(java.util.function.UnaryOperator<String> uebersetzer) {
+        this.uebersetzer = uebersetzer;
+    }
+
+    /** Label per {@code #{i18n.t(...)}}; ohne Kompilier-Abhaengigkeit, v1-Apps ohne die Bean liefern null. */
+    private static String perI18nBean(String label) {
+        FacesContext faces = FacesContext.getCurrentInstance();
+        try {
+            String literal = label.replace("\\", "\\\\").replace("'", "\\'");
+            return faces == null ? null
+                    : faces.getApplication().evaluateExpressionGet(faces, "#{i18n.t('" + literal + "')}", String.class);
+        } catch (RuntimeException e) { // NOSONAR - keine i18n-Bean oder kein Eintrag: Label bleibt unuebersetzt
+            return null;
+        }
     }
 
     private int defaultWidth(String key) {

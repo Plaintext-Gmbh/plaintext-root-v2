@@ -47,8 +47,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>Warum die Benutzerverwaltung.</b> {@code useradmin.xhtml} ist die einzige Seite in root,
  * die ihren Stand ueber {@code TableSettings} haelt, und bindet seit Karte 1346
  * {@code sortBy="#{myUserBackingBean.anzeige.sortMeta}"} und {@code <p:ajax event="sort">} — genau
- * so, wie es member.xhtml in guild tun wird. Die Tabelle hat {@code multiViewState="true"}: innerhalb
- * einer Sitzung haelt PrimeFaces die Sortierung ohnehin. Jeder Schritt hier laeuft deshalb in einem
+ * so, wie es member.xhtml in guild tun wird. Bis Karte 1904 hatte die Tabelle {@code multiViewState="true"},
+ * das die Sortierung innerhalb einer Sitzung ohnehin hielt. Jeder Schritt hier laeuft deshalb in einem
  * neuen Browser-Kontext (neue Sitzung); was dort sortiert ankommt, kann nur aus dem gespeicherten
  * Stand kommen.</p>
  *

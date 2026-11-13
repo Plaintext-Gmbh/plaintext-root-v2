@@ -150,6 +150,21 @@ class TableSettingsTest {
     }
 
     @Test
+    @DisplayName("Karte 1904: uebersetzte Kopftexte (EN) finden die Spalte ueber das uebersetzte Label")
+    void uebersetzterKopftext() {
+        // Ohne Faces und ohne Uebersetzer: nur das deutsche Label trifft (Verhalten wie bisher).
+        assertThat(anzeige.keyFromHeader("Team key")).isNull();
+
+        anzeige.setUebersetzer(label -> "TeamKey".equals(label) ? "Team key" : label);
+        assertThat(anzeige.keyFromHeader("Team key")).isEqualTo("team");
+        assertThat(anzeige.keyFromHeader("TeamKey")).isEqualTo("team");
+        assertThat(anzeige.keyFromHeader("Gibtsnicht")).isNull();
+
+        anzeige.setUebersetzer(label -> null); // keine Uebersetzung vorhanden
+        assertThat(anzeige.keyFromHeader("Team key")).isNull();
+    }
+
+    @Test
     @DisplayName("Gesamtbreite verteilen: proportional, aber keine Spalte unter dem Minimum")
     void breiteVerteilen() {
         anzeige.setGesamtBreite(540);
@@ -255,5 +270,17 @@ class TableSettingsTest {
         Mockito.when(ext.getRequestParameterMap()).thenReturn(params);
         Mockito.when(ext.getRequestParameterValuesMap()).thenReturn(values);
         return faces;
+    }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("Karte 1904: breite(key) liefert gespeicherte Breite, sonst Vorgabe, ohne Breiten null")
+    void breiteFuerDasWidthAttribut() {
+        TableSettings mit = new TableSettings("t1904", true);
+        mit.init(null, java.util.List.of(new TableColumn("a", "A", 120), new TableColumn("b", "B", 0)));
+        org.junit.jupiter.api.Assertions.assertEquals("120px", mit.breite("a"));
+        org.junit.jupiter.api.Assertions.assertNull(mit.breite("b"));
+        TableSettings ohne = new TableSettings("t1904b", false);
+        ohne.init(null, java.util.List.of(new TableColumn("a", "A", 120)));
+        org.junit.jupiter.api.Assertions.assertNull(ohne.breite("a"));
     }
 }
