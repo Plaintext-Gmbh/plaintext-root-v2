@@ -5,12 +5,14 @@ package ch.plaintext.boot.plugins.jsf.userprofile;
 
 import ch.plaintext.boot.plugins.objstore.SimpleStorable;
 import ch.plaintext.boot.plugins.objstore.SimpleStorableConverter;
+import ch.plaintext.boot.table.FesterStand;
 import ch.plaintext.boot.table.TableColumnProfile;
 import ch.plaintext.boot.table.TableState;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -63,6 +65,9 @@ class UserPreferenceTabellenStaendeTest {
         profil.setTotalWidth(1200);
         profil.setPaginatorBottom(false);
         profil.setRowsPerPage(3000);
+        FesterStand fest = new FesterStand(Map.of("nr", "90px"), List.of("nr", "typ"), 900);   // Karte 1853 R7
+        stand.setFesterStand(fest);
+        profil.setFesterStand(fest);
         stand.getProfiles().put("Breit", profil);
 
         UserPreference pref = new UserPreference();
@@ -102,6 +107,9 @@ class UserPreferenceTabellenStaendeTest {
         assertThat(geladen.getProfiles().get("Breit").getPaginatorBottom()).isFalse();
         assertThat(geladen.getProfiles().get("Breit").getPaginatorTop()).isNull();
         assertThat(geladen.getProfiles().get("Breit").getRowsPerPage()).isEqualTo(3000);
+        // Karte 1853 Runde 7: der feste Stand (Record) ueberlebt den Konverter, am Stand und im Profil.
+        assertThat(geladen.getFesterStand()).isEqualTo(fest);
+        assertThat(geladen.getProfiles().get("Breit").getFesterStand()).isEqualTo(fest);
     }
 
     /**

@@ -1,7 +1,15 @@
 # `pt:tableSettings` einsetzen — Anleitung für KIs
 
-Stand: Karte 1853, Runde 6 (13.11.2026). Repo: `Plaintext-Gmbh/plaintext-root-v2`
-(Tag + CSS + JS in `plaintext-root-template`, Java in `plaintext-root-common`).
+Stand: Karte 1853, Runde 7 (13.11.2026). Repo: `Plaintext-Gmbh/plaintext-root-v2`
+(Tag + CSS + JS in `plaintext-root-template`, Java in `plaintext-root-tablesettings`).
+
+Runde 7 (13.11.): Reiter «Breiten» entfernt — Breiten zieht man im Modus Resize. Neu im
+Ansicht-Reiter: «Aktuellen Stand festhalten» merkt Breiten, Gesamtbreite und Reihenfolge
+(`TableState.festerStand`, wandert mit ins Profil); ein **Doppelklick auf den Modus-Knopf**
+stellt die Tabelle genau darauf zurück (`anzeige.festerStandHerstellen(tabelle)`). Modus-Knopf
+heisst «Anpassen»/«Adjust», in diesem Modus outline, sonst gefüllt; Reorder und Resize haben
+eigene Symbole, die Spaltenköpfe zeigen im jeweiligen Modus ein Griff-Viereck (Reorder links
+am Titel, Resize rechts). Skript und Stil lädt das Tag jetzt immer, auch ohne `mitBreiten`.
 
 Runde 6 (13.11.): Widget mehrsprachig (de/en/fr/it, Bundle
 `ch.plaintext.boot.table.tablesettings`, Basis = de), Meldungen als Growl (FacesMessages,

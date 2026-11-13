@@ -7,9 +7,11 @@
                 xmlns:a="jakarta.faces.passthrough"
                 xmlns:p="http://primefaces.org/ui">
     <!--
-      pt:tableSettings — der Bedienbereich einer Tabelle: Kopfleiste mit den Schaltern
-      «Verschieben» / «Grösse ändern» und dem Panel für Ansicht, Spalten und Breiten
-      (Karte 1853, Mockup Variante A; vorher Fieldset, Karte 1336).
+      pt:tableSettings — der Bedienbereich einer Tabelle: Kopfleiste mit dem Regler-Symbol und
+      dem Panel für Modus, Profil, Ansicht und Spalten (Karte 1853, Mockup Variante A; vorher
+      Fieldset, Karte 1336). Runde 7 (Daniel 13.11.): Reiter «Breiten» entfernt — Breiten zieht
+      man im Modus Resize; die Ansicht haelt einen festen Stand (Breiten + Reihenfolge) fest, der
+      mit ins Profil wandert, ein Doppelklick auf den Modus-Knopf stellt ihn wieder her.
 
       WARUM ALS TAG UND NICHT ALS KOPIERVORLAGE:
       Diese Bedienung ist rund 300 Zeilen Markup, davon die Haelfte Ajax-Verdrahtung. Wer sie
@@ -50,8 +52,8 @@
       Suchausdruck; update muss den Tag-Wrap <ptSettingsId>-bereich UND die Tabelle mitrendern —
       Vorbild: guild member.xhtml). Ohne diese drei Zeilen an der Tabelle bleiben die Schalter
       wirkungslos (das Tag kann fremde Komponenten nur anbieten, nicht verdrahten) — und ohne
-      eingeschalteten Schalter haengt auch kein Griff im Spaltenkopf (Punkt 4 des Nachtrags,
-      umgesetzt in table-settings.js ueber data-pt-resize an der Schalterzeile).
+      eingeschalteten Schalter haengt auch kein Griff im Spaltenkopf (Runde 7: table-settings.css
+      liest den Modus direkt an der Tabelle - ui-draggable-column / ui-datatable-resizable).
 
       REIHENFOLGE: Gespeichert wird in TableState.columnOrder; kurz vor dem Rendern sortiert
       das Tag die Spalten-Kinder der Tabelle ueber f:event preRenderComponent um. PrimeFaces
@@ -124,7 +126,7 @@
                   id="#{ptSettingsId}-bereich"
                   binding="#{anzeige.reihenfolgeZiel}"
                   a:data-pt-tablesettings="#{ptTabelleDom}"
-                  a:data-pt-remote="#{anzeige.mitBreiten ? ptSettingsId.concat('MeldeSpaltenbreite') : ''}"
+                  a:data-pt-breiten="#{anzeige.mitBreiten ? '1' : ''}"
                   a:data-pt-settings-id="#{ptSettingsId}">
 
         <!-- Reihenfolge der Spalten-Kinder vor jedem Rendern an den gespeicherten Stand anpassen
@@ -166,21 +168,20 @@
                         hideEffect="fade" showEffect="fade">
             <h:panelGroup layout="block" id="#{ptSettingsId}-panelInhalt">
             <!-- Kopfzeile des Panels (Runde 6, Karte 1853): EIN Dreifach-Schalter rotiert durch
-                 «Spalten anpassen» (beide aus) -> «Verschieben» (Koepfe ziehbar) -> «Vergroessern»
+                 «Anpassen» (beide aus) -> «Verschieben» (Koepfe ziehbar) -> «Vergroessern»
                  (Breiten ziehbar) -> zurueck. Die Seite bindet draggableColumns/resizableColumns
                  an dieselben zwei Eigenschaften — der Schalter setzt genau sie. Ohne aktiven Modus
-                 haengt auch kein Griff im Spaltenkopf (table-settings.js liest data-pt-resize an
-                 der Schalterzeile). Profilzeile rechts: Auswahl, Neu, Papierkorb. -->
+                 haengt auch kein Griff im Spaltenkopf. Profilzeile rechts: Auswahl, Neu, Papierkorb. -->
             <h:panelGroup layout="block" styleClass="pt-ts-kopfzeile">
-                <h:panelGroup layout="block" styleClass="pt-ts-schalterzeile"
-                              a:data-pt-resize="#{anzeige.groesseAendernAktiv ? '1' : ''}">
-                    <p:commandButton id="#{ptSettingsId}-modus"
+                <!-- Runde 7: Klick wechselt den Modus, Doppelklick stellt den festen Stand her. Beides
+                     ueber remoteCommands (unten), ausgeloest von js/table-settings.js - ein Ajax-
+                     Knopf haette beim Doppelklick zweimal den Modus gewechselt. Adjust = outline,
+                     Reorder/Resize gefuellt (Punkt 7). -->
+                <h:panelGroup layout="block" styleClass="pt-ts-schalterzeile">
+                    <p:commandButton id="#{ptSettingsId}-modus" type="button"
                                      value="#{anzeige.modusLabel}"
                                      icon="#{anzeige.modusIcon}"
-                                     action="#{anzeige.modusWechseln()}"
-                                     process="@this"
-                                     update="#{tabelle} #{ptSettingsId}-panelInhalt"
-                                     styleClass="pt-ts-modus"
+                                     styleClass="pt-ts-modus#{anzeige.modus == 0 ? ' ui-button-outlined' : ''}"
                                      title="#{anzeige.modusTitel}"/>
                 </h:panelGroup>
 
@@ -243,6 +244,19 @@
                                           rendered="#{not anzeige.paginator}"
                                           styleClass="pt-tablesettings-hint"/>
                         </h:panelGroup>
+                    </h:panelGroup>
+                    <!-- Fester Stand (Runde 7, Punkt 2): Breiten + Reihenfolge festhalten; steht im
+                         Profil. Wiederherstellen per Doppelklick auf den Modus-Knopf (Punkt 3). -->
+                    <h:panelGroup layout="block" id="#{ptSettingsId}-festerStand" styleClass="pt-ts-fester-stand">
+                        <h:outputText value="#{ts['festerStand.label']}" styleClass="pt-tablesettings-label"/>
+                        <p:commandButton id="#{ptSettingsId}-festhalten" value="#{ts['festerStand.erfassen']}"
+                                         icon="pi pi-bookmark"
+                                         action="#{anzeige.festerStandErfassen()}"
+                                         process="@this" update="#{ptSettingsId}-festerStand"
+                                         styleClass="ui-button-outlined"
+                                         title="#{ts['festerStand.erfassen.titel']}"/>
+                        <h:outputText value="#{anzeige.festerStandErfasst ? ts['festerStand.vorhanden'] : ts['festerStand.keiner']}"
+                                      styleClass="pt-tablesettings-hint"/>
                     </h:panelGroup>
                 </p:tab>
 
@@ -320,62 +334,6 @@
                                   styleClass="pt-tablesettings-hint"/>
                 </p:tab>
 
-                <!-- ── Breiten: Gesamtbreite, Zielbreite, Zuruecksetzen (Karte 1336) ────────── -->
-                <p:tab title="#{ts['tab.breiten']}" rendered="#{anzeige.mitBreiten}">
-                    <!-- Die Gesamtbreite ist das, worauf sich die Spalten verteilen; leer heisst:
-                         Summe der Spalten, die Tabelle waechst beim Ziehen mit. -->
-                    <h:panelGroup layout="block" id="#{ptSettingsId}-totalWidthBlock" styleClass="pt-tablesettings-breitenblock">
-                        <h:outputText value="#{ts['breiten.gesamtbreite']}" styleClass="pt-tablesettings-label"/>
-                        <p:inputNumber id="#{ptSettingsId}-totalWidth" value="#{anzeige.gesamtBreite}"
-                                       decimalPlaces="0" symbol=" px" symbolPosition="s"
-                                       minValue="200" maxValue="20000"
-                                       style="width:120px; margin-right:6px;"
-                                       title="#{ts['breiten.gesamtbreite.titel']}">
-                            <p:ajax event="change" process="@this"
-                                    listener="#{anzeige.onGesamtBreiteChange()}"
-                                    update="#{tabelle} #{ptSettingsId}-totalWidthBlock"/>
-                        </p:inputNumber>
-
-                        <p:commandButton id="#{ptSettingsId}-breitenKnopf"
-                                         value="#{anzeige.breitenKnopfText}"
-                                         icon="pi pi-refresh"
-                                         action="#{anzeige.breitenKnopfGedrueckt()}"
-                                         process="@this"
-                                         update="#{tabelle} #{ptSettingsId}-totalWidthBlock"
-                                         styleClass="ui-button-outlined"
-                                         title="#{ts['breiten.knopf.titel']}"/>
-
-                        <p:commandButton value="#{ts['breiten.reset']}" icon="pi pi-undo"
-                                         action="#{anzeige.resetColumnWidths()}"
-                                         process="@this"
-                                         update="#{tabelle} #{ptSettingsId}-totalWidthBlock"
-                                         styleClass="ui-button-outlined" style="margin-left:6px;"
-                                         title="#{ts['breiten.reset.titel']}"/>
-
-                        <h:outputText value="#{ts['breiten.hint']}"
-                                      styleClass="pt-tablesettings-hint"/>
-                    </h:panelGroup>
-
-                    <!-- Zweite Breite: auf diesen Wert setzt ein Klick auf das Viereck im Spaltenkopf
-                         eine einzelne Spalte. Von Hand ziehen trifft nie zweimal denselben Pixelwert —
-                         untereinander stehende Tabellen sahen deshalb nie gleich aus. -->
-                    <h:panelGroup layout="block" styleClass="pt-tablesettings-breitenblock"
-                                  style="margin-top:10px;">
-                        <h:outputText value="#{ts['breiten.spaltenbreite']}" styleClass="pt-tablesettings-label"/>
-                        <p:inputNumber id="#{ptSettingsId}-targetWidth" value="#{anzeige.zielSpaltenBreite}"
-                                       decimalPlaces="0" symbol=" px" symbolPosition="s"
-                                       minValue="44" maxValue="4000"
-                                       styleClass="pt-tablesettings-zielbreite"
-                                       style="width:120px; margin-right:6px;"
-                                       title="#{ts['breiten.spaltenbreite.titel']}">
-                            <p:ajax event="change" process="@this"
-                                    listener="#{anzeige.onZielSpaltenBreiteChange()}"
-                                    update="#{tabelle}"/>
-                        </p:inputNumber>
-                        <h:outputText value="#{ts['breiten.spaltenbreite.hint']}"
-                                      styleClass="pt-tablesettings-hint"/>
-                    </h:panelGroup>
-                </p:tab>
             </p:tabView>
             </h:panelGroup>
         </p:overlayPanel>
@@ -401,22 +359,22 @@
             </f:facet>
         </p:dialog>
 
-        <!-- Das Viereck in jedem Spaltenkopf (Karte 1336: eines statt zwei): ziehen aendert die Breite
-             (PrimeFaces-Anfasser), ein Klick setzt die Spalte auf die eingestellte Spaltenbreite.
-             Der Server rendert die Tabelle danach mit den neuen Breiten — kein clientseitiges
-             Nachrechnen noetig, p:dataTable kann resizeMode="expand" von Haus aus.
+        <!-- Modus-Knopf (Runde 7): js/table-settings.js ruft bei Klick <id>ModusWechseln, bei
+             Doppelklick <id>FesterStand. Ohne ignoreAutoUpdate, damit das Growl erscheint. -->
+        <p:remoteCommand name="#{ptSettingsId}ModusWechseln" process="@this"
+                         action="#{anzeige.modusWechseln()}"
+                         update="#{tabelle} #{ptSettingsId}-panelInhalt"/>
+        <!-- Der Wrap muss mit: die Reihenfolge greift erst in seinem preRenderComponent (wie beim
+             reorder der Liste) - sonst meldet das Growl den festen Stand, die Tabelle zeigt ihn
+             aber erst nach dem Neuladen (claude2-Befund, Runde 7). -->
+        <p:remoteCommand name="#{ptSettingsId}FesterStand" process="@this"
+                         action="#{anzeige.festerStandHerstellen(tabelle)}"
+                         update="#{anzeige.reihenfolgeZielClientId} #{tabelle} #{ptSettingsId}-panelInhalt"/>
 
-             Die Anbindung laeuft ueber data-Attribute an diesem Anker und nicht ueber feste IDs im
-             Skript: das haelt js/table-settings.js frei von Annahmen ueber Formularnamen und macht
-             zwei Bedienbereiche auf einer Seite moeglich. Muster: data-pt-dropdown in topbar.js. -->
-        <h:panelGroup rendered="#{anzeige.mitBreiten}">
-            <p:remoteCommand name="#{ptSettingsId}MeldeSpaltenbreite" process="@this"
-                             actionListener="#{anzeige.onSpaltenbreiteGemeldet}"
-                             update="#{tabelle} #{ptSettingsId}-totalWidthBlock"
-                             ignoreAutoUpdate="true"/>
-
-            <h:outputStylesheet library="plaintext-layout" name="css/table-settings.css"/>
-            <h:outputScript library="plaintext-layout" name="js/table-settings.js" target="body"/>
-        </h:panelGroup>
+        <!-- Skript und Stil IMMER laden (Runde 7): Oeffner und Modus-Knopf laufen ueber das Skript,
+             auch auf Seiten ohne Spaltenbreiten. Die Griffe im Spaltenkopf (Verschieben: Symbol
+             links am Titel, Resize: das ↔-Viereck von PrimeFaces) zeichnet table-settings.css. -->
+        <h:outputStylesheet library="plaintext-layout" name="css/table-settings.css"/>
+        <h:outputScript library="plaintext-layout" name="js/table-settings.js" target="body"/>
 
 </ui:composition>

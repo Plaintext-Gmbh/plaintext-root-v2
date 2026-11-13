@@ -15,11 +15,9 @@ import org.primefaces.component.api.ColumnAware;
 import org.primefaces.component.api.UIColumn;
 import org.primefaces.component.api.UITable;
 import org.primefaces.event.ColumnResizeEvent;
-import org.primefaces.event.ReorderEvent;
 import org.primefaces.event.ToggleEvent;
 import org.primefaces.event.data.PageEvent;
 import org.primefaces.event.data.SortEvent;
-import org.primefaces.expression.SearchExpressionUtils;
 import org.primefaces.model.SortMeta;
 import org.primefaces.model.SortOrder;
 import org.primefaces.model.Visibility;
@@ -28,9 +26,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -572,18 +568,15 @@ public class TableSettings implements Serializable {
                 sichtbar.add(column.getKey());
             }
         }
-        int from = event instanceof ReorderEvent re ? re.getFromIndex() : -1;
-        int to = event instanceof ReorderEvent re2 ? re2.getToIndex() : -1;
-        if (from < 0 || to < 0 || from >= sichtbar.size() || to >= sichtbar.size() || from == to) {
+        List<String> verschoben = TableKomponenten.verschoben(sichtbar, event);
+        if (verschoben == null) {
             return;
         }
-        String gezogen = sichtbar.remove(from);
-        sichtbar.add(to, gezogen);
-        state.setColumnOrder(mergeSichtbar(sichtbar));
+        state.setColumnOrder(mergeSichtbar(verschoben));
         persist();
         growl(text("meldung.reihenfolgeGeaendert"));
         reihenfolgeAnwenden(tabelle);
-        log.debug("[TableSettings:{}] onColReorder | from={} | to={}", page, from, to);
+        log.debug("[TableSettings:{}] onColReorder | ueber from/to | {}", page, verschoben);
     }
 
     /** Persistiert die im Request mitgelieferte neue Reihenfolge, falls sie vom Stand abweicht. */
@@ -694,6 +687,33 @@ public class TableSettings implements Serializable {
     /** Icon des Dreifach-Schalters je Modus. */
     public String getModusIcon() {
         return TableSettingsTexte.modusIcon(getModus());
+    }
+
+    /** Haelt Breiten und Reihenfolge fest (Ansicht-Reiter, Karte 1853 Runde 7); wandert mit ins Profil. */
+    public void festerStandErfassen() {
+        state.setFesterStand(FesterStand.aus(state, getOrderedColumns().stream().map(TableColumn::getKey).toList()));
+        persist();
+        growl(text("meldung.festerStand.erfasst"));
+    }
+
+    public boolean isFesterStandErfasst() {
+        return state.getFesterStand() != null;
+    }
+
+    /** Doppelklick auf den Modus-Knopf: Breiten und Reihenfolge genau auf den festen Stand. */
+    public void festerStandHerstellen(String tabelle) {
+        if (state.getFesterStand() == null) {
+            growl(text("meldung.festerStand.fehlt"));
+            return;
+        }
+        state.getFesterStand().anwenden(state);
+        persist();
+        UIData data = tabelleFinden(tabelle);
+        if (data != null) {
+            TableKomponenten.pfReihenfolgeVergessen(data);   // sonst gilt PFs Kopf-Zug-Ordnung weiter
+            reihenfolgeAnwenden(data);
+        }
+        growl(text("meldung.festerStand.hergestellt"));
     }
 
     /** Schalter «Verschieben»: duerfen die Spaltenkoepfe per Ziehen umgeordnet werden? Vorgabe: aus. */
@@ -922,31 +942,16 @@ public class TableSettings implements Serializable {
                 sichtbar.put(column.getKey(), breiteVon(column));
             }
         }
-        if (ziel == null || sichtbar.isEmpty()) {
+        TableKomponenten.Verteilung v = ziel == null ? null : TableKomponenten.verteilen(sichtbar, ziel, MIN_SPALTE_PX);
+        if (v == null) {
             return;
         }
-        int alt = sichtbar.values().stream().mapToInt(Integer::intValue).sum();
-        if (alt <= 0) {
-            return;
-        }
-
-        int gesetzt = 0;
-        int amMinimum = 0;
-        for (Map.Entry<String, Integer> e : sichtbar.entrySet()) {
-            int neu = Math.round((float) e.getValue() * ziel / alt);
-            if (neu < MIN_SPALTE_PX) {
-                neu = MIN_SPALTE_PX;
-                amMinimum++;
-            }
-            state.getColumnWidths().put(e.getKey(), neu + "px");
-            gesetzt += neu;
-        }
-
-        if (gesetzt > ziel) {
+        v.breiten().forEach((key, breite) -> state.getColumnWidths().put(key, breite + "px"));
+        if (v.summe() > ziel) {
             // Die Untergrenze hat die Rechnung gesprengt: der Wert im Feld
             // waere gelogen, also folgt die Breite wieder den Spalten.
             state.setTotalWidth(null);
-            growl(text("meldung.zuSchmal", ziel, amMinimum, gesetzt));
+            growl(text("meldung.zuSchmal", ziel, v.amMinimum(), v.summe()));
         } else {
             growl(text("meldung.verteilt", ziel));
         }
@@ -1267,6 +1272,7 @@ public class TableSettings implements Serializable {
         state.setRowsPerPage(profile.getRowsPerPage());
         state.setSortBy(TableSort.kopie(profile.getSortBy()));
         state.setPageState(new LinkedHashMap<>(profile.getPageState()));
+        state.setFesterStand(profile.getFesterStand());
         state.setActiveProfile(selectedProfile);
         save();
         growl(profilMeldung(selectedProfile, "meldung.profil.angewendet"));
@@ -1372,6 +1378,7 @@ public class TableSettings implements Serializable {
         profile.setRowsPerPage(state.getRowsPerPage());
         profile.setSortBy(TableSort.kopie(state.getSortBy()));
         profile.setPageState(new LinkedHashMap<>(state.getPageState()));
+        profile.setFesterStand(state.getFesterStand());
         state.getProfiles().put(name, profile);
     }
 

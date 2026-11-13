@@ -21,6 +21,13 @@ exhaustive.
   returns `null`. Tag unchanged.
 
 ### Changed
+- **`pt:tableSettings` Runde 7** (Karte 1853): the «Breiten» tab is gone (widths are dragged in Resize mode;
+  the click-to-target-width on the header square went with it). New in the View tab: «save current layout» keeps
+  widths, total width and column order (`TableState.festerStand`, also stored in the profile); a double-click on
+  the mode button restores exactly that layout. Mode label «Adjust»/«Anpassen» (outline in that mode, filled in
+  Reorder/Resize), real icons for Reorder/Resize, and header grips per mode again - `table-settings.js` looked
+  for the mode row inside the wrap, where it has not been since Runde 5. Script and stylesheet now load even
+  without `mitBreiten`. The wrap attribute `data-pt-remote` is replaced by `data-pt-breiten`.
 - **`ch.plaintext.boot.table` lives only in `plaintext-root-tablesettings`** (Karte 2086). Until now the package was
   compiled twice (into `plaintext-root-common` and into the standalone `plaintext-root-tablesettings`, which also
   picked up `FacesMessages` and `StabileApi` through the source path). `plaintext-root-common` now depends on
