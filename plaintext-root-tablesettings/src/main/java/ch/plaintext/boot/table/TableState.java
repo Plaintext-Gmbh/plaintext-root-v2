@@ -52,16 +52,6 @@ public class TableState implements Serializable {
     private Map<String, String> columnWidths = new LinkedHashMap<>();
 
     /**
-     * Gesamtbreite der Tabelle in Pixeln, oder {@code null} fuer "aus den Spalten rechnen".
-     * Warum es diese Angabe ueberhaupt gibt, steht bei
-     * {@link TableSettings#getTabellenBreite()}.
-     */
-    private Integer totalWidth;
-
-    /** Breite, auf die der Knopf im Spaltenkopf eine einzelne Spalte setzt. */
-    private Integer targetColumnWidth;
-
-    /**
      * Steht der Bereich "Anzeige" offen? Das gehoert in den gespeicherten Stand und nicht in die
      * Bean: der Bereich wird bei jeder Spaltenaenderung mitgerendert, und ein Wert, der nur in der
      * Bean auf "zu" startet, klappte ihn dabei jedes Mal zu — mitten im Einrichten.

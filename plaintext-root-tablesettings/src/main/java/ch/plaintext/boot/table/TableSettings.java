@@ -112,9 +112,10 @@ import java.util.stream.Collectors;
  * }</pre>
  *
  * <p><b>Herkunft der Breiten-Rechnerei.</b> Sie stammt aus einer einzelnen, sehr breiten
- * Projektuebersicht und ist dort teuer erkauft worden; die Begruendungen zu Gesamtbreite,
- * Zielbreite und proportionalem Umrechnen stehen bei den jeweiligen Methoden. Wer sie liest,
- * bevor er etwas vereinfacht, spart sich den Weg ein zweites Mal.</p>
+ * Projektuebersicht und ist dort teuer erkauft worden; die Begruendung zu
+ * {@link #getTabellenBreite()} steht bei der Methode. Gesamtbreite, Zielbreite und proportionales
+ * Umrechnen sind mit Karte 2160 weggefallen — Breiten zieht man im Modus «Vergröessern», einen
+ * exakten Wert trägt man im Panel ein (Doppelklick auf den Modus-Knopf im Resize-Modus).</p>
  *
  * @author info@plaintext.ch
  * @since 2026
@@ -129,9 +130,6 @@ public class TableSettings implements Serializable {
 
     /** Schmalste Spalte in Pixeln, damit nichts unlesbar zusammenfaellt. */
     private static final int MIN_SPALTE_PX = 44;
-
-    /** Unter dieser Gesamtbreite ist die Tabelle nicht mehr bedienbar. */
-    private static final int MIN_GESAMT_PX = 200;
 
     /** Zeilen pro Seite, wenn die Seite keine eigene Vorgabe nennt — dieselbe wie {@code pt:table}. */
     public static final int VORGABE_ZEILEN = 20;
@@ -776,17 +774,10 @@ public class TableSettings implements Serializable {
      * Tabellenbreite, die der Summe entspricht, macht sie wieder verbindlich.</p>
      */
     public String getTabellenBreite() {
-        if (!mitBreiten) {
-            return "";
-        }
-        Integer gesetzt = state.getTotalWidth();
-        if (gesetzt != null && gesetzt >= MIN_GESAMT_PX) {
-            return "width: " + gesetzt + "px;";
-        }
-        return "width: " + spaltenSumme() + "px;";
+        return mitBreiten ? "width: " + spaltenSumme() + "px;" : "";
     }
 
-    /** Summe der Spalten, die wirklich in der Tabelle stehen, ohne eine von Hand gesetzte Gesamtbreite. */
+    /** Summe der Spalten, die wirklich in der Tabelle stehen. */
     public int spaltenSumme() {
         int summe = 0;
         for (TableColumn column : columns) {
@@ -809,30 +800,64 @@ public class TableSettings implements Serializable {
             return;
         }
         state.getColumnWidths().put(key, event.getWidth() + "px");
+        breiteFixSpalte = key;
         persist();
         growl(text("meldung.breiteGeaendert"));
         log.debug("[TableSettings:{}] onColumnResize | column={} | width={}px", page, key, event.getWidth());
     }
 
+    // ── Breite fix eintragen (Karte 2160, Doppelklick im Modus «Vergroessern») ─
+
     /**
-     * Breite einer Spalte, die der Setzen-Knopf im Spaltenkopf meldet
-     * (Request-Parameter {@code sp} = Kopftext, {@code px} = Breite).
+     * Die Spalte, deren Breite per Doppelklick im Resize-Modus exakt einzutragen ist — die
+     * zuletzt gezogene ({@link #onColumnResize}). {@code null}, solange in dieser Sitzung nichts
+     * gezogen wurde; das Panel zeigt dann einen Hinweis statt des Eingabefelds.
      */
-    public void onSpaltenbreiteGemeldet() {
-        Map<String, String> params = FacesContext.getCurrentInstance()
-                .getExternalContext().getRequestParameterMap();
-        String key = keyFromHeader(params.get("sp"));
-        Integer breite = TableKomponenten.zuBreite(params.get("px"), MIN_SPALTE_PX);
-        if (key == null || breite == null) {
-            log.debug("[TableSettings:{}] onSpaltenbreiteGemeldet | verworfen | sp={} | px={}",
-                    page, params.get("sp"), params.get("px"));
+    @Getter
+    private String breiteFixSpalte;
+
+    /** Soll das Eingabefeld im Ansicht-Reiter gerendert werden? Geoeffnet per Doppelklick. */
+    @Getter
+    private boolean breiteFixOffen;
+
+    /** Der eingetragene Wert fuer {@link #breiteFixUebernehmen()}. */
+    @Getter
+    @Setter
+    private Integer breiteFixWert;
+
+    /** Doppelklick auf den Modus-Knopf im Resize-Modus: Feld im Ansicht-Reiter aufklappen. */
+    public void breiteFixOeffnen() {
+        breiteFixOffen = true;
+        TableColumn ziel = breiteFixSpalte == null ? null : spalte(breiteFixSpalte);
+        breiteFixWert = ziel == null ? null : breiteVon(ziel);
+    }
+
+    /** Die Zielspalte als Column; {@code null} bei unbekanntem Schluessel (Sitzungsreste). */
+    private TableColumn spalte(String key) {
+        return columns.stream().filter(c -> c.getKey().equals(key)).findFirst().orElse(null);
+    }
+
+    /**
+     * Uebernimmt den eingetragenen Wert fuer die zuletzt gezogene Spalte. Zu kleine Werte werden
+     * verworfen statt beanstandet — wie an dieser Stelle immer, haelt ein Wert das Formular nicht
+     * auf. Nach dem Uebernehmen klappt das Feld wieder zu; die Tabelle zeigt den Wert sofort,
+     * die DataTables-ColumnMeta wird mitgesetzt, sonst ginge die gezogene Breite bis zum Neuladen
+     * vor ({@link TableKomponenten#metaBreiteSetzen}).
+     */
+    public void breiteFixUebernehmen(String tabelle) {
+        if (breiteFixSpalte == null || spalte(breiteFixSpalte) == null
+                || breiteFixWert == null || breiteFixWert < MIN_SPALTE_PX) {
+            log.debug("[TableSettings:{}] breiteFixUebernehmen | verworfen | spalte={} | wert={}",
+                    page, breiteFixSpalte, breiteFixWert);
             return;
         }
-        state.getColumnWidths().put(key, breite + "px");
-        // Eine gesetzte Gesamtbreite waere jetzt falsch — die Tabelle folgt
-        // wieder der Summe ihrer Spalten.
-        state.setTotalWidth(null);
+        state.getColumnWidths().put(breiteFixSpalte, breiteFixWert + "px");
+        breiteFixOffen = false;
         persist();
+        UIData data = tabelleFinden(tabelle);
+        if (data != null) {
+            TableKomponenten.metaBreiteSetzen(data, this::keyFromHeader, breiteFixSpalte, breiteFixWert + "px");
+        }
         growl(text("meldung.breiteGespeichert"));
     }
 
@@ -855,115 +880,6 @@ public class TableSettings implements Serializable {
      */
     public ResourceBundle getTexte() {
         return TableSettingsTexte.bundle();
-    }
-
-    /** Gesamtbreite fuer das Eingabefeld; ohne eigene Angabe die aktuelle Summe als Vorschlag. */
-    public Integer getGesamtBreite() {
-        Integer gesetzt = state.getTotalWidth();
-        if (gesetzt != null && gesetzt >= MIN_GESAMT_PX) {
-            return gesetzt;
-        }
-        return spaltenSumme();
-    }
-
-    /**
-     * Zu schmale Werte werden verworfen statt beanstandet: eine Fehlermeldung an einem Feld, das
-     * nur die Anzeige einstellt, haelt das ganze Formular auf — und der Benutzer wollte hier
-     * nichts abschicken, sondern nur schieben.
-     */
-    public void setGesamtBreite(Integer breite) {
-        if (breite == null || breite < MIN_GESAMT_PX) {
-            state.setTotalWidth(null);
-            return;
-        }
-        state.setTotalWidth(breite);
-    }
-
-    public void onGesamtBreiteChange() {
-        persist();
-    }
-
-    /** Zielbreite fuer den Knopf im Spaltenkopf; ohne Angabe die schmalste sichtbare Spalte. */
-    public Integer getZielSpaltenBreite() {
-        Integer gesetzt = state.getTargetColumnWidth();
-        if (gesetzt != null && gesetzt >= MIN_SPALTE_PX) {
-            return gesetzt;
-        }
-        int schmalste = Integer.MAX_VALUE;
-        for (TableColumn column : columns) {
-            if (isVisible(column.getKey())) {
-                schmalste = Math.min(schmalste, breiteVon(column));
-            }
-        }
-        return schmalste == Integer.MAX_VALUE ? MIN_SPALTE_PX : schmalste;
-    }
-
-    public void setZielSpaltenBreite(Integer breite) {
-        state.setTargetColumnWidth(breite == null || breite < MIN_SPALTE_PX ? null : breite);
-    }
-
-    public void onZielSpaltenBreiteChange() {
-        persist();
-    }
-
-    /**
-     * Weicht die eingetippte Gesamtbreite von dem ab, was die Spalten ergeben?
-     * Danach richtet sich, was der Knopf daneben tut.
-     */
-    public boolean isBreiteAbweichend() {
-        Integer gesetzt = state.getTotalWidth();
-        return gesetzt != null && gesetzt >= MIN_GESAMT_PX && gesetzt != spaltenSumme();
-    }
-
-    public String getBreitenKnopfText() {
-        return isBreiteAbweichend() ? text("breiten.knopf.setzen") : text("breiten.knopf.rechnen");
-    }
-
-    /** Ein Knopf, zwei Aufgaben — je nachdem, ob eine abweichende Breite dasteht. */
-    public void breitenKnopfGedrueckt() {
-        if (isBreiteAbweichend()) {
-            breiteAufSpaltenVerteilen();
-        } else {
-            state.setTotalWidth(null);
-            persist();
-            growl(text("meldung.gesamtbreiteFolgt"));
-        }
-    }
-
-    /**
-     * Rechnet alle sichtbaren Spalten proportional auf die eingetragene Gesamtbreite um; keine
-     * faellt dabei unter {@value #MIN_SPALTE_PX} px.
-     */
-    void breiteAufSpaltenVerteilen() {
-        Integer ziel = state.getTotalWidth();
-        Map<String, Integer> sichtbar = new LinkedHashMap<>();
-        for (TableColumn column : columns) {
-            if (isVisible(column.getKey())) {
-                sichtbar.put(column.getKey(), breiteVon(column));
-            }
-        }
-        TableKomponenten.Verteilung v = ziel == null ? null : TableKomponenten.verteilen(sichtbar, ziel, MIN_SPALTE_PX);
-        if (v == null) {
-            return;
-        }
-        v.breiten().forEach((key, breite) -> state.getColumnWidths().put(key, breite + "px"));
-        if (v.summe() > ziel) {
-            // Die Untergrenze hat die Rechnung gesprengt: der Wert im Feld
-            // waere gelogen, also folgt die Breite wieder den Spalten.
-            state.setTotalWidth(null);
-            growl(text("meldung.zuSchmal", ziel, v.amMinimum(), v.summe()));
-        } else {
-            growl(text("meldung.verteilt", ziel));
-        }
-        persist();
-    }
-
-    /** Alle Spaltenbreiten auf die Vorgaben der Seite zuruecksetzen. */
-    public void resetColumnWidths() {
-        state.getColumnWidths().clear();
-        state.setTotalWidth(null);
-        persist();
-        growl(text("meldung.breitenReset"));
     }
 
     // ── Paginator und Seitengroesse (Karte 1336) ───────────────────────────
@@ -1265,8 +1181,6 @@ public class TableSettings implements Serializable {
         }
         state.setColumnWidths(new LinkedHashMap<>(profile.getColumnWidths()));
         state.setColumnVisible(new LinkedHashMap<>(profile.getColumnVisible()));
-        state.setTotalWidth(profile.getTotalWidth());
-        state.setTargetColumnWidth(profile.getTargetColumnWidth());
         state.setPaginatorTop(profile.getPaginatorTop());
         state.setPaginatorBottom(profile.getPaginatorBottom());
         state.setRowsPerPage(profile.getRowsPerPage());
@@ -1371,8 +1285,6 @@ public class TableSettings implements Serializable {
         TableColumnProfile profile = new TableColumnProfile();
         profile.setColumnWidths(new LinkedHashMap<>(state.getColumnWidths()));
         profile.setColumnVisible(new LinkedHashMap<>(state.getColumnVisible()));
-        profile.setTotalWidth(state.getTotalWidth());
-        profile.setTargetColumnWidth(state.getTargetColumnWidth());
         profile.setPaginatorTop(state.getPaginatorTop());
         profile.setPaginatorBottom(state.getPaginatorBottom());
         profile.setRowsPerPage(state.getRowsPerPage());

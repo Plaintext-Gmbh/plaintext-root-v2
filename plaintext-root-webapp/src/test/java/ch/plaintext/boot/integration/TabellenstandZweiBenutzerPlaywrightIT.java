@@ -70,6 +70,7 @@ class TabellenstandZweiBenutzerPlaywrightIT {
     private static final String ANNA = "pw-tabelle-anna";
     private static final String BRUNO = "pw-tabelle-bruno";
     private static final String CARLA = "pw-tabelle-carla";   // Runde 7, eigener Stand
+    private static final String DORA = "pw-tabelle-dora";     // Karte 2160, Breite fix
     private static final String PASSWORT = "Playwright-2026!";
 
     /** Ablageschluessel: Mandant + "/" + Seitenschluessel von MyUserBackingBean. */
@@ -105,6 +106,7 @@ class TabellenstandZweiBenutzerPlaywrightIT {
         benutzerAnlegen(ANNA);
         benutzerAnlegen(BRUNO);
         benutzerAnlegen(CARLA);
+        benutzerAnlegen(DORA);
     }
 
     private void benutzerAnlegen(String name) {
@@ -286,6 +288,92 @@ TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder()
             assertTrue(zurueck.indexOf("Benutzername") < zurueck.indexOf("Vorname"),
                     "Doppelklick stellt die Reihenfolge nicht ohne Neuladen her: " + zurueck);
         }
+    }
+
+    /**
+     * Karte 2160: Doppelklick auf den Modus-Knopf im Modus «Vergroessern» klappt das Feld fuer eine
+     * exakte Breite im Ansicht-Reiter auf (Ziel = zuletzt gezogene Spalte); der eingetragene Wert
+     * landet im Profil und wirkt nach dem Reload am Tabellenkopf.
+     */
+    @Test
+    @DisplayName("Karte 2160: Doppelklick im Resize-Modus -> Breite-Feld -> Wert wirkt nach Reload")
+    void breiteFixPerDoppelklick() {
+        try (BrowserContext d = neuerKontext()) {
+            Page seite = benutzerverwaltung(d, DORA);
+            seite.click("#fm\\:anz-oeffnen");
+            seite.locator(".pt-ts-panel").waitFor();
+            assertEquals("2", seite.locator("#fm\\:anz-modus").getAttribute("data-pt-modus"),
+                    "Vorgabe = Resize (Modus 2)");
+
+            // Spalte «Vorname» im Tabellenkopf ziehen -> onColumnResize speichert und merkt sie.
+            resizerZiehen(seite, "Vorname", 40);
+            TableState gezogen = warteAufStand(seite, DORA,
+                    st -> st.getColumnWidths().get("vorname") != null);
+            int gezogeneBreite = Math.round(Float.parseFloat(
+                    gezogen.getColumnWidths().get("vorname").replace("px", "").trim()));
+
+            // Doppelklick auf den Modus-Knopf -> Feld im Ansicht-Reiter, 1. Reiter aktiv, Vorschlag = gezogene Breite.
+            // Das Eingabefeld liegt IM TabView (NamingContainer) — seine Client-Id traegt eine Stufe,
+            // deshalb greift der Test per CSS-Klasse wie bei der Reihenfolge-Liste.
+            seite.locator("#fm\\:anz-modus").dblclick();
+            seite.waitForTimeout(1500);
+            System.out.println("DBG2160 " + seite.evaluate("""
+                    () => JSON.stringify({breiteFixFn: typeof window.anzBreiteFix,
+                        modusFn: typeof window.anzModusWechseln,
+                        attr: (document.querySelector('.pt-ts-modus') || {}).getAttribute ? document.querySelector('.pt-ts-modus').getAttribute('data-pt-modus') : null,
+                        gruppeDa: !!document.querySelector('.pt-ts-breite-fix'),
+                        eingabeDa: !!document.querySelector('.pt-ts-breite-fix-wert')})
+                    """));
+            Locator feld = seite.locator(".pt-ts-breite-fix-wert");
+            feld.waitFor();
+            assertTrue(seite.locator(".pt-ts-panel .ui-tabs-header[aria-selected='true'], "
+                            + ".pt-ts-panel li.ui-state-active").innerText().contains("Ansicht"),
+                    "Der 1. Reiter (Ansicht) muss nach dem Doppelklick aktiv sein");
+            assertEquals(gezogeneBreite, Integer.parseInt(feld.inputValue()),
+                    "Vorschlag muss die gezogene Breite der zuletzt gezogenen Spalte sein");
+
+            // Exakten Wert eintragen und uebernehmen: Stand, Profil und Tabellenkopf zeigen ihn sofort.
+            feld.fill("222");
+            seite.click(".pt-ts-breite-fix-uebernehmen");
+            TableState fix = warteAufStand(seite, DORA, st -> "222px".equals(st.getColumnWidths().get("vorname")));
+            assertEquals("222px", fix.getProfiles().get(fix.getActiveProfile()).getColumnWidths().get("vorname"),
+                    "Der Wert muss im aktiven Profil landen");
+            assertEquals(222, thBreite(seite, "Vorname"), "Tabellenkopf zeigt die Breite nicht direkt");
+
+            // «Breite wirkt nach Reload»: frische Session-Ansicht, kein PF-ColumnMeta mehr im Spiel.
+            seite.reload();
+            seite.locator("#fm\\:tbl").waitFor();
+            assertEquals(222, thBreite(seite, "Vorname"), "Breite wirkt nach dem Reload nicht");
+        }
+    }
+
+    /** Die am Tabellenkopf gerenderte Breite der Spalte, in px gerundet (fehlt sie, -1). */
+    private static int thBreite(Page seite, String spalte) {
+        Locator th = seite.locator("#fm\\:tbl thead th:has(.ui-column-title:text-is('" + spalte + "'))");
+        String width = th.getAttribute("width");
+        if (width == null || width.isBlank()) {
+            width = th.getAttribute("style");   // PF 16 schreibt die Breite teils ins style-Attribut
+        }
+        if (width == null) {
+            return -1;
+        }
+        var m = java.util.regex.Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*px").matcher(width);
+        return m.find() ? Math.round(Float.parseFloat(m.group(1))) : -1;
+    }
+
+    /** Zieht den Resize-Griff der Spalte um {@code px} nach rechts und loest damit den colResize-Ajax aus. */
+    private static void resizerZiehen(Page seite, String spalte, int px) {
+        Locator resizer = seite.locator("#fm\\:tbl thead th:has(.ui-column-title:text-is('" + spalte + "')) .ui-column-resizer");
+        resizer.waitFor();
+        var box = resizer.boundingBox();
+        assertNotNull(box, "Resize-Griff der Spalte " + spalte + " sichtbar");
+        double x = box.x + box.width / 2;
+        double y = box.y + box.height / 2;
+        seite.mouse().move(x, y);
+        seite.mouse().down();
+        seite.mouse().move(x + px, y, new com.microsoft.playwright.Mouse.MoveOptions().setSteps(10));
+        seite.waitForTimeout(300);
+        seite.mouse().up();
     }
 
     /**

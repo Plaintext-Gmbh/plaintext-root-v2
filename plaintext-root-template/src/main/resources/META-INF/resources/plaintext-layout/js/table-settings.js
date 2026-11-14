@@ -6,6 +6,8 @@
  * Runde 7 (Karte 1853): der Klick auf das Viereck im Kopf (Spalte auf die Zielbreite setzen,
  * Karte 1336) ist mit dem Reiter «Breiten» weggefallen - die Wiederholbarkeit, fuer die er da
  * war, liefert jetzt der feste Stand (Ansicht festhalten, Doppelklick auf den Modus-Knopf).
+ * Karte 2160: Gesamt-/Zielbreite samt Java entfernt; der Doppelklick im Modus «Vergroessern»
+ * oeffnet stattdessen das Feld fuer eine exakte Breite (Ansicht-Reiter, remoteCommand BreiteFix).
  *
  * WARUM ALS EIGENE DATEI (Welle 4, CSP ohne 'unsafe-inline'):
  * Solange irgendwo ein Inline-<script> steht, muss die Content-Security-Policy
@@ -49,12 +51,14 @@
     }
 
     /*
-     * Modus-Knopf (Runde 7, Punkt 3): Klick wechselt den Modus, Doppelklick stellt den festen
-     * Stand her. Der Klick wartet kurz, ob ein zweiter folgt - sonst wechselte ein Doppelklick
-     * zuerst zweimal den Modus. Beide laufen ueber p:remoteCommand des Tags
-     * (<settingsId>ModusWechseln / <settingsId>FesterStand); die settingsId steht in der Id des
-     * Knopfs (<settingsId>-modus). Delegation am document: der Knopf wird bei jedem Wechsel neu
-     * gerendert.
+     * Modus-Knopf (Runde 7, Punkt 3; Karte 2160 erweitert): Klick wechselt den Modus,
+     * Doppelklick stellt im Modus «Verschieben»/«Anpassen» den festen Stand her — im Modus
+     * «Vergroessern» (data-pt-modus=2) oeffnet er stattdessen das Feld fuer eine exakte Breite
+     * im Ansicht-Reiter. Der Klick wartet kurz, ob ein zweiter folgt - sonst wechselte ein
+     * Doppelklick zuerst zweimal den Modus. Beide Aktionen laufen ueber p:remoteCommand des Tags
+     * (<settingsId>ModusWechseln / <settingsId>FesterStand / <settingsId>BreiteFix); die
+     * settingsId steht in der Id des Knopfs (<settingsId>-modus). Delegation am document:
+     * der Knopf wird bei jedem Wechsel neu gerendert.
      */
     var modusWartet = null;
     document.addEventListener('click', function (e) {
@@ -67,7 +71,8 @@
         if (modusWartet) {
             clearTimeout(modusWartet);
             modusWartet = null;
-            aufrufen(settingsId + 'FesterStand');
+            aufrufen(knopf.getAttribute('data-pt-modus') === '2'
+                    ? settingsId + 'BreiteFix' : settingsId + 'FesterStand');
             return;
         }
         modusWartet = setTimeout(function () {

@@ -165,28 +165,6 @@ class TableSettingsTest {
     }
 
     @Test
-    @DisplayName("Gesamtbreite verteilen: proportional, aber keine Spalte unter dem Minimum")
-    void breiteVerteilen() {
-        anzeige.setGesamtBreite(540);
-        assertThat(anzeige.isBreiteAbweichend()).isTrue();
-        anzeige.breitenKnopfGedrueckt();
-        // name 160/270*540 = 320, team 110/270*540 = 220
-        assertThat(anzeige.getState().getColumnWidths())
-                .containsEntry("name", "320px")
-                .containsEntry("team", "220px");
-    }
-
-    @Test
-    @DisplayName("Zu schmale Gesamtbreite laesst die Tabelle wieder den Spalten folgen")
-    void zuSchmaleGesamtbreiteWirdVerworfen() {
-        anzeige.setGesamtBreite(50);
-
-        assertThat(anzeige.getState().getTotalWidth()).isNull();
-        assertThat(anzeige.isBreiteAbweichend()).isFalse();
-        assertThat(anzeige.getTabellenBreite()).isEqualTo("width: 351px;");
-    }
-
-    @Test
     @DisplayName("Jede Aenderung landet in der Ablage — unter dem Seitenschluessel")
     void persistiertUnterSeite() {
         anzeige.persist();
@@ -335,7 +313,6 @@ class TableSettingsTest {
     void festerStandFesthaltenUndHerstellen() {
         anzeige.getState().getColumnWidths().put("name", "180px");
         anzeige.getState().setColumnOrder(java.util.List.of("team", "name", "extra"));
-        anzeige.getState().setTotalWidth(900);
         assertThat(anzeige.isFesterStandErfasst()).isFalse();
 
         anzeige.festerStandErfassen();
@@ -343,17 +320,15 @@ class TableSettingsTest {
         assertThat(anzeige.getState().getProfiles().get(TableSettings.PROFILE_DEFAULT).getFesterStand())
                 .isEqualTo(anzeige.getState().getFesterStand());
 
-        // verstellen: andere Breite, neue Spalte mit Breite, andere Reihenfolge, keine Gesamtbreite
+        // verstellen: andere Breite, neue Spalte mit Breite, andere Reihenfolge
         anzeige.getState().getColumnWidths().put("name", "300px");
         anzeige.getState().getColumnWidths().put("team", "77px");
         anzeige.getState().setColumnOrder(java.util.List.of("extra", "name", "team"));
-        anzeige.getState().setTotalWidth(null);
 
         anzeige.festerStandHerstellen(":fm:tbl");
 
         assertThat(anzeige.getState().getColumnWidths()).containsExactly(java.util.Map.entry("name", "180px"));
         assertThat(anzeige.getState().getColumnOrder()).containsExactly("team", "name", "extra");
-        assertThat(anzeige.getState().getTotalWidth()).isEqualTo(900);
 
         // Der feste Stand bleibt unberuehrt, wenn danach weiter gezogen wird.
         anzeige.getState().getColumnWidths().put("name", "222px");
@@ -406,7 +381,7 @@ class TableSettingsTest {
     @DisplayName("text(): Bundle-Aufloesung mit Locale, Fallback ohne Faces-Kontext")
     void textAusBundle() {
         assertThat(anzeige.text("meldung.reihenfolgeGeaendert")).isEqualTo("Spaltenreihenfolge wurde geändert.");
-        assertThat(anzeige.text("meldung.verteilt", 540)).isEqualTo("Spalten auf 540 px verteilt.");
+        assertThat(anzeige.text("meldung.breiteGespeichert")).isEqualTo("Spaltenbreite wurde gespeichert.");
         assertThat(anzeige.text("gibts.nicht")).isEqualTo("gibts.nicht");   // Fallback: der Schluessel
     }
 
@@ -506,17 +481,8 @@ class TableSettingsTest {
     }
 
     @Test
-    @DisplayName("Ausgelagerte Rechnungen (Runde 7): Verteilen hebt aufs Minimum, from/to verschiebt")
+    @DisplayName("Ausgelagerte Rechnungen: from/to verschiebt (verteilen ist mit Karte 2160 weggefallen)")
     void ausgelagerteRechnungen() {
-        java.util.Map<String, Integer> sichtbar = new java.util.LinkedHashMap<>();
-        sichtbar.put("a", 100);
-        sichtbar.put("b", 300);
-        TableKomponenten.Verteilung v = TableKomponenten.verteilen(sichtbar, 120, 44);
-        assertThat(v.breiten()).containsExactly(java.util.Map.entry("a", 44), java.util.Map.entry("b", 90));
-        assertThat(v.amMinimum()).isEqualTo(1);
-        assertThat(v.summe()).isEqualTo(134);
-        assertThat(TableKomponenten.verteilen(new java.util.LinkedHashMap<>(), 500, 44)).isNull();
-
         org.primefaces.event.ReorderEvent event = Mockito.mock(org.primefaces.event.ReorderEvent.class);
         Mockito.when(event.getFromIndex()).thenReturn(2);
         Mockito.when(event.getToIndex()).thenReturn(0);

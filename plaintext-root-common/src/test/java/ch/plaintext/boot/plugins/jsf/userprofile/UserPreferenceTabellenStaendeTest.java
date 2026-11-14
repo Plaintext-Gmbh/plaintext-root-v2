@@ -50,8 +50,6 @@ class UserPreferenceTabellenStaendeTest {
         stand.getColumnVisible().put("nr", true);
         stand.getColumnVisible().put("typ", false);
         stand.getColumnWidths().put("nr", "88px");
-        stand.setTotalWidth(1200);
-        stand.setTargetColumnWidth(140);
         stand.setColsExpanded(true);
         stand.setActiveProfile("Breit");
         stand.setPaginatorTop(false);          // Karte 1336
@@ -62,10 +60,9 @@ class UserPreferenceTabellenStaendeTest {
         TableColumnProfile profil = new TableColumnProfile();
         profil.getColumnWidths().put("nr", "88px");
         profil.getColumnVisible().put("typ", false);
-        profil.setTotalWidth(1200);
         profil.setPaginatorBottom(false);
         profil.setRowsPerPage(3000);
-        FesterStand fest = new FesterStand(Map.of("nr", "90px"), List.of("nr", "typ"), 900);   // Karte 1853 R7
+        FesterStand fest = new FesterStand(Map.of("nr", "90px"), List.of("nr", "typ"));   // Karte 1853 R7
         stand.setFesterStand(fest);
         profil.setFesterStand(fest);
         stand.getProfiles().put("Breit", profil);
@@ -89,13 +86,10 @@ class UserPreferenceTabellenStaendeTest {
         assertThat(geladen).isNotNull();
         assertThat(geladen.getColumnVisible()).containsEntry("nr", true).containsEntry("typ", false);
         assertThat(geladen.getColumnWidths()).containsEntry("nr", "88px");
-        assertThat(geladen.getTotalWidth()).isEqualTo(1200);
-        assertThat(geladen.getTargetColumnWidth()).isEqualTo(140);
         assertThat(geladen.isColsExpanded()).isTrue();
         assertThat(geladen.getActiveProfile()).isEqualTo("Breit");
         assertThat(geladen.getProfiles()).containsKey("Breit");
         assertThat(geladen.getProfiles().get("Breit").getColumnWidths()).containsEntry("nr", "88px");
-        assertThat(geladen.getProfiles().get("Breit").getTotalWidth()).isEqualTo(1200);
         // Karte 1336: Paginator und Seitengroesse, am Stand und im Profil; nie gesetzt bleibt null.
         assertThat(geladen.getPaginatorTop()).isFalse();
         assertThat(geladen.getPaginatorBottom()).isNull();
@@ -142,5 +136,40 @@ class UserPreferenceTabellenStaendeTest {
         TableState geladen = ((UserPreference) gelesen).getTabellenStaende().get("guild42/guild-member");
         assertThat(geladen).isNotNull();
         assertThat(geladen.getColumnWidths()).containsEntry("nr", "88px");
+    }
+
+    @Test
+    @DisplayName("Karte 2160: Alt-Stände mit totalWidth/targetColumnWidth (Stand, Profil, fester Stand) laden weiter")
+    void altfelderDerBreitenkarteWerdenUeberlesen() {
+        TableState stand = new TableState();
+        stand.getColumnWidths().put("nr", "88px");
+        stand.setColsExpanded(true);
+        TableColumnProfile profil = new TableColumnProfile();
+        profil.getColumnWidths().put("nr", "120px");
+        stand.getProfiles().put("Breit", profil);
+        stand.setFesterStand(new FesterStand(Map.of("nr", "90px"), List.of("nr", "typ")));
+
+        UserPreference pref = new UserPreference();
+        pref.setUniqueId("daniel@plaintext.ch");
+        pref.getTabellenStaende().put("guild42/guild-member", stand);
+        String json = converter.convertToDatabaseColumn(pref);
+
+        // Die Felder aus der Zeit vor Karte 2160 in ALLE drei Ebenen injizieren: der Stand, das
+        // Profil und der feste Stand tragen je ein columnWidths-Map — der Ersetzungspunkt.
+        // (Hier KEINE Zukunftsfelder: genau diese Namen existierten bis 3.31.0 wirklich.)
+        String alt = json.replace("\"columnWidths\"",
+                "\"totalWidth\":1000,\"targetColumnWidth\":120,\"columnWidths\"");
+        assertThat(alt).isNotEqualTo(json);
+
+        SimpleStorable gelesen = converter.convertToEntityAttribute(alt);
+
+        assertThat(gelesen).as("Altstand mit Breiten-Feldern muss lesbar bleiben").isInstanceOf(UserPreference.class);
+        TableState geladen = ((UserPreference) gelesen).getTabellenStaende().get("guild42/guild-member");
+        assertThat(geladen).isNotNull();
+        assertThat(geladen.getColumnWidths()).containsEntry("nr", "88px");
+        assertThat(geladen.getProfiles()).containsKey("Breit");
+        assertThat(geladen.getProfiles().get("Breit").getColumnWidths()).containsEntry("nr", "120px");
+        assertThat(geladen.getFesterStand())
+                .isEqualTo(new FesterStand(Map.of("nr", "90px"), List.of("nr", "typ")));
     }
 }

@@ -89,33 +89,37 @@ final class TableKomponenten {
         }
     }
 
-    /** Ergebnis von {@link #verteilen}: neue Breiten, wie viele auf das Minimum gehoben wurden, Summe. */
-    record Verteilung(Map<String, Integer> breiten, int amMinimum, int summe) {
-    }
-
     /**
-     * Rechnet die sichtbaren Spaltenbreiten proportional auf {@code ziel} um; keine faellt unter
-     * {@code minimum}. {@code null}, wenn nichts zu verteilen ist. Aus TableSettings ausgelagert
-     * (Groessen-Leitplanke, Karte 1853 Runde 7), Rechnung unveraendert.
+     * Schreibt eine Breite in die {@link ColumnMeta} der Spalte (Karte 2160): die DataTable
+     * haelt eine gezogene Breite in ihrem View-State, und der Renderer laesst sie gegenueber dem
+     * {@code width}-Attribut der Spalte gewinnen — ein per Panel eingetragener exakter Wert
+     * bliebe sonst bis zum Neuladen unsichtbar. Die Spalte wird ueber den Kopftext gesucht
+     * (derselbe Aufloeser wie beim Resize), der Breitenwert inkl. Einheit geschrieben.
      */
-    static Verteilung verteilen(Map<String, Integer> sichtbar, int ziel, int minimum) {
-        int alt = sichtbar.values().stream().mapToInt(Integer::intValue).sum();
-        if (sichtbar.isEmpty() || alt <= 0) {
-            return null;
+    static void metaBreiteSetzen(UIData data, UnaryOperator<String> keyFromHeader, String key, String breite) {
+        if (!(data instanceof UITable<?> tabelle)) {
+            return;
         }
-        Map<String, Integer> breiten = new LinkedHashMap<>();
-        int summe = 0;
-        int amMinimum = 0;
-        for (Map.Entry<String, Integer> e : sichtbar.entrySet()) {
-            int neu = Math.round((float) e.getValue() * ziel / alt);
-            if (neu < minimum) {
-                neu = minimum;
-                amMinimum++;
+        String columnKey = null;
+        for (UIColumn spalte : tabelle.getColumns()) {
+            if (spalte.getHeaderText() != null && key.equals(keyFromHeader.apply(spalte.getHeaderText()))) {
+                columnKey = spalte.getColumnKey();
+                break;
             }
-            breiten.put(e.getKey(), neu);
-            summe += neu;
         }
-        return new Verteilung(breiten, amMinimum, summe);
+        Map<String, ColumnMeta> alt = tabelle.getColumnMeta();
+        if (columnKey == null || alt == null) {
+            return;
+        }
+        String treffer = columnKey;
+        Map<String, ColumnMeta> neu = new HashMap<>();
+        alt.forEach((metaKey, meta) -> {
+            ColumnMeta kopie = new ColumnMeta(meta.getColumnKey());
+            kopie.setWidth(metaKey.equals(treffer) ? breite : meta.getWidth());
+            kopie.setVisible(meta.getVisible());
+            neu.put(metaKey, kopie);
+        });
+        tabelle.setColumnMeta(neu);
     }
 
     /**
@@ -196,18 +200,5 @@ final class TableKomponenten {
         }
         kinder.clear();
         kinder.addAll(gemischt);
-    }
-
-    /** Zahl aus einem Meldeparameter, oder {@code null} wenn unbrauchbar oder unter {@code minimum}. */
-    static Integer zuBreite(String roh, int minimum) {
-        if (roh == null || roh.isBlank()) {
-            return null;
-        }
-        try {
-            int wert = Math.round(Float.parseFloat(roh.trim()));
-            return wert >= minimum ? wert : null;
-        } catch (NumberFormatException e) {
-            return null;
-        }
     }
 }

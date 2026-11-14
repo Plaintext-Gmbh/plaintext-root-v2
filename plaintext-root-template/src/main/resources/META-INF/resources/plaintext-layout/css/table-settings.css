@@ -535,3 +535,23 @@
     margin-left: 0;
     flex-basis: 100%;
 }
+
+/* Breite fix eintragen (Karte 2160): dieselbe Zeilenanordnung wie der feste Stand darueber. */
+.pt-ts-breite-fix {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--content-border-color, #e2e8f0);
+}
+
+.pt-ts-breite-fix .pt-tablesettings-hint {
+    margin-left: 0;
+    flex-basis: 100%;
+}
+
+.pt-ts-breite-fix .pt-ts-breite-fix-wert {
+    width: 90px;
+}
