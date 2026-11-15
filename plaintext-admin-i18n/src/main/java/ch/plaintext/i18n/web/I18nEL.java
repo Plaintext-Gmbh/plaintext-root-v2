@@ -111,6 +111,21 @@ public class I18nEL {
     }
 
     /**
+     * Wie {@link #t(String)}, aber ohne X_-Platzhalter-Anlage: Ist fuer die Sprache keine
+     * Uebersetzung hinterlegt, wird der Original-Text angezeigt (Karte 2295). Das ist der
+     * richtige Weg fuer Stellen, deren Grundtext selbst ein fachlicher Schluessel ist —
+     * z.B. Mandatsnamen: uebersetzbar per Modul-CSV oder der Admin-UI, aber ohne Eintrag
+     * bleibt der Roh-Name stehen statt eines X_-Praefix.
+     */
+    public String tOrKey(String label) {
+        String uebersetzt = t(label);
+        if (uebersetzt != null && uebersetzt.startsWith("X_") && uebersetzt.substring(2).equals(label)) {
+            return label;
+        }
+        return uebersetzt;
+    }
+
+    /**
      * Language of the logged-in user from {@link UserPreferencesBackingBean}; German when there is no
      * bean, no session or no language set.
      */

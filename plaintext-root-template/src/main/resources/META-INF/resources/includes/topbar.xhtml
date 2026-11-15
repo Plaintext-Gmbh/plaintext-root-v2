@@ -14,10 +14,10 @@
                              src="#{request.contextPath}/api/branding/logo?theme=#{userPreferencesBackingBean.darkMode}"
                              width="#{userPreferencesBackingBean.darkMode == 'dark' ? brandingBean.darkLogoWidth : brandingBean.lightLogoWidth}"
                              height="#{userPreferencesBackingBean.darkMode == 'dark' ? brandingBean.darkLogoHeight : brandingBean.lightLogoHeight}"
-                             alt="Logo" style="object-fit:contain;"/>
+                             alt="#{i18n.t('Logo')}" style="object-fit:contain;"/>
                     </a>
                 </ui:fragment>
-                <a href="#" class="menu-button" aria-label="Menu">
+                <a href="#" class="menu-button" aria-label="#{i18n.t('Menü')}">
                     <i class="pi pi-bars"/>
                 </a>
             </div>
@@ -36,7 +36,7 @@
                            aria-label="#{i18n.t('Suchen… (⌘K)')}"
                            placeholder="#{i18n.t('Suchen… (⌘K)')}"/>
                     <span class="global-search-kbd" aria-hidden="true">⌘K</span>
-                    <button type="button" class="global-search-close" aria-label="Suche schliessen" tabindex="-1">✕</button>
+                    <button type="button" class="global-search-close" aria-label="#{i18n.t('Suche schließen')}" tabindex="-1">✕</button>
                 </div>
                 <div id="global-search-results" class="global-search-results" style="display:none;"
                      role="listbox" aria-label="#{i18n.t('Suchergebnisse')}"/>
@@ -52,7 +52,7 @@
                             <h:form id="impersonationFm" style="margin:0; padding:0; display:inline;">
                                 <p:commandLink actionListener="#{myUserBackingBean.stopImpersonation()}"
                                                update="@none" process="@this"
-                                               title="Impersonation beenden"
+                                               title="#{i18n.t('Impersonation beenden')}"
                                                style="text-decoration:none;">
                                     <i class="topbar-icon pi pi-circle-fill" style="font-size:1.5rem"/>
                                 </p:commandLink>
@@ -66,9 +66,9 @@
                             <h:form id="mandatSwitchForm" style="margin:0;">
                                 <input type="hidden" name="_csrf" value="#{_csrf.token}"/>
                                 <p:selectOneMenu value="#{plaintextSecurity.activeMandat}"
-                                                 style="min-width:160px;" title="Mandant wechseln">
+                                                 style="min-width:160px;" title="#{i18n.t('Mandant wechseln')}">
                                     <f:selectItems value="#{plaintextSecurity.allowedMandate}"
-                                                   var="dt" itemLabel="#{dt}" itemValue="#{dt}"/>
+                                                   var="dt" itemLabel="#{i18n.tOrKey(dt)}" itemValue="#{dt}"/>
                                     <p:ajax event="change" process="@this" update="@none"
                                             oncomplete="sessionStorage.removeItem('openSubmenuLabel'); window.location.reload();"/>
                                 </p:selectOneMenu>
@@ -81,7 +81,7 @@
                          p:ifGranted intern tat (SecurityUtils: ExternalContext.isUserInRole). -->
                     <ui:fragment rendered="#{facesContext.externalContext.isUserInRole('ROLE_ADMIN') or facesContext.externalContext.isUserInRole('ROLE_ROOT')}">
                         <li class="topbar-item">
-                            <a href="useradmin.xhtml" title="Benutzer verwalten">
+                            <a href="useradmin.xhtml" title="#{i18n.t('Benutzer verwalten')}">
                                 <i class="topbar-icon pi pi-users" style="font-size:1.5rem"/>
                             </a>
                         </li>
@@ -89,7 +89,7 @@
 
                     <ui:fragment rendered="#{i18nService != null and i18nService.i18nEnabled}">
                         <li class="topbar-item" style="position: relative;">
-                            <a href="#" id="i18n-lang-button" title="Sprache wechseln"
+                            <a href="#" id="i18n-lang-button" title="#{i18n.t('Sprache wechseln')}"
                                data-pt-dropdown="i18n-lang-dropdown"
                                aria-haspopup="true" aria-expanded="false">
                                 <i class="topbar-icon #{brandingBean.i18nIcon}" style="font-size: 1.5rem; color: var(--primary-color);"/>
@@ -121,7 +121,7 @@
                         <li class="topbar-item" style="position: relative;">
                             <h:form id="notifFm" style="margin:0; padding:0; display:contents;">
                                 <input type="hidden" name="_csrf" value="#{_csrf.token}"/>
-                                <a href="#" id="notif-bell-button" title="Benachrichtigungen"
+                                <a href="#" id="notif-bell-button" title="#{i18n.t('Benachrichtigungen')}"
                                    data-pt-dropdown="notif-dropdown"
                                    aria-haspopup="true" aria-expanded="false">
                                     <i class="topbar-icon pi pi-bell" style="font-size:1.5rem"/>
@@ -146,7 +146,7 @@
                                             </a>
                                             <p:commandLink actionListener="#{notificationTopbarBean.markiereGelesen(n.id)}"
                                                            update="@form" process="@this" rendered="#{n.gelesenAm == null}"
-                                                           title="Als gelesen markieren" style="flex:0 0 auto; padding-top:0.2rem;">
+                                                           title="#{i18n.t('Als gelesen markieren')}" style="flex:0 0 auto; padding-top:0.2rem;">
                                                 <i class="pi pi-check" style="font-size:0.8rem; opacity:0.5;"/>
                                             </p:commandLink>
                                         </li>
@@ -174,7 +174,7 @@
                     </ui:fragment>
 
                     <li class="topbar-item">
-                        <a href="#" id="layout-config-button" title="Einstellungen">
+                        <a href="#" id="layout-config-button" title="#{i18n.t('Einstellungen')}">
                             <i class="topbar-icon pi pi-cog" style="font-size:1.5rem"/>
                         </a>
                     </li>
@@ -206,7 +206,7 @@
                     </li>
 
                     <li class="topbar-item">
-                        <a href="#" title="Abmelden" id="logoutLink" data-pt-logout-form="logoutForm"
+                        <a href="#" title="#{i18n.t('Abmelden')}" id="logoutLink" data-pt-logout-form="logoutForm"
                            style="display:flex; align-items:center; justify-content:center; padding:8px; cursor:pointer;">
                             <i class="topbar-icon pi pi-sign-out" style="font-size:1.5rem"/>
                         </a>
