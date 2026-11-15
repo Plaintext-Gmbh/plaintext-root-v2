@@ -57,7 +57,7 @@
                         <span style="font-size:0.85rem; flex:1;">#{componentTheme.name}</span>
                         <span class="color-delete-btn" data-pt-delete-color="#{componentTheme.file}"
                               style="font-size:0.7rem; color:var(--pt-text-color-secondary); cursor:pointer; padding:2px 4px; opacity:0.5; transition:opacity 0.2s;"
-                              title="Hide color">&#x2715;</span>
+                              title="#{i18n.t('Farbe ausblenden')}">&#x2715;</span>
                     </a>
                 </ui:repeat>
 
@@ -73,7 +73,7 @@
                         <span style="font-size:0.85rem; flex:1;">#{namedColor.name}</span>
                         <span class="color-delete-btn" data-pt-delete-color="#{namedColor.name}"
                               style="font-size:0.7rem; color:var(--pt-text-color-secondary); cursor:pointer; padding:2px 4px; opacity:0.5; transition:opacity 0.2s;"
-                              title="Delete color">&#x2715;</span>
+                              title="#{i18n.t('Farbe löschen')}">&#x2715;</span>
                     </a>
                 </ui:repeat>
 
@@ -91,7 +91,7 @@
                 <div style="display:flex; align-items:center; gap:8px;">
                     <input type="color" id="newColorPicker" value="#4CAF50"
                            style="width:44px; height:44px; min-width:44px; border:none; padding:0; cursor:pointer; border-radius:50%; overflow:hidden; background:transparent; -webkit-appearance:none;" />
-                    <input type="text" id="newColorName" placeholder="Name..."
+                    <input type="text" id="newColorName" placeholder="#{i18n.t('Name')}"
                            style="flex:1; padding:6px 10px; border-radius:6px; border:1px solid var(--pt-surface-border); background:var(--pt-surface-0); color:var(--pt-text-color); font-size:0.85rem; outline:none;" />
                     <a href="#" data-pt-config-aktion="farbe-hinzufuegen-bestaetigen"
                        style="padding:4px 12px; border-radius:6px; background:var(--pt-primary-color); color:var(--pt-primary-color-text); text-decoration:none; font-size:0.85rem; font-weight:500;">OK</a>
