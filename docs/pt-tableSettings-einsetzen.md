@@ -1,10 +1,18 @@
 # `pt:tableSettings` einsetzen — Anleitung für KIs
 
-Stand: Karte 1853, Runde 7 (13.11.2026). Repo: `Plaintext-Gmbh/plaintext-root-v2`
+Stand: Karte 2160 (14.11.2026). Repo: `Plaintext-Gmbh/plaintext-root-v2`
 (Tag + CSS + JS in `plaintext-root-template`, Java in `plaintext-root-tablesettings`).
 
+Karte 2160 (14.11.): Gesamtbreite und Zielspaltenbreite samt Java entfernt
+(`getGesamtBreite`/`getZielSpaltenBreite`/Verteilen/«Breiten zurücksetzen» — alte Stände mit
+diesen Feldern ignoriert die Ablage beim Laden). Neu: **exakte Breite eintragen** — Doppelklick
+auf den Modus-Knopf im Modus «Vergrössern» (Resize) klappt im Ansicht-Reiter ein Feld auf
+(Ziel = zuletzt gezogene Spalte, Vorschlag = ihre Breite; Wert < 44 px wird verworfen). Der
+Wert landet über `persist()` im aktiven Profil. Im Modus «Verschieben»/«Anpassen» stellt der
+Doppelklick weiterhin den festen Stand her (Runde 7).
+
 Runde 7 (13.11.): Reiter «Breiten» entfernt — Breiten zieht man im Modus Resize. Neu im
-Ansicht-Reiter: «Aktuellen Stand festhalten» merkt Breiten, Gesamtbreite und Reihenfolge
+Ansicht-Reiter: «Aktuellen Stand festhalten» merkt Breiten und Reihenfolge
 (`TableState.festerStand`, wandert mit ins Profil); ein **Doppelklick auf den Modus-Knopf**
 stellt die Tabelle genau darauf zurück (`anzeige.festerStandHerstellen(tabelle)`). Modus-Knopf
 heisst «Anpassen»/«Adjust», in diesem Modus outline, sonst gefüllt; Reorder und Resize haben
@@ -44,9 +52,9 @@ Die drei Verdrahtungszeilen an der Tabelle sind Pflicht — ohne sie bleibt der 
 im Panel wirkungslos (das Tag kann fremde Komponenten nur anbieten). Seit Runde 6 (13.11.)
 ist der Schalter ein Dreifach-Umschalter: «Spalten anpassen» (beide aus) -> «Verschieben»
 (draggableColumns an) -> «Vergroessern» (resizableColumns an) -> zurueck. Er setzt genau die
-beiden Eigenschaften, die hier gebunden werden. Breiten wirken, wenn die Seite zusätzlich bindet: `style`/`tableStyle` aus
-`#{anzeige.spaltenBreiteStyle()}` (siehe JavaDoc `TableSettings`), Paginierung wie im
-Tag-Kopfkommentar beschrieben.
+beiden Eigenschaften, die hier gebunden werden. Breiten wirken, wenn die Seite zusätzlich bindet:
+`width="#{anzeige.breite('key')}"` je Spalte und `tableStyle="#{anzeige.tabellenBreite}"`
+(siehe JavaDoc `TableSettings`), Paginierung wie im Tag-Kopfkommentar beschrieben.
 
 ## 2. Das TableSettings-Objekt
 

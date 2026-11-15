@@ -165,28 +165,6 @@ class TableSettingsTest {
     }
 
     @Test
-    @DisplayName("Gesamtbreite verteilen: proportional, aber keine Spalte unter dem Minimum")
-    void breiteVerteilen() {
-        anzeige.setGesamtBreite(540);
-        assertThat(anzeige.isBreiteAbweichend()).isTrue();
-        anzeige.breitenKnopfGedrueckt();
-        // name 160/270*540 = 320, team 110/270*540 = 220
-        assertThat(anzeige.getState().getColumnWidths())
-                .containsEntry("name", "320px")
-                .containsEntry("team", "220px");
-    }
-
-    @Test
-    @DisplayName("Zu schmale Gesamtbreite laesst die Tabelle wieder den Spalten folgen")
-    void zuSchmaleGesamtbreiteWirdVerworfen() {
-        anzeige.setGesamtBreite(50);
-
-        assertThat(anzeige.getState().getTotalWidth()).isNull();
-        assertThat(anzeige.isBreiteAbweichend()).isFalse();
-        assertThat(anzeige.getTabellenBreite()).isEqualTo("width: 351px;");
-    }
-
-    @Test
     @DisplayName("Jede Aenderung landet in der Ablage — unter dem Seitenschluessel")
     void persistiertUnterSeite() {
         anzeige.persist();
@@ -289,42 +267,44 @@ class TableSettingsTest {
     }
 
     @Test
-    @DisplayName("Dreifach-Schalter: anpassen -> Verschieben -> Vergroessern -> anpassen, gespeichert")
+    @DisplayName("Dreifach-Schalter: anpassen -> Verschieben -> Vergroessern -> anpassen, NIE gespeichert (Daniel 15.11.)")
     void modusRotiertUndPersistiert() {
-        assertThat(anzeige.getModus()).isEqualTo(2);   // Vorgabe: Groesse an (bisheriges Verhalten)
-
-        anzeige.modusWechseln();
-        assertThat(anzeige.getModus()).isEqualTo(0);
+        Mockito.clearInvocations(store);   // init() legt das Standardprofil ab — nicht zaehlen
+        assertThat(anzeige.getModus()).isEqualTo(0);   // Start je Anmeldung: neutral = Anpassen
         assertThat(anzeige.isVerschiebenAktiv()).isFalse();
-        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();
 
         anzeige.modusWechseln();
         assertThat(anzeige.getModus()).isEqualTo(1);
         assertThat(anzeige.isVerschiebenAktiv()).isTrue();
-        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();
+        assertThat(anzeige.isGroesseAendernAktiv()).isTrue();   // Griff haengt immer (mitBreiten)
 
         anzeige.modusWechseln();
         assertThat(anzeige.getModus()).isEqualTo(2);
         assertThat(anzeige.isVerschiebenAktiv()).isFalse();
-        assertThat(anzeige.isGroesseAendernAktiv()).isTrue();
 
-        Mockito.verify(store, Mockito.atLeastOnce()).save(eq("testpage"), any(TableState.class));
+        anzeige.modusWechseln();
+        assertThat(anzeige.getModus()).isEqualTo(0);
+
+        // Der Modus geht nicht in den Stand: kein persist() beim Wechsel.
+        Mockito.verify(store, Mockito.never()).save(eq("testpage"), any(TableState.class));
     }
 
     @Test
     @DisplayName("Modus-Label und -Icon folgen dem Zustand")
     void modusLabelUndIcon() {
-        assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.vergroessern"));
-        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrows-h");
-        anzeige.modusWechseln();
         assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.anpassen"));
         assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-sliders-h");
+        anzeige.modusWechseln();
+        assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.verschieben"));
+        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrow-right-arrow-left");
+        anzeige.modusWechseln();
+        assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.vergroessern"));
+        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrows-h");
     }
 
     @Test
     @DisplayName("Runde 7: Modus Verschieben hat ein eigenes Symbol, Resize kein erfundenes")
     void modusIconsExistieren() {
-        anzeige.modusWechseln();   // 2 -> 0
         anzeige.modusWechseln();   // 0 -> 1 Verschieben
         assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrow-right-arrow-left");
         assertThat(anzeige.text("modus.anpassen")).isEqualTo("Anpassen");
@@ -335,7 +315,6 @@ class TableSettingsTest {
     void festerStandFesthaltenUndHerstellen() {
         anzeige.getState().getColumnWidths().put("name", "180px");
         anzeige.getState().setColumnOrder(java.util.List.of("team", "name", "extra"));
-        anzeige.getState().setTotalWidth(900);
         assertThat(anzeige.isFesterStandErfasst()).isFalse();
 
         anzeige.festerStandErfassen();
@@ -343,17 +322,15 @@ class TableSettingsTest {
         assertThat(anzeige.getState().getProfiles().get(TableSettings.PROFILE_DEFAULT).getFesterStand())
                 .isEqualTo(anzeige.getState().getFesterStand());
 
-        // verstellen: andere Breite, neue Spalte mit Breite, andere Reihenfolge, keine Gesamtbreite
+        // verstellen: andere Breite, neue Spalte mit Breite, andere Reihenfolge
         anzeige.getState().getColumnWidths().put("name", "300px");
         anzeige.getState().getColumnWidths().put("team", "77px");
         anzeige.getState().setColumnOrder(java.util.List.of("extra", "name", "team"));
-        anzeige.getState().setTotalWidth(null);
 
         anzeige.festerStandHerstellen(":fm:tbl");
 
         assertThat(anzeige.getState().getColumnWidths()).containsExactly(java.util.Map.entry("name", "180px"));
         assertThat(anzeige.getState().getColumnOrder()).containsExactly("team", "name", "extra");
-        assertThat(anzeige.getState().getTotalWidth()).isEqualTo(900);
 
         // Der feste Stand bleibt unberuehrt, wenn danach weiter gezogen wird.
         anzeige.getState().getColumnWidths().put("name", "222px");
@@ -406,7 +383,7 @@ class TableSettingsTest {
     @DisplayName("text(): Bundle-Aufloesung mit Locale, Fallback ohne Faces-Kontext")
     void textAusBundle() {
         assertThat(anzeige.text("meldung.reihenfolgeGeaendert")).isEqualTo("Spaltenreihenfolge wurde geändert.");
-        assertThat(anzeige.text("meldung.verteilt", 540)).isEqualTo("Spalten auf 540 px verteilt.");
+        assertThat(anzeige.text("meldung.breiteGespeichert")).isEqualTo("Spaltenbreite wurde gespeichert.");
         assertThat(anzeige.text("gibts.nicht")).isEqualTo("gibts.nicht");   // Fallback: der Schluessel
     }
 
@@ -506,17 +483,8 @@ class TableSettingsTest {
     }
 
     @Test
-    @DisplayName("Ausgelagerte Rechnungen (Runde 7): Verteilen hebt aufs Minimum, from/to verschiebt")
+    @DisplayName("Ausgelagerte Rechnungen: from/to verschiebt (verteilen ist mit Karte 2160 weggefallen)")
     void ausgelagerteRechnungen() {
-        java.util.Map<String, Integer> sichtbar = new java.util.LinkedHashMap<>();
-        sichtbar.put("a", 100);
-        sichtbar.put("b", 300);
-        TableKomponenten.Verteilung v = TableKomponenten.verteilen(sichtbar, 120, 44);
-        assertThat(v.breiten()).containsExactly(java.util.Map.entry("a", 44), java.util.Map.entry("b", 90));
-        assertThat(v.amMinimum()).isEqualTo(1);
-        assertThat(v.summe()).isEqualTo(134);
-        assertThat(TableKomponenten.verteilen(new java.util.LinkedHashMap<>(), 500, 44)).isNull();
-
         org.primefaces.event.ReorderEvent event = Mockito.mock(org.primefaces.event.ReorderEvent.class);
         Mockito.when(event.getFromIndex()).thenReturn(2);
         Mockito.when(event.getToIndex()).thenReturn(0);

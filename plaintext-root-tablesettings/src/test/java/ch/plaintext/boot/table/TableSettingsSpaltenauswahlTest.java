@@ -84,15 +84,14 @@ class TableSettingsSpaltenauswahlTest {
     }
 
     @Test
-    @DisplayName("Schalter starten ohne versehentliches Verschieben — Grösse ändern wie bisher an")
+    @DisplayName("Schalter: ohne Modus kein Verschieben — der Verbreitern-Griff hängt immer (mitBreiten)")
     void schalterDefaults() {
         assertThat(anzeige.isVerschiebenAktiv()).isFalse();
         assertThat(anzeige.isGroesseAendernAktiv()).isTrue();
 
-        anzeige.setVerschiebenAktiv(true);
-        anzeige.setGroesseAendernAktiv(false);
+        anzeige.modusWechseln();   // 0 -> 1 Verschieben
         assertThat(anzeige.isVerschiebenAktiv()).isTrue();
-        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();
+        assertThat(anzeige.isGroesseAendernAktiv()).isTrue();
     }
 
     @Test

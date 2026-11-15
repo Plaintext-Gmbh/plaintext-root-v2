@@ -12,21 +12,20 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Ein festgehaltener Spaltenstand: Breiten, Gesamtbreite und Reihenfolge (Karte 1853 Runde 7,
- * Daniel 13.11.). Erfasst im Ansicht-Reiter, wandert mit ins Profil; ein Doppelklick auf den
- * Modus-Knopf stellt die Tabelle genau darauf zurueck.
+ * Ein festgehaltener Spaltenstand: Breiten und Reihenfolge (Karte 1853 Runde 7, Daniel 13.11.;
+ * die Gesamtbreite ist seit Karte 2160 weggefallen). Erfasst im Ansicht-Reiter, wandert mit ins
+ * Profil; ein Doppelklick auf den Modus-Knopf stellt die Tabelle genau darauf zurueck.
  *
  * <p>Kopiert beim Erfassen und beim Anwenden: der laufende Stand aendert sich bei jedem Ziehen,
  * der feste darf das nicht.</p>
  *
  * @param columnWidths Spaltenschluessel -&gt; Breite inkl. Einheit; fehlende = Vorgabe der Seite
  * @param columnOrder  Reihenfolge der Schluessel; {@code null} = Reihenfolge der Seite
- * @param totalWidth   Gesamtbreite; {@code null} = Summe der Spalten
  * @author info@plaintext.ch
  * @since 2026
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record FesterStand(Map<String, String> columnWidths, List<String> columnOrder, Integer totalWidth)
+public record FesterStand(Map<String, String> columnWidths, List<String> columnOrder)
         implements Serializable {
 
     public FesterStand {
@@ -41,13 +40,12 @@ public record FesterStand(Map<String, String> columnWidths, List<String> columnO
      * gezogenen Reihenfolge stehen.
      */
     static FesterStand aus(TableState state, List<String> reihenfolge) {
-        return new FesterStand(state.getColumnWidths(), reihenfolge, state.getTotalWidth());
+        return new FesterStand(state.getColumnWidths(), reihenfolge);
     }
 
-    /** Setzt Breiten, Gesamtbreite und Reihenfolge des laufenden Stands genau auf diesen. */
+    /** Setzt Breiten und Reihenfolge des laufenden Stands genau auf diesen. */
     void anwenden(TableState state) {
         state.setColumnWidths(new LinkedHashMap<>(columnWidths));
         state.setColumnOrder(columnOrder == null ? null : new ArrayList<>(columnOrder));
-        state.setTotalWidth(totalWidth);
     }
 }

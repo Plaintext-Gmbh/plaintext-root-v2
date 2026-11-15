@@ -33,12 +33,6 @@ public class TableColumnProfile implements Serializable {
     /** Spaltenschluessel -&gt; sichtbar. */
     private Map<String, Boolean> columnVisible = new LinkedHashMap<>();
 
-    /** Gesamtbreite der Tabelle in Pixeln, {@code null} = aus den Spalten rechnen. */
-    private Integer totalWidth;
-
-    /** Breite, auf die der Knopf im Spaltenkopf eine einzelne Spalte setzt. */
-    private Integer targetColumnWidth;
-
     /**
      * Paginator oben/unten und Zeilen pro Seite (Karte 1336). Ein Profil aus der Zeit davor hat
      * hier {@code null} — angewendet ergibt das wieder das Verhalten der Seite ohne Einstellung.

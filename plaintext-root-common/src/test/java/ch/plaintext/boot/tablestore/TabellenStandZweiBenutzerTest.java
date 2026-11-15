@@ -86,8 +86,8 @@ class TabellenStandZweiBenutzerTest {
         TableSettings a = sitzung("anna@guild42.ch");
         a.setVisibleColumns(List.of("nr", "name", "notiz"));        // typ aus, notiz an
         a.persist();
-        a.setGesamtBreite(1000);
-        a.breitenKnopfGedrueckt();                                   // Breiten proportional verteilt
+        a.getState().getColumnWidths().put("nr", "300px");          // statt Gesamtbreite verteilen (Karte 2160)
+        a.persist();
         a.setPaginatorOben(false);
         a.onPaginatorChange(null);
         a.setSeitengroesse(1000);
@@ -122,7 +122,7 @@ class TabellenStandZweiBenutzerTest {
         assertThat(aNeu).isNotSameAs(a);
         assertThat(aNeu.getVisibleColumns()).containsExactly("nr", "name", "notiz");
         assertThat(aNeu.widthStyle("nr")).isEqualTo(breiteNrBeiA);
-        assertThat(aNeu.getGesamtBreite()).isEqualTo(1000);
+        assertThat(aNeu.widthStyle("nr")).isEqualTo("width:300px;");
         assertThat(aNeu.getPaginatorPosition()).isEqualTo("bottom");
         assertThat(aNeu.getRows()).isEqualTo(1000);
         assertThat(aNeu.getProfileNames()).containsExactlyInAnyOrder(TableSettings.PROFILE_DEFAULT, "Buchhaltung");

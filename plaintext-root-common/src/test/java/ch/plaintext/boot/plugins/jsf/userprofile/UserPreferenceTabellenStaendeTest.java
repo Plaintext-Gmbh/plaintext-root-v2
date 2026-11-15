@@ -50,22 +50,17 @@ class UserPreferenceTabellenStaendeTest {
         stand.getColumnVisible().put("nr", true);
         stand.getColumnVisible().put("typ", false);
         stand.getColumnWidths().put("nr", "88px");
-        stand.setTotalWidth(1200);
-        stand.setTargetColumnWidth(140);
         stand.setColsExpanded(true);
         stand.setActiveProfile("Breit");
         stand.setPaginatorTop(false);          // Karte 1336
         stand.setRowsPerPage(1000);
         stand.setColumnOrder(List.of("typ", "nr", "name"));   // Karte 1853
-        stand.setMoveEnabled(true);                           // Karte 1853
-        stand.setResizeEnabled(false);                        // Karte 1853
         TableColumnProfile profil = new TableColumnProfile();
         profil.getColumnWidths().put("nr", "88px");
         profil.getColumnVisible().put("typ", false);
-        profil.setTotalWidth(1200);
         profil.setPaginatorBottom(false);
         profil.setRowsPerPage(3000);
-        FesterStand fest = new FesterStand(Map.of("nr", "90px"), List.of("nr", "typ"), 900);   // Karte 1853 R7
+        FesterStand fest = new FesterStand(Map.of("nr", "90px"), List.of("nr", "typ"));   // Karte 1853 R7
         stand.setFesterStand(fest);
         profil.setFesterStand(fest);
         stand.getProfiles().put("Breit", profil);
@@ -77,6 +72,9 @@ class UserPreferenceTabellenStaendeTest {
 
         String json = converter.convertToDatabaseColumn(pref);
         assertThat(json).isNotNull().startsWith("{").contains("tabellenStaende").contains("guild42/guild-member");
+        // Daniel 15.11. (Karte 2160): der Modus wird nie gespeichert — die Schalter der
+        // Runde 6/7 duerfen im JSON nicht mehr auftauchen.
+        assertThat(json).doesNotContain("moveEnabled", "resizeEnabled");
 
         SimpleStorable gelesen = converter.convertToEntityAttribute(json);
         assertThat(gelesen).isInstanceOf(UserPreference.class);
@@ -89,21 +87,18 @@ class UserPreferenceTabellenStaendeTest {
         assertThat(geladen).isNotNull();
         assertThat(geladen.getColumnVisible()).containsEntry("nr", true).containsEntry("typ", false);
         assertThat(geladen.getColumnWidths()).containsEntry("nr", "88px");
-        assertThat(geladen.getTotalWidth()).isEqualTo(1200);
-        assertThat(geladen.getTargetColumnWidth()).isEqualTo(140);
         assertThat(geladen.isColsExpanded()).isTrue();
         assertThat(geladen.getActiveProfile()).isEqualTo("Breit");
         assertThat(geladen.getProfiles()).containsKey("Breit");
         assertThat(geladen.getProfiles().get("Breit").getColumnWidths()).containsEntry("nr", "88px");
-        assertThat(geladen.getProfiles().get("Breit").getTotalWidth()).isEqualTo(1200);
         // Karte 1336: Paginator und Seitengroesse, am Stand und im Profil; nie gesetzt bleibt null.
         assertThat(geladen.getPaginatorTop()).isFalse();
         assertThat(geladen.getPaginatorBottom()).isNull();
         assertThat(geladen.getRowsPerPage()).isEqualTo(1000);
-        // Karte 1853: Reihenfolge und Schalter ueberleben den Konverter (Default-Typing inklusive).
+        // Karte 1853: Reihenfolge ueberlebt den Konverter (Default-Typing inklusive). Der Modus
+        // (bis 3.31.0 moveEnabled/resizeEnabled) wird seit Daniel 15.11. (Karte 2160) nicht
+        // mehr gespeichert — siehe altfelderDerBreitenkarteWerdenUeberlesen.
         assertThat(geladen.getColumnOrder()).containsExactly("typ", "nr", "name");
-        assertThat(geladen.getMoveEnabled()).isTrue();
-        assertThat(geladen.getResizeEnabled()).isFalse();
         assertThat(geladen.getProfiles().get("Breit").getPaginatorBottom()).isFalse();
         assertThat(geladen.getProfiles().get("Breit").getPaginatorTop()).isNull();
         assertThat(geladen.getProfiles().get("Breit").getRowsPerPage()).isEqualTo(3000);
@@ -142,5 +137,44 @@ class UserPreferenceTabellenStaendeTest {
         TableState geladen = ((UserPreference) gelesen).getTabellenStaende().get("guild42/guild-member");
         assertThat(geladen).isNotNull();
         assertThat(geladen.getColumnWidths()).containsEntry("nr", "88px");
+    }
+
+    @Test
+    @DisplayName("Karte 2160: Alt-Stände mit totalWidth/targetColumnWidth (Stand, Profil, fester Stand) laden weiter")
+    void altfelderDerBreitenkarteWerdenUeberlesen() {
+        TableState stand = new TableState();
+        stand.getColumnWidths().put("nr", "88px");
+        stand.setColsExpanded(true);
+        TableColumnProfile profil = new TableColumnProfile();
+        profil.getColumnWidths().put("nr", "120px");
+        stand.getProfiles().put("Breit", profil);
+        stand.setFesterStand(new FesterStand(Map.of("nr", "90px"), List.of("nr", "typ")));
+
+        UserPreference pref = new UserPreference();
+        pref.setUniqueId("daniel@plaintext.ch");
+        pref.getTabellenStaende().put("guild42/guild-member", stand);
+        String json = converter.convertToDatabaseColumn(pref);
+
+        // Die Felder aus der Zeit vor Karte 2160 in ALLE drei Ebenen injizieren: der Stand, das
+        // Profil und der feste Stand tragen je ein columnWidths-Map — der Ersetzungspunkt.
+        // (Hier KEINE Zukunftsfelder: genau diese Namen existierten bis 3.31.0 wirklich.)
+        // Daniel 15.11.: dazu die Modus-Schalter der Runde 6/7 — der Modus wird nicht mehr
+        // gespeichert, Alt-Staende und Profile mit ihnen muessen trotzdem laden.
+        String alt = json.replace("\"columnWidths\"",
+                "\"totalWidth\":1000,\"targetColumnWidth\":120,\"columnWidths\"");
+        alt = alt.replace("\"colsExpanded\"",
+                "\"moveEnabled\":true,\"resizeEnabled\":false,\"colsExpanded\"");
+        assertThat(alt).isNotEqualTo(json);
+
+        SimpleStorable gelesen = converter.convertToEntityAttribute(alt);
+
+        assertThat(gelesen).as("Altstand mit Breiten-Feldern muss lesbar bleiben").isInstanceOf(UserPreference.class);
+        TableState geladen = ((UserPreference) gelesen).getTabellenStaende().get("guild42/guild-member");
+        assertThat(geladen).isNotNull();
+        assertThat(geladen.getColumnWidths()).containsEntry("nr", "88px");
+        assertThat(geladen.getProfiles()).containsKey("Breit");
+        assertThat(geladen.getProfiles().get("Breit").getColumnWidths()).containsEntry("nr", "120px");
+        assertThat(geladen.getFesterStand())
+                .isEqualTo(new FesterStand(Map.of("nr", "90px"), List.of("nr", "typ")));
     }
 }

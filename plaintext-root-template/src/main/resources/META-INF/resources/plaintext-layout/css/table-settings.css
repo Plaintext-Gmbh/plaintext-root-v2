@@ -344,6 +344,19 @@
     flex: 0 1 auto;
 }
 
+/* Daniel 15.11.: der Modus-Knopf («Adjust») wohnt zuoberst im Panel ueber die ganze
+   Breite — mit einem Trennstrich vor der Profilzeile. */
+.pt-ts-kopfzeile .pt-ts-schalterzeile {
+    flex: 1 1 100%;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--content-border-color, #e2e8f0);
+    margin-bottom: 8px;
+}
+
+.pt-ts-kopfzeile .pt-ts-schalterzeile .pt-ts-modus {
+    width: 100%;
+}
+
 .pt-ts-kopfzeile .pt-ts-profilzeile {
     margin-left: auto;
 }
@@ -534,4 +547,24 @@
 .pt-ts-fester-stand .pt-tablesettings-hint {
     margin-left: 0;
     flex-basis: 100%;
+}
+
+/* Breite fix eintragen (Karte 2160): dieselbe Zeilenanordnung wie der feste Stand darueber. */
+.pt-ts-breite-fix {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--content-border-color, #e2e8f0);
+}
+
+.pt-ts-breite-fix .pt-tablesettings-hint {
+    margin-left: 0;
+    flex-basis: 100%;
+}
+
+.pt-ts-breite-fix .pt-ts-breite-fix-wert {
+    width: 90px;
 }

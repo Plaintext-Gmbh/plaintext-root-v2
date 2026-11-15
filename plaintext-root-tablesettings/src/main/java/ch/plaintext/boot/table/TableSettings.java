@@ -112,9 +112,10 @@ import java.util.stream.Collectors;
  * }</pre>
  *
  * <p><b>Herkunft der Breiten-Rechnerei.</b> Sie stammt aus einer einzelnen, sehr breiten
- * Projektuebersicht und ist dort teuer erkauft worden; die Begruendungen zu Gesamtbreite,
- * Zielbreite und proportionalem Umrechnen stehen bei den jeweiligen Methoden. Wer sie liest,
- * bevor er etwas vereinfacht, spart sich den Weg ein zweites Mal.</p>
+ * Projektuebersicht und ist dort teuer erkauft worden; die Begruendung zu
+ * {@link #getTabellenBreite()} steht bei der Methode. Gesamtbreite, Zielbreite und proportionales
+ * Umrechnen sind mit Karte 2160 weggefallen — Breiten zieht man im Modus «Vergröessern», einen
+ * exakten Wert trägt man im Panel ein (Doppelklick auf den Modus-Knopf im Resize-Modus).</p>
  *
  * @author info@plaintext.ch
  * @since 2026
@@ -129,9 +130,6 @@ public class TableSettings implements Serializable {
 
     /** Schmalste Spalte in Pixeln, damit nichts unlesbar zusammenfaellt. */
     private static final int MIN_SPALTE_PX = 44;
-
-    /** Unter dieser Gesamtbreite ist die Tabelle nicht mehr bedienbar. */
-    private static final int MIN_GESAMT_PX = 200;
 
     /** Zeilen pro Seite, wenn die Seite keine eigene Vorgabe nennt — dieselbe wie {@code pt:table}. */
     public static final int VORGABE_ZEILEN = 20;
@@ -651,27 +649,29 @@ public class TableSettings implements Serializable {
         TableKomponenten.kinderOrdnen(data, state.getColumnOrder(), this::keyFromHeader);
     }
 
-    // ── Modus-Dreifach-Schalter (Karte 1853, Runde 6, Daniel 13.11.) ─────────
+    // ── Modus-Dreifach-Schalter (Karte 1853 Runde 6; Daniel 15.11.: nie speichern) ─
 
     /**
-     * Der Modus des Dreifach-Schalters: 0 = «Spalten anpassen» (beide aus), 1 = «Verschieben»
-     * (Spaltenkoepfe ziehbar), 2 = «Vergroessern» (Spaltenbreiten ziehbar). Die Seite bindet
-     * weiterhin draggableColumns/resizableColumns an {@link #isVerschiebenAktiv()} und
-     * {@link #isGroesseAendernAktiv()} — der Schalter setzt genau diese beiden Stellungen.
+     * Der Modus des Dreifach-Schalters, SITZUNGSEIGENSCHAFT: 0 = «Anpassen» (Start je Anmeldung,
+     * Daniel 15.11. 08:18 — «welcher der 3 Zustaende aktiv ist … nicht speichern, immer starten
+     * mit neutral also Adjust»), 1 = «Verschieben» (Spaltenkoepfe ziehbar), 2 = «Vergroessern».
+     * Resize haengt nicht mehr am Modus, sondern ist auf Seiten mit Breiten dauerhaft an
+     * ({@link #isGroesseAendernAktiv()}) — sonst waere der Verbreitern-Griff mit immer
+     * zurueckgesetztem Modus nie sichtbar (Daniel: «wird aktuell gar nicht angezeigt — fixen»).
+     */
+    private int modus;
+
+    /**
+     * Der Modus des Dreifach-Schalters: 0 = «Spalten anpassen», 1 = «Verschieben»
+     * (Spaltenkoepfe ziehbar), 2 = «Vergroessern». Sitzungseigenschaft — wird nie gespeichert.
      */
     public int getModus() {
-        if (isVerschiebenAktiv()) {
-            return 1;
-        }
-        return isGroesseAendernAktiv() ? 2 : 0;
+        return modus;
     }
 
-    /** Ein Klick rotiert: anpassen (0) -> Verschieben (1) -> Vergroessern (2) -> anpassen (0). */
+    /** Ein Klick rotiert: anpassen (0) -> Verschieben (1) -> Vergroessern (2) -> anpassen (0). Speichert nichts. */
     public void modusWechseln() {
-        int naechster = (getModus() + 1) % 3;
-        state.setMoveEnabled(naechster == 1);
-        state.setResizeEnabled(naechster == 2);
-        persist();
+        modus = (modus + 1) % 3;
     }
 
     /** Label des Dreifach-Schalters je Modus — Weiterleitung an {@link TableSettingsTexte}. */
@@ -718,28 +718,16 @@ public class TableSettings implements Serializable {
 
     /** Schalter «Verschieben»: duerfen die Spaltenkoepfe per Ziehen umgeordnet werden? Vorgabe: aus. */
     public boolean isVerschiebenAktiv() {
-        return Boolean.TRUE.equals(state.getMoveEnabled());
+        return modus == 1;
     }
 
-    public void setVerschiebenAktiv(boolean aktiv) {
-        state.setMoveEnabled(aktiv);
-    }
-
-    public void onVerschiebenChange() {
-        persist();
-    }
-
-    /** Schalter «Grösse aendern»: duerfen Spaltenbreiten gezogen werden? Vorgabe: an (bisheriges Verhalten). */
+    /**
+     * Schalter «Groesse aendern»: der Verbreitern-Griff haengt auf Seiten mit Spaltenbreiten
+     * immer (Daniel 15.11.) — nicht mehr abhaengig vom Modus, der seitdem nie gespeichert wird
+     * und je Anmeldung mit «Anpassen» startet.
+     */
     public boolean isGroesseAendernAktiv() {
-        return !Boolean.FALSE.equals(state.getResizeEnabled());
-    }
-
-    public void setGroesseAendernAktiv(boolean aktiv) {
-        state.setResizeEnabled(aktiv);
-    }
-
-    public void onGroesseAendernChange() {
-        persist();
+        return mitBreiten;
     }
 
     // ── Breiten ─────────────────────────────────────────────────────────────
@@ -776,17 +764,10 @@ public class TableSettings implements Serializable {
      * Tabellenbreite, die der Summe entspricht, macht sie wieder verbindlich.</p>
      */
     public String getTabellenBreite() {
-        if (!mitBreiten) {
-            return "";
-        }
-        Integer gesetzt = state.getTotalWidth();
-        if (gesetzt != null && gesetzt >= MIN_GESAMT_PX) {
-            return "width: " + gesetzt + "px;";
-        }
-        return "width: " + spaltenSumme() + "px;";
+        return mitBreiten ? "width: " + spaltenSumme() + "px;" : "";
     }
 
-    /** Summe der Spalten, die wirklich in der Tabelle stehen, ohne eine von Hand gesetzte Gesamtbreite. */
+    /** Summe der Spalten, die wirklich in der Tabelle stehen. */
     public int spaltenSumme() {
         int summe = 0;
         for (TableColumn column : columns) {
@@ -809,30 +790,85 @@ public class TableSettings implements Serializable {
             return;
         }
         state.getColumnWidths().put(key, event.getWidth() + "px");
+        breiteFixSpalte = key;
         persist();
         growl(text("meldung.breiteGeaendert"));
         log.debug("[TableSettings:{}] onColumnResize | column={} | width={}px", page, key, event.getWidth());
     }
 
+    // ── Breite fix eintragen (Karte 2160; Daniel 15.11.: Doppelklick auf den Verbreitern-Griff) ─
+
     /**
-     * Breite einer Spalte, die der Setzen-Knopf im Spaltenkopf meldet
-     * (Request-Parameter {@code sp} = Kopftext, {@code px} = Breite).
+     * Die Spalte, deren Breite exakt einzutragen ist — gesetzt vom Doppelklick auf den
+     * Resize-Griff ihres Kopfes ({@link #breiteFixOeffnen(String)}) oder als zuletzt gezogene
+     * ({@link #onColumnResize}). {@code null}, solange nichts gewaehlt wurde; das Feld zeigt
+     * dann einen Hinweis statt der Eingabe.
      */
-    public void onSpaltenbreiteGemeldet() {
+    @Getter
+    private String breiteFixSpalte;
+
+    /** Der eingetragene Wert fuer {@link #breiteFixUebernehmen(String)}. */
+    @Getter
+    @Setter
+    private Integer breiteFixWert;
+
+    /**
+     * Doppelklick auf den Verbreitern-Griff: das Skript (js/table-settings.js) meldet die
+     * Position des Kopfes als {@code kopf}-Parameter; die Spalte dazu wird ueber
+     * {@link TableKomponenten#kopfKey} aufgeloest und der aktuellen Breite vorbesetzt.
+     * Ohne Aufloesung bleibt die zuletzt gezogene Spalte das Ziel (Zug im Kopf vor dem
+     * Doppelklick). Das Feld steht dauerhaft im Ansicht-Reiter — es gibt nichts aufzuklappen.
+     */
+    public void breiteFixOeffnen(String tabelle) {
         Map<String, String> params = FacesContext.getCurrentInstance()
                 .getExternalContext().getRequestParameterMap();
-        String key = keyFromHeader(params.get("sp"));
-        Integer breite = TableKomponenten.zuBreite(params.get("px"), MIN_SPALTE_PX);
-        if (key == null || breite == null) {
-            log.debug("[TableSettings:{}] onSpaltenbreiteGemeldet | verworfen | sp={} | px={}",
-                    page, params.get("sp"), params.get("px"));
+        String kopf = params.get("kopf");
+        int index = -1;
+        if (kopf != null) {
+            try {
+                index = Integer.parseInt(kopf.trim());
+            } catch (NumberFormatException e) { // NOSONAR - ungueltiger Parameter: Ziel bleibt die gezogene Spalte
+                log.debug("[TableSettings:{}] breiteFixOeffnen | kopf ungueltig | {}", page, kopf);
+            }
+        }
+        if (index >= 0) {
+            UIData data = tabelleFinden(tabelle);
+            String key = data == null ? null
+                    : TableKomponenten.kopfKey(data, this::keyFromHeader, index);
+            if (key != null) {
+                breiteFixSpalte = key;
+            }
+        }
+        TableColumn ziel = breiteFixSpalte == null ? null : spalte(breiteFixSpalte);
+        breiteFixWert = ziel == null ? null : breiteVon(ziel);
+    }
+
+    /** Die Zielspalte als Column; {@code null} bei unbekanntem Schluessel (Sitzungsreste). */
+    private TableColumn spalte(String key) {
+        return columns.stream().filter(c -> c.getKey().equals(key)).findFirst().orElse(null);
+    }
+
+    /**
+     * Uebernimmt den eingetragenen Wert fuer die gewaehlte Spalte — ausgeloest vom change-Event
+     * des Eingabefelds, ein Save-Button existiert nicht (Daniel 15.11.: «immer speichern bei
+     * jeder Aktion»). Zu kleine Werte werden verworfen statt beanstandet — wie an dieser Stelle
+     * immer, haelt ein Wert das Formular nicht auf. Die Tabelle zeigt den Wert sofort, die
+     * DataTables-ColumnMeta wird mitgesetzt, sonst ginge die gezogene Breite bis zum Neuladen
+     * vor ({@link TableKomponenten#metaBreiteSetzen}).
+     */
+    public void breiteFixUebernehmen(String tabelle) {
+        if (breiteFixSpalte == null || spalte(breiteFixSpalte) == null
+                || breiteFixWert == null || breiteFixWert < MIN_SPALTE_PX) {
+            log.debug("[TableSettings:{}] breiteFixUebernehmen | verworfen | spalte={} | wert={}",
+                    page, breiteFixSpalte, breiteFixWert);
             return;
         }
-        state.getColumnWidths().put(key, breite + "px");
-        // Eine gesetzte Gesamtbreite waere jetzt falsch — die Tabelle folgt
-        // wieder der Summe ihrer Spalten.
-        state.setTotalWidth(null);
+        state.getColumnWidths().put(breiteFixSpalte, breiteFixWert + "px");
         persist();
+        UIData data = tabelleFinden(tabelle);
+        if (data != null) {
+            TableKomponenten.metaBreiteSetzen(data, this::keyFromHeader, breiteFixSpalte, breiteFixWert + "px");
+        }
         growl(text("meldung.breiteGespeichert"));
     }
 
@@ -855,115 +891,6 @@ public class TableSettings implements Serializable {
      */
     public ResourceBundle getTexte() {
         return TableSettingsTexte.bundle();
-    }
-
-    /** Gesamtbreite fuer das Eingabefeld; ohne eigene Angabe die aktuelle Summe als Vorschlag. */
-    public Integer getGesamtBreite() {
-        Integer gesetzt = state.getTotalWidth();
-        if (gesetzt != null && gesetzt >= MIN_GESAMT_PX) {
-            return gesetzt;
-        }
-        return spaltenSumme();
-    }
-
-    /**
-     * Zu schmale Werte werden verworfen statt beanstandet: eine Fehlermeldung an einem Feld, das
-     * nur die Anzeige einstellt, haelt das ganze Formular auf — und der Benutzer wollte hier
-     * nichts abschicken, sondern nur schieben.
-     */
-    public void setGesamtBreite(Integer breite) {
-        if (breite == null || breite < MIN_GESAMT_PX) {
-            state.setTotalWidth(null);
-            return;
-        }
-        state.setTotalWidth(breite);
-    }
-
-    public void onGesamtBreiteChange() {
-        persist();
-    }
-
-    /** Zielbreite fuer den Knopf im Spaltenkopf; ohne Angabe die schmalste sichtbare Spalte. */
-    public Integer getZielSpaltenBreite() {
-        Integer gesetzt = state.getTargetColumnWidth();
-        if (gesetzt != null && gesetzt >= MIN_SPALTE_PX) {
-            return gesetzt;
-        }
-        int schmalste = Integer.MAX_VALUE;
-        for (TableColumn column : columns) {
-            if (isVisible(column.getKey())) {
-                schmalste = Math.min(schmalste, breiteVon(column));
-            }
-        }
-        return schmalste == Integer.MAX_VALUE ? MIN_SPALTE_PX : schmalste;
-    }
-
-    public void setZielSpaltenBreite(Integer breite) {
-        state.setTargetColumnWidth(breite == null || breite < MIN_SPALTE_PX ? null : breite);
-    }
-
-    public void onZielSpaltenBreiteChange() {
-        persist();
-    }
-
-    /**
-     * Weicht die eingetippte Gesamtbreite von dem ab, was die Spalten ergeben?
-     * Danach richtet sich, was der Knopf daneben tut.
-     */
-    public boolean isBreiteAbweichend() {
-        Integer gesetzt = state.getTotalWidth();
-        return gesetzt != null && gesetzt >= MIN_GESAMT_PX && gesetzt != spaltenSumme();
-    }
-
-    public String getBreitenKnopfText() {
-        return isBreiteAbweichend() ? text("breiten.knopf.setzen") : text("breiten.knopf.rechnen");
-    }
-
-    /** Ein Knopf, zwei Aufgaben — je nachdem, ob eine abweichende Breite dasteht. */
-    public void breitenKnopfGedrueckt() {
-        if (isBreiteAbweichend()) {
-            breiteAufSpaltenVerteilen();
-        } else {
-            state.setTotalWidth(null);
-            persist();
-            growl(text("meldung.gesamtbreiteFolgt"));
-        }
-    }
-
-    /**
-     * Rechnet alle sichtbaren Spalten proportional auf die eingetragene Gesamtbreite um; keine
-     * faellt dabei unter {@value #MIN_SPALTE_PX} px.
-     */
-    void breiteAufSpaltenVerteilen() {
-        Integer ziel = state.getTotalWidth();
-        Map<String, Integer> sichtbar = new LinkedHashMap<>();
-        for (TableColumn column : columns) {
-            if (isVisible(column.getKey())) {
-                sichtbar.put(column.getKey(), breiteVon(column));
-            }
-        }
-        TableKomponenten.Verteilung v = ziel == null ? null : TableKomponenten.verteilen(sichtbar, ziel, MIN_SPALTE_PX);
-        if (v == null) {
-            return;
-        }
-        v.breiten().forEach((key, breite) -> state.getColumnWidths().put(key, breite + "px"));
-        if (v.summe() > ziel) {
-            // Die Untergrenze hat die Rechnung gesprengt: der Wert im Feld
-            // waere gelogen, also folgt die Breite wieder den Spalten.
-            state.setTotalWidth(null);
-            growl(text("meldung.zuSchmal", ziel, v.amMinimum(), v.summe()));
-        } else {
-            growl(text("meldung.verteilt", ziel));
-        }
-        persist();
-    }
-
-    /** Alle Spaltenbreiten auf die Vorgaben der Seite zuruecksetzen. */
-    public void resetColumnWidths() {
-        state.getColumnWidths().clear();
-        state.setTotalWidth(null);
-        persist();
-        growl(text("meldung.breitenReset"));
     }
 
     // ── Paginator und Seitengroesse (Karte 1336) ───────────────────────────
@@ -1265,8 +1192,6 @@ public class TableSettings implements Serializable {
         }
         state.setColumnWidths(new LinkedHashMap<>(profile.getColumnWidths()));
         state.setColumnVisible(new LinkedHashMap<>(profile.getColumnVisible()));
-        state.setTotalWidth(profile.getTotalWidth());
-        state.setTargetColumnWidth(profile.getTargetColumnWidth());
         state.setPaginatorTop(profile.getPaginatorTop());
         state.setPaginatorBottom(profile.getPaginatorBottom());
         state.setRowsPerPage(profile.getRowsPerPage());
@@ -1371,8 +1296,6 @@ public class TableSettings implements Serializable {
         TableColumnProfile profile = new TableColumnProfile();
         profile.setColumnWidths(new LinkedHashMap<>(state.getColumnWidths()));
         profile.setColumnVisible(new LinkedHashMap<>(state.getColumnVisible()));
-        profile.setTotalWidth(state.getTotalWidth());
-        profile.setTargetColumnWidth(state.getTargetColumnWidth());
         profile.setPaginatorTop(state.getPaginatorTop());
         profile.setPaginatorBottom(state.getPaginatorBottom());
         profile.setRowsPerPage(state.getRowsPerPage());
