@@ -123,6 +123,29 @@ final class TableKomponenten {
     }
 
     /**
+     * Der Spaltenschluessel zur Position des Kopfes (Karte 2160, Daniel 15.11.): der Doppelklick
+     * auf den Resize-Griff meldet die Position des {@code th} in der Kopfzeile — die Seiten
+     * vergeben den Spalten keine Ids (z.B. guild member.xhtml). Gezaehlt wird ueber die
+     * GERENDERTEN Spalten, dieselbe Annahme wie beim colReorder. {@code null} ohne Treffer.
+     */
+    static String kopfKey(UIData data, UnaryOperator<String> keyFromHeader, int index) {
+        if (!(data instanceof UITable<?> tabelle) || index < 0) {
+            return null;
+        }
+        int sichtbar = -1;
+        for (UIColumn spalte : tabelle.getColumns()) {
+            if (!spalte.isRendered()) {
+                continue;
+            }
+            sichtbar++;
+            if (sichtbar == index && spalte.getHeaderText() != null) {
+                return keyFromHeader.apply(spalte.getHeaderText());
+            }
+        }
+        return null;
+    }
+
+    /**
      * Rueckfall fuer colReorder mit from/to (Indizes ueber die sichtbaren Spalten): die neue
      * sichtbare Reihenfolge, {@code null} ohne gueltige Verschiebung. Aus TableSettings ausgelagert.
      */

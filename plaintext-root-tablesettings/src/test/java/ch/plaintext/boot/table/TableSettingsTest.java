@@ -267,42 +267,44 @@ class TableSettingsTest {
     }
 
     @Test
-    @DisplayName("Dreifach-Schalter: anpassen -> Verschieben -> Vergroessern -> anpassen, gespeichert")
+    @DisplayName("Dreifach-Schalter: anpassen -> Verschieben -> Vergroessern -> anpassen, NIE gespeichert (Daniel 15.11.)")
     void modusRotiertUndPersistiert() {
-        assertThat(anzeige.getModus()).isEqualTo(2);   // Vorgabe: Groesse an (bisheriges Verhalten)
-
-        anzeige.modusWechseln();
-        assertThat(anzeige.getModus()).isEqualTo(0);
+        Mockito.clearInvocations(store);   // init() legt das Standardprofil ab — nicht zaehlen
+        assertThat(anzeige.getModus()).isEqualTo(0);   // Start je Anmeldung: neutral = Anpassen
         assertThat(anzeige.isVerschiebenAktiv()).isFalse();
-        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();
 
         anzeige.modusWechseln();
         assertThat(anzeige.getModus()).isEqualTo(1);
         assertThat(anzeige.isVerschiebenAktiv()).isTrue();
-        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();
+        assertThat(anzeige.isGroesseAendernAktiv()).isTrue();   // Griff haengt immer (mitBreiten)
 
         anzeige.modusWechseln();
         assertThat(anzeige.getModus()).isEqualTo(2);
         assertThat(anzeige.isVerschiebenAktiv()).isFalse();
-        assertThat(anzeige.isGroesseAendernAktiv()).isTrue();
 
-        Mockito.verify(store, Mockito.atLeastOnce()).save(eq("testpage"), any(TableState.class));
+        anzeige.modusWechseln();
+        assertThat(anzeige.getModus()).isEqualTo(0);
+
+        // Der Modus geht nicht in den Stand: kein persist() beim Wechsel.
+        Mockito.verify(store, Mockito.never()).save(eq("testpage"), any(TableState.class));
     }
 
     @Test
     @DisplayName("Modus-Label und -Icon folgen dem Zustand")
     void modusLabelUndIcon() {
-        assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.vergroessern"));
-        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrows-h");
-        anzeige.modusWechseln();
         assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.anpassen"));
         assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-sliders-h");
+        anzeige.modusWechseln();
+        assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.verschieben"));
+        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrow-right-arrow-left");
+        anzeige.modusWechseln();
+        assertThat(anzeige.getModusLabel()).isEqualTo(anzeige.text("modus.vergroessern"));
+        assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrows-h");
     }
 
     @Test
     @DisplayName("Runde 7: Modus Verschieben hat ein eigenes Symbol, Resize kein erfundenes")
     void modusIconsExistieren() {
-        anzeige.modusWechseln();   // 2 -> 0
         anzeige.modusWechseln();   // 0 -> 1 Verschieben
         assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrow-right-arrow-left");
         assertThat(anzeige.text("modus.anpassen")).isEqualTo("Anpassen");

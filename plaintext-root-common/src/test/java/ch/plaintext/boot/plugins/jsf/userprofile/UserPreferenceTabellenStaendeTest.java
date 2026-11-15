@@ -55,8 +55,6 @@ class UserPreferenceTabellenStaendeTest {
         stand.setPaginatorTop(false);          // Karte 1336
         stand.setRowsPerPage(1000);
         stand.setColumnOrder(List.of("typ", "nr", "name"));   // Karte 1853
-        stand.setMoveEnabled(true);                           // Karte 1853
-        stand.setResizeEnabled(false);                        // Karte 1853
         TableColumnProfile profil = new TableColumnProfile();
         profil.getColumnWidths().put("nr", "88px");
         profil.getColumnVisible().put("typ", false);
@@ -74,6 +72,9 @@ class UserPreferenceTabellenStaendeTest {
 
         String json = converter.convertToDatabaseColumn(pref);
         assertThat(json).isNotNull().startsWith("{").contains("tabellenStaende").contains("guild42/guild-member");
+        // Daniel 15.11. (Karte 2160): der Modus wird nie gespeichert — die Schalter der
+        // Runde 6/7 duerfen im JSON nicht mehr auftauchen.
+        assertThat(json).doesNotContain("moveEnabled", "resizeEnabled");
 
         SimpleStorable gelesen = converter.convertToEntityAttribute(json);
         assertThat(gelesen).isInstanceOf(UserPreference.class);
@@ -94,10 +95,10 @@ class UserPreferenceTabellenStaendeTest {
         assertThat(geladen.getPaginatorTop()).isFalse();
         assertThat(geladen.getPaginatorBottom()).isNull();
         assertThat(geladen.getRowsPerPage()).isEqualTo(1000);
-        // Karte 1853: Reihenfolge und Schalter ueberleben den Konverter (Default-Typing inklusive).
+        // Karte 1853: Reihenfolge ueberlebt den Konverter (Default-Typing inklusive). Der Modus
+        // (bis 3.31.0 moveEnabled/resizeEnabled) wird seit Daniel 15.11. (Karte 2160) nicht
+        // mehr gespeichert — siehe altfelderDerBreitenkarteWerdenUeberlesen.
         assertThat(geladen.getColumnOrder()).containsExactly("typ", "nr", "name");
-        assertThat(geladen.getMoveEnabled()).isTrue();
-        assertThat(geladen.getResizeEnabled()).isFalse();
         assertThat(geladen.getProfiles().get("Breit").getPaginatorBottom()).isFalse();
         assertThat(geladen.getProfiles().get("Breit").getPaginatorTop()).isNull();
         assertThat(geladen.getProfiles().get("Breit").getRowsPerPage()).isEqualTo(3000);
@@ -157,8 +158,12 @@ class UserPreferenceTabellenStaendeTest {
         // Die Felder aus der Zeit vor Karte 2160 in ALLE drei Ebenen injizieren: der Stand, das
         // Profil und der feste Stand tragen je ein columnWidths-Map — der Ersetzungspunkt.
         // (Hier KEINE Zukunftsfelder: genau diese Namen existierten bis 3.31.0 wirklich.)
+        // Daniel 15.11.: dazu die Modus-Schalter der Runde 6/7 — der Modus wird nicht mehr
+        // gespeichert, Alt-Staende und Profile mit ihnen muessen trotzdem laden.
         String alt = json.replace("\"columnWidths\"",
                 "\"totalWidth\":1000,\"targetColumnWidth\":120,\"columnWidths\"");
+        alt = alt.replace("\"colsExpanded\"",
+                "\"moveEnabled\":true,\"resizeEnabled\":false,\"colsExpanded\"");
         assertThat(alt).isNotEqualTo(json);
 
         SimpleStorable gelesen = converter.convertToEntityAttribute(alt);

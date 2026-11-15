@@ -95,19 +95,6 @@ public class TableState implements Serializable {
     private List<String> columnOrder;
 
     /**
-     * Schalter «Verschieben» (draggableColumns): duerfen die Spaltenkoepfe per Ziehen
-     * umgeordnet werden? {@code null} = aus — damit startet die Tabelle ohne versehentliches
-     * Verschieben, wie der Schalter es will (Karte 1853).
-     */
-    private Boolean moveEnabled;
-
-    /**
-     * Schalter «Groesse aendern» (resizableColumns): duerfen die Spaltenbreiten gezogen werden?
-     * {@code null} = an — so verhaelt sich der Bestand vor dem Schalter (Karte 1853).
-     */
-    private Boolean resizeEnabled;
-
-    /**
      * Festgehaltener Spaltenstand (Karte 1853 Runde 7): im Ansicht-Reiter erfasst, per Doppelklick
      * auf den Modus-Knopf wiederhergestellt. {@code null} = keiner erfasst.
      */

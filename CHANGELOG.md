@@ -13,11 +13,13 @@ exhaustive.
 ## [Unreleased]
 
 ### Added
-- **pt:tableSettings: exakte Breite per Doppelklick** (Karte 2160). Ein Doppelklick auf den Dreifach-Modus-Knopf im
-  Modus «Vergrössern» (Resize) klappt im Ansicht-Reiter ein Eingabefeld auf — Ziel ist die zuletzt gezogene Spalte,
-  der Vorschlag ihre aktuelle Breite; der eingetragene Wert (unter 44 px wird verworfen) wandert über `persist()`
-  ins aktive Profil und wirkt am Tabellenkopf auch nach dem Reload. Im Modus «Verschieben»/«Anpassen» stellt der
-  Doppelklick weiterhin den festen Stand her (Runde 7). Playwright-validiert auf `useradmin.xhtml`.
+- **pt:tableSettings: exakte Breite per Doppelklick auf den Verbreitern-Griff** (Karte 2160). Ein Doppelklick auf
+  das ↔-Viereck im Kopf einer Spalte (Daniel 15.11. — ersetzt die Zwischenlösung über den Modus-Knopf vom 14.11.)
+  wählt diese Spalte und öffnet das Panel am Griff: das Eingabefeld im Ansicht-Reiter (dauerhaft sichtbar beim
+  «Fester Stand»-Block, Vorschlag = aktuelle Breite) speichert beim Verlassen ohne Übernehmen-Knopf — der Wert
+  (unter 44 px wird verworfen) wandert über `persist()` ins aktive Profil und wirkt am Tabellenkopf auch nach dem
+  Reload. Der Doppelklick auf den Modus-Knopf stellt durchgehend den festen Stand her (Runde 7).
+  Playwright-validiert auf `useradmin.xhtml`.
 - **File store type «Lokale Datei» (`LOKAL`)** (Karte 2096): `ch.plaintext.boot.ablage.LokaleDateiAblage` implements
   `DateiAblage` on a folder of the server's file system, confined to a base the operator sets with
   `plaintext.ablagen.lokal.basis` (no `..`, no symlink leading outside, atomic writes). Under *Root → Sidecars →
@@ -38,6 +40,16 @@ exhaustive.
   `resetColumnWidths` in einem Test; Inventar in eigenen Tests — Bumps passen mit an). Daten bleiben kompatibel:
   alte Stände mit den Feldern überliest die Ablage dank `ignoreUnknown` auf allen drei Typen (Test mit echten
   Alt-Feldern auf Stand-, Profil- und FesterStand-Ebene).
+
+### Changed
+- **pt:tableSettings: Modus wird nie gespeichert, Verbreitern-Griff haengt immer** (Karte 2160, Daniel 15.11.).
+  Der Dreifach-Modus-Knopf startet je Anmeldung neutral mit «Anpassen» und rotiert nur noch sitzungsintern —
+  `TableState.moveEnabled`/`resizeEnabled` sind entfernt (alte Stände/Profile mit den Feldern laden weiter über
+  `ignoreUnknown`). `isGroesseAendernAktiv()` liefert jetzt `mitBreiten`: das Resize-Viereck im Spaltenkopf ist auf
+  jeder Seite mit Breiten dauerhaft sichtbar (Daniel: «wird aktuell gar nicht angezeigt — fixen») und das Ziehen
+  jederzeit möglich; nur das Verschieben der Köpfe hängt noch am Modus «Verschieben». Im Panel steht der Modus-Knopf
+  zuoberst über die volle Breite, mit einem Trennstrich vor der Profilzeile, und `modusWechseln` schreibt nichts
+  in den Stand (Playwright prüft den Neustart mit «Anpassen»).
 
 ### Fixed
 - **pt:tableSettings: Wrap-Binding request-gebunden (JSF1104, session-scoped Beans)** (Karte 2097). `TableSettings`

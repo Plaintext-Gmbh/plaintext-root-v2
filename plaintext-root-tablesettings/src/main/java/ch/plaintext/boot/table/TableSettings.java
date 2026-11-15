@@ -649,27 +649,29 @@ public class TableSettings implements Serializable {
         TableKomponenten.kinderOrdnen(data, state.getColumnOrder(), this::keyFromHeader);
     }
 
-    // ── Modus-Dreifach-Schalter (Karte 1853, Runde 6, Daniel 13.11.) ─────────
+    // ── Modus-Dreifach-Schalter (Karte 1853 Runde 6; Daniel 15.11.: nie speichern) ─
 
     /**
-     * Der Modus des Dreifach-Schalters: 0 = «Spalten anpassen» (beide aus), 1 = «Verschieben»
-     * (Spaltenkoepfe ziehbar), 2 = «Vergroessern» (Spaltenbreiten ziehbar). Die Seite bindet
-     * weiterhin draggableColumns/resizableColumns an {@link #isVerschiebenAktiv()} und
-     * {@link #isGroesseAendernAktiv()} — der Schalter setzt genau diese beiden Stellungen.
+     * Der Modus des Dreifach-Schalters, SITZUNGSEIGENSCHAFT: 0 = «Anpassen» (Start je Anmeldung,
+     * Daniel 15.11. 08:18 — «welcher der 3 Zustaende aktiv ist … nicht speichern, immer starten
+     * mit neutral also Adjust»), 1 = «Verschieben» (Spaltenkoepfe ziehbar), 2 = «Vergroessern».
+     * Resize haengt nicht mehr am Modus, sondern ist auf Seiten mit Breiten dauerhaft an
+     * ({@link #isGroesseAendernAktiv()}) — sonst waere der Verbreitern-Griff mit immer
+     * zurueckgesetztem Modus nie sichtbar (Daniel: «wird aktuell gar nicht angezeigt — fixen»).
+     */
+    private int modus;
+
+    /**
+     * Der Modus des Dreifach-Schalters: 0 = «Spalten anpassen», 1 = «Verschieben»
+     * (Spaltenkoepfe ziehbar), 2 = «Vergroessern». Sitzungseigenschaft — wird nie gespeichert.
      */
     public int getModus() {
-        if (isVerschiebenAktiv()) {
-            return 1;
-        }
-        return isGroesseAendernAktiv() ? 2 : 0;
+        return modus;
     }
 
-    /** Ein Klick rotiert: anpassen (0) -> Verschieben (1) -> Vergroessern (2) -> anpassen (0). */
+    /** Ein Klick rotiert: anpassen (0) -> Verschieben (1) -> Vergroessern (2) -> anpassen (0). Speichert nichts. */
     public void modusWechseln() {
-        int naechster = (getModus() + 1) % 3;
-        state.setMoveEnabled(naechster == 1);
-        state.setResizeEnabled(naechster == 2);
-        persist();
+        modus = (modus + 1) % 3;
     }
 
     /** Label des Dreifach-Schalters je Modus — Weiterleitung an {@link TableSettingsTexte}. */
@@ -716,28 +718,16 @@ public class TableSettings implements Serializable {
 
     /** Schalter «Verschieben»: duerfen die Spaltenkoepfe per Ziehen umgeordnet werden? Vorgabe: aus. */
     public boolean isVerschiebenAktiv() {
-        return Boolean.TRUE.equals(state.getMoveEnabled());
+        return modus == 1;
     }
 
-    public void setVerschiebenAktiv(boolean aktiv) {
-        state.setMoveEnabled(aktiv);
-    }
-
-    public void onVerschiebenChange() {
-        persist();
-    }
-
-    /** Schalter «Grösse aendern»: duerfen Spaltenbreiten gezogen werden? Vorgabe: an (bisheriges Verhalten). */
+    /**
+     * Schalter «Groesse aendern»: der Verbreitern-Griff haengt auf Seiten mit Spaltenbreiten
+     * immer (Daniel 15.11.) — nicht mehr abhaengig vom Modus, der seitdem nie gespeichert wird
+     * und je Anmeldung mit «Anpassen» startet.
+     */
     public boolean isGroesseAendernAktiv() {
-        return !Boolean.FALSE.equals(state.getResizeEnabled());
-    }
-
-    public void setGroesseAendernAktiv(boolean aktiv) {
-        state.setResizeEnabled(aktiv);
-    }
-
-    public void onGroesseAendernChange() {
-        persist();
+        return mitBreiten;
     }
 
     // ── Breiten ─────────────────────────────────────────────────────────────
@@ -806,28 +796,49 @@ public class TableSettings implements Serializable {
         log.debug("[TableSettings:{}] onColumnResize | column={} | width={}px", page, key, event.getWidth());
     }
 
-    // ── Breite fix eintragen (Karte 2160, Doppelklick im Modus «Vergroessern») ─
+    // ── Breite fix eintragen (Karte 2160; Daniel 15.11.: Doppelklick auf den Verbreitern-Griff) ─
 
     /**
-     * Die Spalte, deren Breite per Doppelklick im Resize-Modus exakt einzutragen ist — die
-     * zuletzt gezogene ({@link #onColumnResize}). {@code null}, solange in dieser Sitzung nichts
-     * gezogen wurde; das Panel zeigt dann einen Hinweis statt des Eingabefelds.
+     * Die Spalte, deren Breite exakt einzutragen ist — gesetzt vom Doppelklick auf den
+     * Resize-Griff ihres Kopfes ({@link #breiteFixOeffnen(String)}) oder als zuletzt gezogene
+     * ({@link #onColumnResize}). {@code null}, solange nichts gewaehlt wurde; das Feld zeigt
+     * dann einen Hinweis statt der Eingabe.
      */
     @Getter
     private String breiteFixSpalte;
 
-    /** Soll das Eingabefeld im Ansicht-Reiter gerendert werden? Geoeffnet per Doppelklick. */
-    @Getter
-    private boolean breiteFixOffen;
-
-    /** Der eingetragene Wert fuer {@link #breiteFixUebernehmen()}. */
+    /** Der eingetragene Wert fuer {@link #breiteFixUebernehmen(String)}. */
     @Getter
     @Setter
     private Integer breiteFixWert;
 
-    /** Doppelklick auf den Modus-Knopf im Resize-Modus: Feld im Ansicht-Reiter aufklappen. */
-    public void breiteFixOeffnen() {
-        breiteFixOffen = true;
+    /**
+     * Doppelklick auf den Verbreitern-Griff: das Skript (js/table-settings.js) meldet die
+     * Position des Kopfes als {@code kopf}-Parameter; die Spalte dazu wird ueber
+     * {@link TableKomponenten#kopfKey} aufgeloest und der aktuellen Breite vorbesetzt.
+     * Ohne Aufloesung bleibt die zuletzt gezogene Spalte das Ziel (Zug im Kopf vor dem
+     * Doppelklick). Das Feld steht dauerhaft im Ansicht-Reiter — es gibt nichts aufzuklappen.
+     */
+    public void breiteFixOeffnen(String tabelle) {
+        Map<String, String> params = FacesContext.getCurrentInstance()
+                .getExternalContext().getRequestParameterMap();
+        String kopf = params.get("kopf");
+        int index = -1;
+        if (kopf != null) {
+            try {
+                index = Integer.parseInt(kopf.trim());
+            } catch (NumberFormatException e) { // NOSONAR - ungueltiger Parameter: Ziel bleibt die gezogene Spalte
+                log.debug("[TableSettings:{}] breiteFixOeffnen | kopf ungueltig | {}", page, kopf);
+            }
+        }
+        if (index >= 0) {
+            UIData data = tabelleFinden(tabelle);
+            String key = data == null ? null
+                    : TableKomponenten.kopfKey(data, this::keyFromHeader, index);
+            if (key != null) {
+                breiteFixSpalte = key;
+            }
+        }
         TableColumn ziel = breiteFixSpalte == null ? null : spalte(breiteFixSpalte);
         breiteFixWert = ziel == null ? null : breiteVon(ziel);
     }
@@ -838,10 +849,11 @@ public class TableSettings implements Serializable {
     }
 
     /**
-     * Uebernimmt den eingetragenen Wert fuer die zuletzt gezogene Spalte. Zu kleine Werte werden
-     * verworfen statt beanstandet — wie an dieser Stelle immer, haelt ein Wert das Formular nicht
-     * auf. Nach dem Uebernehmen klappt das Feld wieder zu; die Tabelle zeigt den Wert sofort,
-     * die DataTables-ColumnMeta wird mitgesetzt, sonst ginge die gezogene Breite bis zum Neuladen
+     * Uebernimmt den eingetragenen Wert fuer die gewaehlte Spalte — ausgeloest vom change-Event
+     * des Eingabefelds, ein Save-Button existiert nicht (Daniel 15.11.: «immer speichern bei
+     * jeder Aktion»). Zu kleine Werte werden verworfen statt beanstandet — wie an dieser Stelle
+     * immer, haelt ein Wert das Formular nicht auf. Die Tabelle zeigt den Wert sofort, die
+     * DataTables-ColumnMeta wird mitgesetzt, sonst ginge die gezogene Breite bis zum Neuladen
      * vor ({@link TableKomponenten#metaBreiteSetzen}).
      */
     public void breiteFixUebernehmen(String tabelle) {
@@ -852,7 +864,6 @@ public class TableSettings implements Serializable {
             return;
         }
         state.getColumnWidths().put(breiteFixSpalte, breiteFixWert + "px");
-        breiteFixOffen = false;
         persist();
         UIData data = tabelleFinden(tabelle);
         if (data != null) {

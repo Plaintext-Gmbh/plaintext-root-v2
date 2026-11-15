@@ -6,8 +6,10 @@
  * Runde 7 (Karte 1853): der Klick auf das Viereck im Kopf (Spalte auf die Zielbreite setzen,
  * Karte 1336) ist mit dem Reiter «Breiten» weggefallen - die Wiederholbarkeit, fuer die er da
  * war, liefert jetzt der feste Stand (Ansicht festhalten, Doppelklick auf den Modus-Knopf).
- * Karte 2160: Gesamt-/Zielbreite samt Java entfernt; der Doppelklick im Modus «Vergroessern»
- * oeffnet stattdessen das Feld fuer eine exakte Breite (Ansicht-Reiter, remoteCommand BreiteFix).
+ * Karte 2160: Gesamt-/Zielbreite samt Java entfernt; der Doppelklick auf den Verbreitern-Griff
+ * oeffnet das Feld fuer eine exakte Breite (Ansicht-Reiter, remoteCommand BreiteFix). Daniel
+ * 15.11.: Resize haengt nicht mehr am Modus — der Griff ist auf Seiten mit Breiten immer da,
+ * der Modus wird nie gespeichert und startet je Anmeldung mit «Anpassen».
  *
  * WARUM ALS EIGENE DATEI (Welle 4, CSP ohne 'unsafe-inline'):
  * Solange irgendwo ein Inline-<script> steht, muss die Content-Security-Policy
@@ -51,12 +53,11 @@
     }
 
     /*
-     * Modus-Knopf (Runde 7, Punkt 3; Karte 2160 erweitert): Klick wechselt den Modus,
-     * Doppelklick stellt im Modus «Verschieben»/«Anpassen» den festen Stand her — im Modus
-     * «Vergroessern» (data-pt-modus=2) oeffnet er stattdessen das Feld fuer eine exakte Breite
-     * im Ansicht-Reiter. Der Klick wartet kurz, ob ein zweiter folgt - sonst wechselte ein
-     * Doppelklick zuerst zweimal den Modus. Beide Aktionen laufen ueber p:remoteCommand des Tags
-     * (<settingsId>ModusWechseln / <settingsId>FesterStand / <settingsId>BreiteFix); die
+     * Modus-Knopf (Runde 7, Punkt 3): Klick wechselt den Modus, Doppelklick stellt den festen
+     * Stand her — unabhaengig vom Modus (Daniel 15.11.; das exakte Breiten-Feld oeffnet seitdem
+     * der Doppelklick auf den Verbreitern-Griff, unten). Der Klick wartet kurz, ob ein zweiter
+     * folgt - sonst wechselte ein Doppelklick zuerst zweimal den Modus. Beide Aktionen laufen
+     * ueber p:remoteCommand des Tags (<settingsId>ModusWechseln / <settingsId>FesterStand); die
      * settingsId steht in der Id des Knopfs (<settingsId>-modus). Delegation am document:
      * der Knopf wird bei jedem Wechsel neu gerendert.
      */
@@ -71,8 +72,7 @@
         if (modusWartet) {
             clearTimeout(modusWartet);
             modusWartet = null;
-            aufrufen(knopf.getAttribute('data-pt-modus') === '2'
-                    ? settingsId + 'BreiteFix' : settingsId + 'FesterStand');
+            aufrufen(settingsId + 'FesterStand');
             return;
         }
         modusWartet = setTimeout(function () {
@@ -80,6 +80,56 @@
             aufrufen(settingsId + 'ModusWechseln');
         }, 300);
     });
+
+    /*
+     * Karte 2160 (Daniel 15.11.): Doppelklick auf den Verbreitern-Griff (↔-Viereck im
+     * Spaltenkopf) oeffnet das Breite-Feld fuer genau diese Spalte (remoteCommand <id>BreiteFix
+     * mit der Kopf-Position als Parameter 'kopf' — die Seiten vergeben den Spalten keine Ids).
+     * Das Panel oeffnet sich am Griff, das Eingabefeld im Ansicht-Reiter wird nach dem
+     * Ajax-Update fokussiert (oncomplete des remoteCommand). Annahme wie beim colReorder: EINE
+     * Kopfzeile ohne verbundene Zellen; nur Tabellen eines Bedienbereichs mit Breiten tragen
+     * den Griff (resizableColumns = anzeige.groesseAendernAktiv).
+     *
+     * DER FANGE: PrimeFaces 16 haengt dem Griff SEINEN eigenen dblclick-Handler an —
+     * «Spalte automatisch auf den Inhalt einpassen» (autosizeColumnWidth), gemessen als
+     * verkuemmerte colResize-Breite nach Zug + Doppelklick (183 -> 89/84). Der Griff-Handler
+     * laeuft in der Target-Phase, ein document-Listener in der Bubble-Phase kaeme zu spaet —
+     * deshalb CAPTURE: unser Listener verbraucht den Doppelklick, bevor PrimeFaces ihn sieht,
+     * und oeffnet stattdessen das Feld fuer eine exakte Breite.
+     */
+    document.addEventListener('dblclick', function (e) {
+        var griff = e.target && e.target.closest ? e.target.closest('.ui-column-resizer') : null;
+        if (!griff) {
+            return;
+        }
+        var th = griff.closest('th');
+        var tabelleEl = griff.closest('.ui-datatable');
+        var zeile = th ? th.parentNode : null;
+        if (!zeile || !tabelleEl || !tabelleEl.id) {
+            return;
+        }
+        var wrap = document.querySelector('[data-pt-tablesettings="' + tabelleEl.id + '"]');
+        if (!wrap || wrap.getAttribute('data-pt-breiten') !== '1') {
+            return;
+        }
+        var index = Array.prototype.indexOf.call(zeile.children, th);
+        if (index < 0) {
+            return;
+        }
+        e.preventDefault();
+        e.stopPropagation();   // PrimeFaces' Autosize am Griff (siehe oben) nicht ausloesen
+        var settingsId = wrap.getAttribute('data-pt-settings-id');
+        if (typeof window[settingsId + 'BreiteFix'] === 'function') {
+            window[settingsId + 'BreiteFix']([{name: 'kopf', value: String(index)}]);
+        }
+        if (window.PF) {
+            var panel = PF(settingsId + 'PanelWv');
+            if (panel && typeof panel.isVisible === 'function' && !panel.isVisible()
+                    && typeof panel.show === 'function') {
+                panel.show(griff);
+            }
+        }
+    }, true);
 
     function aufrufen(name) {
         if (typeof window[name] === 'function') {

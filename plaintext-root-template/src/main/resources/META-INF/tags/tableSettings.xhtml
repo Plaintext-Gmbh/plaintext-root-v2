@@ -13,8 +13,12 @@
       man im Modus Resize; die Ansicht haelt einen festen Stand (Breiten + Reihenfolge) fest, der
       mit ins Profil wandert, ein Doppelklick auf den Modus-Knopf stellt ihn wieder her. Karte
       2160 (Daniel 14.11.): Gesamt-/Zielbreite samt Java komplett entfernt — eine exakte Breite
-      trägt man per Doppelklick auf den Modus-Knopf im Modus «Vergroessern» ein (Feld im
-      Ansicht-Reiter, Ziel = zuletzt gezogene Spalte, wandert ins Profil).
+      trägt man per Doppelklick auf den Verbreitern-Griff (↔-Viereck im Spaltenkopf) ein; das
+      Feld dazu steht dauerhaft im Ansicht-Reiter neben «Fester Stand» und speichert bei der
+      Eingabe (kein Übernehmen-Knopf). Nachtrag Daniel 15.11.: der Griff hängt auf Seiten mit
+      Breiten immer (resize unabhängig vom Modus), der Modus selbst wird nie gespeichert und
+      startet je Anmeldung mit «Anpassen», der Modus-Knopf wohnt zuoberst im Panel über die
+      ganze Breite, mit einem Trennstrich vor der Profilzeile.
 
       WARUM ALS TAG UND NICHT ALS KOPIERVORLAGE:
       Diese Bedienung ist rund 300 Zeilen Markup, davon die Haelfte Ajax-Verdrahtung. Wer sie
@@ -177,19 +181,17 @@
                  haengt auch kein Griff im Spaltenkopf. Profilzeile rechts: Auswahl, Neu, Papierkorb. -->
             <h:panelGroup layout="block" styleClass="pt-ts-kopfzeile">
                 <!-- Runde 7: Klick wechselt den Modus, Doppelklick stellt den festen Stand her —
-                     im Modus «Vergroessern» oeffnet der Doppelklick stattdessen das Feld fuer eine
-                     exakte Breite im Ansicht-Reiter (Karte 2160). Beides ueber remoteCommands
-                     (unten), ausgeloest von js/table-settings.js - ein Ajax-Knopf haette beim
-                     Doppelklick zweimal den Modus gewechselt. data-pt-modus liest das Skript beim
-                     Doppelklick ab (der Knopf wird bei jedem Wechsel neu gerendert, Wert frisch).
+                     ausgeloest von js/table-settings.js ueber die remoteCommands unten (ein Ajax-
+                     Knopf haette beim Doppelklick zweimal den Modus gewechselt). Daniel 15.11.:
+                     der Modus ist sitzungseigenschaft und wird nie gespeichert — jede Anmeldung
+                     startet mit «Anpassen» (outline), die Rotation laeuft Klick fuer Klick weiter.
                      Adjust = outline, Reorder/Resize gefuellt (Punkt 7). -->
                 <h:panelGroup layout="block" styleClass="pt-ts-schalterzeile">
                     <p:commandButton id="#{ptSettingsId}-modus" type="button"
                                      value="#{anzeige.modusLabel}"
                                      icon="#{anzeige.modusIcon}"
                                      styleClass="pt-ts-modus#{anzeige.modus == 0 ? ' ui-button-outlined' : ''}"
-                                     title="#{anzeige.modusTitel}"
-                                     a:data-pt-modus="#{anzeige.modus}"/>
+                                     title="#{anzeige.modusTitel}"/>
                 </h:panelGroup>
 
                 <h:panelGroup layout="block" styleClass="pt-ts-profilzeile">
@@ -266,23 +268,23 @@
                                       styleClass="pt-tablesettings-hint"/>
                     </h:panelGroup>
 
-                    <!-- Breite fix (Karte 2160): Doppelklick auf den Modus-Knopf im Modus
-                         «Vergroessern» klappt dieses Feld auf (remoteCommand unten rendert den
-                         Panel-Inhalt neu und aktiviert den 1. Reiter). Ziel ist die zuletzt
-                         gezogene Spalte; der Wert wandert ueber persist() ins aktive Profil. -->
+                    <!-- Breite fix (Karte 2160, Daniel 15.11.): steht DAUERHAFT im Ansicht-Reiter
+                         beim «Fester Stand»-Block (en-UI «Fixed layout») — Spaltenname, Eingabe,
+                         kein Übernehmen-Knopf: das change-Event speichert sofort. Die Spalte
+                         waehlt ein Doppelklick auf ihr ↔-Viereck im Tabellenkopf (remoteCommand
+                         unten); ohne Wahl gilt die zuletzt gezogene Spalte. -->
                     <h:panelGroup layout="block" id="#{ptSettingsId}-breiteFix" styleClass="pt-ts-breite-fix"
-                                  rendered="#{anzeige.breiteFixOffen}">
+                                  rendered="#{anzeige.mitBreiten}">
                         <h:outputText value="#{ts['breiteFix.label']}" styleClass="pt-tablesettings-label"/>
                         <ui:fragment rendered="#{anzeige.breiteFixSpalte != null}">
                             <h:outputText value="#{anzeige.columnLabel(anzeige.breiteFixSpalte)}"
                                           styleClass="pt-ts-breite-fix-spalte"/>
                             <p:inputText id="#{ptSettingsId}-breiteFixWert" value="#{anzeige.breiteFixWert}"
-                                         styleClass="pt-ts-breite-fix-wert"/>
-                            <p:commandButton value="#{ts['breiteFix.uebernehmen']}" icon="pi pi-check"
-                                             action="#{anzeige.breiteFixUebernehmen(tabelle)}"
-                                             process="@this #{ptSettingsId}-breiteFixWert"
-                                             update="#{ptSettingsId}-panelInhalt #{tabelle}"
-                                             styleClass="pt-ts-breite-fix-uebernehmen"/>
+                                         styleClass="pt-ts-breite-fix-wert">
+                                <p:ajax event="change" process="@this"
+                                        listener="#{anzeige.breiteFixUebernehmen(tabelle)}"
+                                        update="#{ptSettingsId}-panelInhalt #{tabelle}"/>
+                            </p:inputText>
                         </ui:fragment>
                         <h:outputText value="#{ts['breiteFix.hint']}" styleClass="pt-tablesettings-hint"
                                       rendered="#{anzeige.breiteFixSpalte != null}"/>
@@ -391,7 +393,8 @@
         </p:dialog>
 
         <!-- Modus-Knopf (Runde 7): js/table-settings.js ruft bei Klick <id>ModusWechseln, bei
-             Doppelklick <id>FesterStand. Ohne ignoreAutoUpdate, damit das Growl erscheint. -->
+             Doppelklick <id>FesterStand (festen Spaltenstand herstellen — unabhaengig vom Modus,
+             Daniel 15.11.). Ohne ignoreAutoUpdate, damit das Growl erscheint. -->
         <p:remoteCommand name="#{ptSettingsId}ModusWechseln" process="@this"
                          action="#{anzeige.modusWechseln()}"
                          update="#{tabelle} #{ptSettingsId}-panelInhalt"/>
@@ -402,13 +405,15 @@
                          action="#{anzeige.festerStandHerstellen(tabelle)}"
                          update="#{anzeige.reihenfolgeZielClientId} #{tabelle} #{ptSettingsId}-panelInhalt"/>
 
-        <!-- Breite fix (Karte 2160): Doppelklick auf den Modus-Knopf im Modus «Vergroessern».
-             update rendert das Feld im Ansicht-Reiter neu, oncomplete aktiviert den 1. Reiter
-             und fokussiert das Eingabefeld (laueft nach dem Update, wie beim Profil-Dialog).
-             Panel und Reiter sind als PF-Widgets registriert (PanelWv/TabsWv) — ohne
-             CSS-Selektoren mit Id-Anteilen, die das Tag nicht kennt. -->
+        <!-- Breite fix (Karte 2160, Daniel 15.11.): Doppelklick auf den Verbreitern-Griff im
+             Kopf der Zielspalte — das Skript liefert die Kopf-Position als Parameter 'kopf'
+             mit. update rendert das Feld im Ansicht-Reiter neu, oncomplete aktiviert den
+             1. Reiter, oeffnet das Panel (am Griff) und fokussiert das Eingabefeld (laeuft
+             nach dem Update, wie beim Profil-Dialog). Panel und Reiter sind als PF-Widgets
+             registriert (PanelWv/TabsWv) — ohne CSS-Selektoren mit Id-Anteilen, die das Tag
+             nicht kennt. -->
         <p:remoteCommand name="#{ptSettingsId}BreiteFix" process="@this"
-                         action="#{anzeige.breiteFixOeffnen()}"
+                         action="#{anzeige.breiteFixOeffnen(tabelle)}"
                          update="#{ptSettingsId}-panelInhalt"
                          oncomplete="if(window.PF){var t=PF('#{ptSettingsId}TabsWv');if(t&amp;&amp;t.select){t.select(0);}var p=PF('#{ptSettingsId}PanelWv');var el=p&amp;&amp;p.jq?p.jq[0]:null;var f=el?el.querySelector('.pt-ts-breite-fix-wert'):null;if(f){f.focus();f.select();}}"/>
 
