@@ -17,6 +17,12 @@
   "extends": [
     "config:recommended"
   ],
+  "dependencyDashboard": true,
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 5,
+  "schedule": [
+    "at any time"
+  ],
   "customManagers": [
     {
       "customType": "regex",
@@ -68,6 +74,13 @@
     }
   ],
   "packageRules": [
+    {
+      "description": "Karte 2029 (17.11.2026): eigene ch.plaintext-Artefakte ignoriert Renovate. Sie werden per Release aktualisiert und liegen in Reposilite (maven.plaintext.ch); ohne Regel versucht Renovate sie extern aufzuloesen und haengt wie bei app/guild belegt (22.08.2026, Karte 958).",
+      "matchPackagePrefixes": [
+        "ch.plaintext"
+      ],
+      "enabled": false
+    },
     {
       "description": [
         "Karte 1507 (12.10.2026): CDI 5 (Jakarta EE 12) NICHT uebernehmen, weder als Major noch als Renovate-Ersatz auf jakarta.cdi:jakarta.cdi(-el)-api.",
