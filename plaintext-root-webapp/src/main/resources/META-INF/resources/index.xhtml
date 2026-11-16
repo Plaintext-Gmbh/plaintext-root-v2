@@ -231,7 +231,7 @@
 
                 <h:panelGroup layout="block" styleClass="dashboard-werkzeug"
                               rendered="#{not dashboardBean.bearbeiten and dashboardBean.kachelnVorhanden}">
-                    <p:commandButton id="anpassen" value="Anpassen" icon="pi pi-pencil"
+                    <p:commandButton id="anpassen" value="#{i18n.t('Anpassen')}" icon="pi pi-pencil"
                                      styleClass="ui-button-flat"
                                      action="#{dashboardBean.anpassen()}" process="@this" update="@form"/>
                 </h:panelGroup>
@@ -321,7 +321,7 @@
                                 <h:panelGroup rendered="#{not empty tile.icon}">
                                     <i class="#{tile.icon} dashboard-tile-icon"></i>
                                 </h:panelGroup>
-                                <span class="dashboard-tile-title">#{tile.title}</span>
+                                <span class="dashboard-tile-title">#{i18n.t(tile.title)}</span>
                             </div>
 
                             <h:panelGroup layout="block" styleClass="dashboard-status"
@@ -342,7 +342,7 @@
                                         <h:panelGroup rendered="#{not empty action.icon}">
                                             <i class="#{action.icon}"></i>
                                         </h:panelGroup>
-                                        <span>#{action.label}</span>
+                                        <span>#{i18n.t(action.label)}</span>
                                     </a>
                                 </ui:repeat>
 

@@ -1080,3 +1080,17 @@ Alle anzeigen;it;Mostra tutto
 Mein Profil;en;My profile
 Mein Profil;fr;Mon profil
 Mein Profil;it;Il mio profilo
+#
+# --- Karte 2315: Rest-Strings aus der Demo-Abnahme 2295 (16.11.2026)
+# Leer-Meldung Benachrichtigungen (notifications.xhtml + topbar.xhtml),
+# Dashboard-Knopf «Anpassen» (index.xhtml), Kachel-Aktion «Öffnen» (Fallback in
+# DashboardTileModelBuilder, gerendert als #{i18n.t(action.label)}).
+Keine Benachrichtigungen;en;No notifications
+Keine Benachrichtigungen;fr;Aucune notification
+Keine Benachrichtigungen;it;Nessuna notifica
+Anpassen;en;Customize
+Anpassen;fr;Personnaliser
+Anpassen;it;Personalizza
+Öffnen;en;Open
+Öffnen;fr;Ouvrir
+Öffnen;it;Apri
