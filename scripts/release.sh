@@ -172,6 +172,19 @@ else
     sag "WARNUNG: mirror_to_plaintext_mvn in ./build nicht gefunden oder Pfad geaendert, Spiegelung entfaellt."
 fi
 
+# ── 2c. Nextcloud-Ablage maven-konform (Karte 2302) ─────────────────────────
+# Statisches Maven-Repo-Layout auf Nextcloud (WebDAV), Release-only; SNAPSHOTs bleiben auf
+# Reposilite. Ohne MAVEN_NEXTCLOUD_DAV/MAVEN_NEXTCLOUD gar nicht erst starten — das Skript
+# allein (Dry-Run) dient dem lokalen Test. Fehler nur als Warnung wie bei der
+# plaintext-mvn-Spiegelung: Das Release bleibt gueltig.
+if [ -z "${MAVEN_NEXTCLOUD_DAV:-}" ] || [ -z "${MAVEN_NEXTCLOUD:-}" ]; then
+    sag "nextcloud: MAVEN_NEXTCLOUD_DAV/MAVEN_NEXTCLOUD nicht gesetzt — Ablage uebersprungen."
+elif bash scripts/maven-dav-sync.sh "$NEU"; then
+    sag "nextcloud: $NEU maven-konform abgelegt."
+else
+    sag "WARNUNG: Nextcloud-Ablage fehlgeschlagen, Release bleibt gueltig (nachlieferbar)."
+fi
+
 # ── 3. GitHub-Release mit Notes (best effort, nie fatal) ───────────────────
 if command -v gh >/dev/null 2>&1 && [ -n "${GITHUB_TOKEN:-}${GH_TOKEN:-}" ]; then
     REPO="$(git remote get-url origin | sed -E 's#^.*[:/]([^/]+/[^/]+)$#\1#; s#\.git$##')"
