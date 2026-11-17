@@ -82,7 +82,7 @@ public final class WebDavAntwort {
         String pfad;
         try {
             pfad = URI.create(href.trim()).getPath();
-        } catch (IllegalArgumentException _) {
+        } catch (IllegalArgumentException ignoriert) {
             return null;
         }
         boolean ordner = r.getElementsByTagNameNS("DAV:", "collection").getLength() > 0;
@@ -95,7 +95,7 @@ public final class WebDavAntwort {
         }
         try {
             return Long.parseLong(len.trim());
-        } catch (NumberFormatException _) {
+        } catch (NumberFormatException ignoriert) {
             return -1;
         }
     }
@@ -106,7 +106,7 @@ public final class WebDavAntwort {
         }
         try {
             return ZonedDateTime.parse(lm.trim(), DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();
-        } catch (RuntimeException _) {
+        } catch (RuntimeException ignoriert) {
             return null;
         }
     }

@@ -156,7 +156,7 @@ public class ModulAnalyse {
             Class<?> typ;
             try {
                 typ = fabrik.getType(bean, false);
-            } catch (RuntimeException | LinkageError _) {
+            } catch (RuntimeException | LinkageError ignoriert) {
                 continue;
             }
             if (typ == null) {
@@ -392,7 +392,7 @@ public class ModulAnalyse {
             Class<?> typ;
             try {
                 typ = kontext.getType(bean, false);
-            } catch (RuntimeException | LinkageError _) {
+            } catch (RuntimeException | LinkageError ignoriert) {
                 continue;
             }
             if (typ == null || !ClassUtils.getUserClass(typ).getName().startsWith("ch.plaintext.")) {
@@ -417,7 +417,7 @@ public class ModulAnalyse {
         try {
             Object o = a.annotationType().getMethod(element).invoke(a);
             return o == null ? "" : o.toString();
-        } catch (ReflectiveOperationException | RuntimeException _) {
+        } catch (ReflectiveOperationException | RuntimeException ignoriert) {
             return "";
         }
     }

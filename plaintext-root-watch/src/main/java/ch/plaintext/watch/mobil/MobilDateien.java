@@ -103,7 +103,7 @@ public class MobilDateien {
         try {
             byte[] h = MessageDigest.getInstance("SHA-256").digest(inhalt);
             return HexFormat.of().formatHex(h, 0, 6);
-        } catch (NoSuchAlgorithmException _) {
+        } catch (NoSuchAlgorithmException ignoriert) {
             // SHA-256 ist in jeder JVM Pflicht; ohne sie waere die Marke die Laenge.
             return Integer.toHexString(new String(inhalt, StandardCharsets.UTF_8).hashCode());
         }

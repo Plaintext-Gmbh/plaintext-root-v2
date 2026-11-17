@@ -105,7 +105,7 @@ public abstract class EnvKeyAesGcmCrypto {
         try {
             byte[] k = Base64.getDecoder().decode(b64.trim());
             return Optional.of(k.length == 32 ? k : sha256(k));   // tolerate deviating lengths via SHA-256
-        } catch (RuntimeException _) {
+        } catch (RuntimeException ignoriert) {
             log.warn("{} ist kein gueltiges base64 — Dev-Fallback.", ENV_KEY);
             return Optional.empty();
         }

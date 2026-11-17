@@ -265,7 +265,7 @@ public class SchnittstellenKatalog {
         Class<?> typ;
         try {
             typ = Class.forName(binaerName(name), false, getClass().getClassLoader());
-        } catch (ClassNotFoundException | LinkageError _) {
+        } catch (ClassNotFoundException | LinkageError ignoriert) {
             return List.of();
         }
         List<Umsetzer> u = new ArrayList<>();
@@ -306,7 +306,7 @@ public class SchnittstellenKatalog {
                 return "?";
             }
             return modulAusOrt(u.toString());
-        } catch (RuntimeException _) {
+        } catch (RuntimeException ignoriert) {
             return "?";
         }
     }

@@ -206,7 +206,7 @@ class VaultwardenValueResolver {
                     warteMs / 1000);
             try {
                 schlaefer.schlafe(warteMs);
-            } catch (InterruptedException _) {
+            } catch (InterruptedException ignoriert) {
                 Thread.currentThread().interrupt();
                 break;
             }
@@ -264,7 +264,7 @@ class VaultwardenValueResolver {
                     versuch, BOOT_MAX_VERSUCHE - 1, warteMs / 1000);
             try {
                 schlaefer.schlafe(warteMs);
-            } catch (InterruptedException _) {
+            } catch (InterruptedException ignoriert) {
                 Thread.currentThread().interrupt();
                 return wert; // interrupted -> into the fail-fast without a further attempt
             }

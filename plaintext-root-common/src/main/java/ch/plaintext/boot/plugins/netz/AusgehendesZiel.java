@@ -88,7 +88,7 @@ public final class AusgehendesZiel {
         URI uri;
         try {
             uri = URI.create(url.trim());
-        } catch (IllegalArgumentException _) {
+        } catch (IllegalArgumentException ignoriert) {
             throw new IllegalArgumentException("Ungültige URL.");
         }
         String schema = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
@@ -128,7 +128,7 @@ public final class AusgehendesZiel {
         InetAddress[] adressen;
         try {
             adressen = aufloeser.aufloesen(h);
-        } catch (UnknownHostException _) {
+        } catch (UnknownHostException ignoriert) {
             throw new IllegalArgumentException("Host '" + h + "' ist nicht auflösbar.");
         }
         if (adressen == null || adressen.length == 0) {

@@ -322,7 +322,7 @@ public class JwtTokenService implements ch.plaintext.ServiceTokenIssuer {
         try {
             Thread.sleep(Duration.ofSeconds(sekunden).toMillis());
             return true;
-        } catch (InterruptedException _) {
+        } catch (InterruptedException ignoriert) {
             Thread.currentThread().interrupt();
             return false;
         }

@@ -711,7 +711,6 @@
                             </path>
                         </annotationProcessorPaths>
                         <compilerArgs>
-                            <arg>--enable-preview</arg>
                             <arg>-Aplaintext.katalog.modul=${project.artifactId}</arg>
                         </compilerArgs>
                     </configuration>
@@ -721,9 +720,7 @@
                         <execution>
                             <id>default-testCompile</id>
                             <configuration>
-                                <compilerArgs combine.self="override">
-                                    <arg>--enable-preview</arg>
-                                </compilerArgs>
+                                <compilerArgs combine.self="override"/>
                             </configuration>
                         </execution>
                     </executions>

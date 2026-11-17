@@ -368,7 +368,7 @@ class RootPagesPlaywrightIT {
                 if (rumpf.startsWith("<?xml") && (rumpf.contains("<error-name>") || rumpf.contains("Exception"))) {
                     ajaxFehler.add(rumpf.length() > 400 ? rumpf.substring(0, 400) : rumpf);
                 }
-            } catch (RuntimeException _) {
+            } catch (RuntimeException ignoriert) {
                 // Rumpf nicht mehr abrufbar: kein Befund.
             }
         });
@@ -477,7 +477,7 @@ class RootPagesPlaywrightIT {
                 if (rumpf.startsWith("<?xml") && (rumpf.contains("<error-name>") || rumpf.contains("Exception"))) {
                     ajaxFehler.add(rumpf.length() > 400 ? rumpf.substring(0, 400) : rumpf);
                 }
-            } catch (RuntimeException _) {
+            } catch (RuntimeException ignoriert) {
                 // Rumpf nicht mehr abrufbar: kein Befund.
             }
         });
@@ -543,7 +543,7 @@ class RootPagesPlaywrightIT {
                 if (rumpf.startsWith("<?xml") && (rumpf.contains("<error-name>") || rumpf.contains("Exception"))) {
                     ajaxFehler.add(rumpf.length() > 400 ? rumpf.substring(0, 400) : rumpf);
                 }
-            } catch (RuntimeException _) {
+            } catch (RuntimeException ignoriert) {
                 // Rumpf nicht mehr abrufbar: kein Befund.
             }
         });

@@ -176,7 +176,7 @@ public final class StartseitenAnordnung {
         String id;
         try {
             id = URLDecoder.decode(felder[0], StandardCharsets.UTF_8);
-        } catch (IllegalArgumentException _) {
+        } catch (IllegalArgumentException ignoriert) {
             return null;
         }
         if (!erlaubt.contains(id) || !gesehen.add(id)) {

@@ -198,7 +198,7 @@ public class SearchService {
     private static boolean isMenuScoped(SearchProvider provider) {
         try {
             return provider.isMenuScoped();
-        } catch (Exception _) {
+        } catch (Exception ignoriert) {
             return true;
         }
     }
@@ -207,7 +207,7 @@ public class SearchService {
         try {
             String t = provider.moduleTitle();
             return (t != null && !t.isBlank()) ? t : null;
-        } catch (Exception _) {
+        } catch (Exception ignoriert) {
             return null;
         }
     }
@@ -215,7 +215,7 @@ public class SearchService {
     private static String safeProviderId(SearchProvider provider) {
         try {
             return provider.providerId();
-        } catch (Exception _) {
+        } catch (Exception ignoriert) {
             return provider.getClass().getSimpleName();
         }
     }

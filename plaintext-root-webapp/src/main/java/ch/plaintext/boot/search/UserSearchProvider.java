@@ -125,7 +125,7 @@ public class UserSearchProvider implements SearchProvider {
     private boolean ifGrantedSafe(String role) {
         try {
             return security.ifGranted(role);
-        } catch (Exception _) {
+        } catch (Exception ignoriert) {
             return false;
         }
     }
@@ -133,7 +133,7 @@ public class UserSearchProvider implements SearchProvider {
     private String safeMandat() {
         try {
             return security.getMandat();
-        } catch (Exception _) {
+        } catch (Exception ignoriert) {
             return null;
         }
     }

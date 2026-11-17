@@ -114,7 +114,7 @@ public class SidecarService implements SidecarRegister {
                 s = s.substring(0, s.length() - 1);
             }
             return s;
-        } catch (IllegalArgumentException _) {
+        } catch (IllegalArgumentException ignoriert) {
             return null;
         }
     }
@@ -280,7 +280,7 @@ public class SidecarService implements SidecarRegister {
         }
         try {
             return SidecarBeschreibung.lies(s.getBeschreibungJson());
-        } catch (SidecarBeschreibung.Ungueltig _) {
+        } catch (SidecarBeschreibung.Ungueltig ignoriert) {
             return null;
         }
     }

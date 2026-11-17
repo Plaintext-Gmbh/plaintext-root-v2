@@ -116,7 +116,7 @@ public abstract class AbstractGcmPasswordCipher {
         }
         try {
             return HexFormat.of().parseHex(hex);
-        } catch (IllegalArgumentException _) {
+        } catch (IllegalArgumentException ignoriert) {
             throw new IllegalStateException(
                     "plaintext.security.data-encryption-key ist kein gültiger Hex-String (0-9a-f erwartet).");
         }

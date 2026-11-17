@@ -76,7 +76,7 @@ class KryptoHaertungVertragTest {
             try {
                 byte[] k = Base64.getDecoder().decode(b64.trim());
                 raw = k.length == 32 ? k : sha256(k);
-            } catch (RuntimeException _) {
+            } catch (RuntimeException ignoriert) {
                 raw = null;
             }
         }

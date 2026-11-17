@@ -85,7 +85,7 @@ public record SidecarBeschreibung(String protokoll, String name, String titel, S
         JsonNode n;
         try {
             n = JSON.readTree(json);
-        } catch (JacksonException _) {
+        } catch (JacksonException ignoriert) {
             throw new Ungueltig("Antwort ist kein JSON.");
         }
         if (n == null || !n.isObject()) {
