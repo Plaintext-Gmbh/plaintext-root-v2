@@ -545,6 +545,11 @@
     width: 90px;
 }
 
+/* Karte 2347: die Beschriftung brach neben dem Modus-Knopf um («Fixed / width:»). */
+.pt-ts-breite-fix .pt-tablesettings-label {
+    white-space: nowrap;
+}
+
 /* ── Karte 2333 (Daniel 17.11.) ──────────────────────────────────────────── */
 
 /* Spalten-Reiter: alle Pfeil-Buttons der Liste sind seit Runde 5/7 ausgeblendet, ihre Spalte
