@@ -22,6 +22,11 @@ exhaustive.
   meldet Module aus `module.yaml`, die die Auswahl nicht nennt (`[modul-lader] ACHTUNG: … NICHT in der Auswahl`).
 
 ### Changed
+- **MY_OBJECT auf TEXT** (Karte 2347, Folge 2333): Migration in plaintext-root-webapp hebt
+  `simple_storable_entity.my_object` von VARCHAR(30000) auf TEXT (`SET DATA TYPE`, laeuft auch auf dem
+  demo-H2-Pfad). Kommt in jeder App mit dem naechsten root-Bump an; die Entity bleibt unveraendert
+  (`ddl-auto: none`). Dazu `white-space: nowrap` fuer die Beschriftung «Fixed width:» der
+  Tabelleneinstellungen.
 - **pt:tableSettings nach Daniels Test** (Karte 2333, 17.11.). Die Griffe im Tabellenkopf folgen wieder dem Modus:
   «Anpassen» zeigt keine, «Verschieben» nur die Verschiebe-Griffe, «Vergrössern» nur den Verbreitern-Griff
   (`isGroesseAendernAktiv()` = `mitBreiten` und Modus 2; gespeicherte Breiten gelten in jedem Modus). Das Feld

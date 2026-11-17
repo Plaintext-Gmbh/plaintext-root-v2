@@ -150,7 +150,7 @@ class PlaintextRootTemplateDriftTest {
         GETEILTE_DATEIEN.put("META-INF/resources/plaintext-layout/js/table-settings.js",
                 "4b8201fbb6b35928119094c4788e9989c4b94f8c7389421beb1d79385e3e3223");
         GETEILTE_DATEIEN.put("META-INF/resources/plaintext-layout/css/table-settings.css",
-                "c588845a0d943e9aa2e69a925244a1bb806424d12f569cc59d92a0bb039366f5");
+                "ce01198038a43c8c607bb08af268c83e13e2c3e42b7a157a60b90e86fe09dccd");
         GETEILTE_DATEIEN.put("META-INF/resources/includes/config.xhtml",
                 "6b8b5014e22ff48a43d9e9bf3adc746cca506f4cadc761ceca0e98935206666b");
         GETEILTE_DATEIEN.put("META-INF/resources/includes/footer.xhtml",
