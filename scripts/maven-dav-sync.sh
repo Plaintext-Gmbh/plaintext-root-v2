@@ -10,7 +10,7 @@
 # Aufruf: maven-dav-sync.sh <version>
 #   Ohne  Geheimnis/Schreib-URL (MAVEN_NEXTCLOUD bzw. MAVEN_NEXTCLOUD_DAV): Dry-Run — Staging wird
 #         gebaut und geprueft, nichts hochgeladen (exit 0).
-#   Env:  MAVEN_NEXTCLOUD_DAV   Ziel-Basis, z.B. https://host/remote.php/webdav/files/<user>/maven
+#   Env:  MAVEN_NEXTCLOUD_DAV   Ziel-Basis, z.B. https://host/remote.php/dav/files/<user>/maven
 #         MAVEN_NEXTCLOUD       <user>:<app-passwort> fuer den Schreib-Zugriff (Woodpecker-Secret)
 #         MAVEN_LOCAL_REPO      Quelle, Default ~/.m2/repository
 set -euo pipefail

@@ -55,6 +55,12 @@ steps:
       # server-id `plaintext-nas` (Reposilite, Profil dual-publish-nas aus .mvn/maven.config).
       MAVEN_NAS_TOKEN:
         from_secret: maven_nas_token
+      # Karte 2302: Release zusaetzlich maven-konform auf Nextcloud (scripts/maven-dav-sync.sh,
+      # Hook 2c in release.sh). Secrets ohne pull_request-Event (oeffentliches Repo).
+      MAVEN_NEXTCLOUD_DAV:
+        from_secret: maven_nextcloud_dav
+      MAVEN_NEXTCLOUD:
+        from_secret: maven_nextcloud
       # GitHub-Release mit generierten Notes (best effort) — derselbe Wert wie MVN_DEPLOY_TOKEN.
       GITHUB_TOKEN:
         from_secret: mvn_deploy_token
