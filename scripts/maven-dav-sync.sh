@@ -36,12 +36,16 @@ NETRC="$STAGE/netrc"; : > "$NETRC"
 ARTEFAKTE=0
 for art in "$QUELLE"/*/"$V"; do
     a="$(basename "$(dirname "$art")")"
-    POM="$art/$a-$V.pom"
-    [ -f "$POM" ] || fehler "$a: POM fehlt ($POM)"
+    [ -f "$art/$a-$V.pom" ] || fehler "$a: POM fehlt ($art/$a-$V.pom)"
+    # deploy-file verweigert Dateien, die im lokalen Maven-Repo liegen ("Cannot deploy artifact from
+    # the local repository", Pipeline 213) — darum erst eine Kopie ausserhalb von ~/.m2.
+    Q="$STAGE/quelle/$a"; mkdir -p "$Q"
+    cp "$art/$a-$V.pom" "$Q/"
+    POM="$Q/$a-$V.pom"
     ARGS=(-Durl="file://$STAGE" -DcreateChecksum=true -DpomFile="$POM")
     if [ -f "$art/$a-$V.jar" ]; then
-        ARGS+=(-Dfile="$art/$a-$V.jar")
-        [ -f "$art/$a-$V-sources.jar" ] && ARGS+=(-Dsources="$art/$a-$V-sources.jar")
+        cp "$art/$a-$V.jar" "$Q/"; ARGS+=(-Dfile="$Q/$a-$V.jar")
+        if [ -f "$art/$a-$V-sources.jar" ]; then cp "$art/$a-$V-sources.jar" "$Q/"; ARGS+=(-Dsources="$Q/$a-$V-sources.jar"); fi
     else
         ARGS+=(-Dfile="$POM" -Dpackaging=pom)   # reines POM-Artefakt (z.B. plaintext-root-parent)
     fi
@@ -54,6 +58,7 @@ sag "Staging: $ARTEFAKTE Artefakte unter $STAGE/$GRUPPE_PFAD."
 
 # ── 2. Upload nach WebDAV — Artefakte zuerst, maven-metadata.xml je Artefakt ZULETZT
 if [ -z "$DAV" ] || [ -z "$AUTH" ]; then
+    rm -rf "$STAGE/quelle"
     sag "Dry-Run: MAVEN_NEXTCLOUD_DAV/MAVEN_NEXTCLOUD nicht gesetzt — nichts hochgeladen."
     find "$STAGE" -type f | sort | sed "s#^$STAGE/##" | head -20 | sed 's/^/  /'
     sag "Dry-Run: $(find "$STAGE" -type f | wc -l) Dateien waeren es."
@@ -68,6 +73,7 @@ dav() { curl -sS --fail --max-time 300 --netrc-file "$NETRC" "$@"; }
 # Zielverzeichnisse zuerst anlegen (MKCOL ist idempotent; 405 = existiert bereits),
 # dann PUTs ohne MKCOL — so bleibt der Upload ~1 Request pro Datei.
 sag "Upload nach $DAV/$GRUPPE_PFAD ..."
+rm -rf "$STAGE/quelle"
 while IFS= read -r d; do
     dav -o /dev/null -X MKCOL "$DAV/${d#"$STAGE"/}" 2>/dev/null || true
 done < <(find "$STAGE" -type d | sort)
