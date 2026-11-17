@@ -33,8 +33,13 @@ public class GenericEntityService<T extends SimpleStorable> {
     @Autowired
     private SimpleStorableEntityRepository repository;
 
+    /**
+     * Legt das Objekt ab. {@code false}, wenn das Speichern scheiterte (Karte 2333: der Aufrufer
+     * darf dann mit weniger Inhalt noch einmal speichern, z.B. bei MY_OBJECT VARCHAR(30000) voll).
+     * Ein Fehler beim Commit (Flush ausserhalb des try) fliegt weiter wie bisher.
+     */
     @Transactional
-    public void save(T object) {
+    public boolean save(T object) {
         try {
             log.debug("Saving object with uniqueId: {}", object.getUniqueId());
             SimpleStorableEntity storable = repository.findByUniqueId(object.getUniqueId());
@@ -44,8 +49,10 @@ public class GenericEntityService<T extends SimpleStorable> {
             storable.setMyObject(object);
             repository.save(storable);
             log.debug("Successfully saved object with uniqueId: {}", object.getUniqueId());
+            return true;
         } catch (Exception e) {
             log.error("Error saving object: " + e.getMessage(), e);
+            return false;
         }
     }
 

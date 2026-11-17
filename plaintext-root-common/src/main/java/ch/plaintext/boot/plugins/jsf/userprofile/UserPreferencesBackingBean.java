@@ -340,7 +340,14 @@ public class UserPreferencesBackingBean implements Serializable {
         } else {
             prefs().getTabellenStaende().put(schluessel, stand);
         }
-        save();
+        if (!save() && stand != null) {
+            // Karte 2333 (Daniel 17.11.): scheitert das Speichern (MY_OBJECT ist VARCHAR(30000),
+            // viele Staende passen nicht), zaehlt der neue Stand - die alten der anderen
+            // Tabellen fallen weg, "das ist nicht so schlimm".
+            prefs().getTabellenStaende().keySet().retainAll(java.util.Set.of(schluessel));
+            log.warn("Tabellenstand '{}' nur ohne die uebrigen Staende speicherbar", schluessel);
+            save();
+        }
     }
 
     /**
@@ -453,16 +460,16 @@ public class UserPreferencesBackingBean implements Serializable {
      * Save preferences with optimistic locking retry.
      * No longer synchronized — uses JPA @Version for concurrency control.
      */
-    public void save() {
+    public boolean save() {
         UserPreference aktuell = prefs();
         if (aktuell == null || aktuell.getUniqueId() == null) {
             // Ohne Anmeldung (Anmeldeseite) wird nichts gespeichert — ein Datensatz
             // "anonymousUser" waere der gemeinsame Stand aller, siehe prefs().
             log.debug("Einstellungen ohne angemeldeten Benutzer - nicht gespeichert");
-            return;
+            return false;
         }
         try {
-            storage.save(aktuell);
+            return storage.save(aktuell);
         } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
             log.debug("Optimistic lock conflict on preferences save, retrying...");
             try {
@@ -471,12 +478,14 @@ public class UserPreferencesBackingBean implements Serializable {
                 if (fresh != null) {
                     prefs = fresh;
                 }
-                storage.save(prefs);
+                return storage.save(prefs);
             } catch (Exception retryEx) {
                 log.error("Retry failed for preferences save: " + retryEx.getMessage(), retryEx);
+                return false;
             }
         } catch (Exception e) {
             log.error("Error saving user preferences: " + e.getMessage(), e);
+            return false;
         }
     }
 
