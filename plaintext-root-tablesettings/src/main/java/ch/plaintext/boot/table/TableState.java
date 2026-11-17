@@ -95,10 +95,16 @@ public class TableState implements Serializable {
     private List<String> columnOrder;
 
     /**
-     * Festgehaltener Spaltenstand (Karte 1853 Runde 7): im Ansicht-Reiter erfasst, per Doppelklick
-     * auf den Modus-Knopf wiederhergestellt. {@code null} = keiner erfasst.
+     * Festgehaltener Spaltenstand (Karte 1853 Runde 7). Mit Karte 2333 aus der Bedienung entfernt;
+     * das Feld bleibt, damit gespeicherte Staende lesbar bleiben.
      */
     private FesterStand festerStand;
+
+    /**
+     * Von Hand gezogene Hoehe der Reihenfolge-Liste im Spalten-Reiter, in Pixeln (Karte 2333).
+     * {@code null} = Vorgabe des Stils. Gehoert zum Stand, nicht ins Profil.
+     */
+    private Integer listenHoehe;
 
     /**
      * Was eine Seite ausser Spalten und Breiten noch merkt (Karte 2086): Filter, Schalter ueber der

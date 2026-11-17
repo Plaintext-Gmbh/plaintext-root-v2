@@ -115,7 +115,7 @@ import java.util.stream.Collectors;
  * Projektuebersicht und ist dort teuer erkauft worden; die Begruendung zu
  * {@link #getTabellenBreite()} steht bei der Methode. Gesamtbreite, Zielbreite und proportionales
  * Umrechnen sind mit Karte 2160 weggefallen — Breiten zieht man im Modus «Vergröessern», einen
- * exakten Wert trägt man im Panel ein (Doppelklick auf den Modus-Knopf im Resize-Modus).</p>
+ * exakten Wert setzt dort das Feld «Feste Breite» per Doppelklick auf den Griff (Karte 2333).</p>
  *
  * @author info@plaintext.ch
  * @since 2026
@@ -270,9 +270,15 @@ public class TableSettings implements Serializable {
     public void init(TableStateStore store, List<TableColumn> columns) {
         this.store = store;
         this.columns = new ArrayList<>(columns);
-        this.state = store == null
-                ? new TableState()
-                : store.load(page, this.columns.stream().map(TableColumn::getKey).toList());
+        try {
+            this.state = store == null
+                    ? new TableState()
+                    : store.load(page, this.columns.stream().map(TableColumn::getKey).toList());
+        } catch (RuntimeException e) {
+            // Karte 2333: ein unlesbarer Altstand sperrt die Seite nicht, er wird ersetzt.
+            log.warn("[TableSettings:{}] Stand nicht lesbar, starte frisch | {}", page, e.toString());
+            this.state = new TableState();
+        }
         if (this.state == null) {
             // Der Vertrag sagt "nie null"; eine fremde Umsetzung, die ihn bricht, soll die Seite
             // trotzdem nicht in eine NPE laufen lassen.
@@ -689,45 +695,18 @@ public class TableSettings implements Serializable {
         return TableSettingsTexte.modusIcon(getModus());
     }
 
-    /** Haelt Breiten und Reihenfolge fest (Ansicht-Reiter, Karte 1853 Runde 7); wandert mit ins Profil. */
-    public void festerStandErfassen() {
-        state.setFesterStand(FesterStand.aus(state, getOrderedColumns().stream().map(TableColumn::getKey).toList()));
-        persist();
-        growl(text("meldung.festerStand.erfasst"));
-    }
-
-    public boolean isFesterStandErfasst() {
-        return state.getFesterStand() != null;
-    }
-
-    /** Doppelklick auf den Modus-Knopf: Breiten und Reihenfolge genau auf den festen Stand. */
-    public void festerStandHerstellen(String tabelle) {
-        if (state.getFesterStand() == null) {
-            growl(text("meldung.festerStand.fehlt"));
-            return;
-        }
-        state.getFesterStand().anwenden(state);
-        persist();
-        UIData data = tabelleFinden(tabelle);
-        if (data != null) {
-            TableKomponenten.pfReihenfolgeVergessen(data);   // sonst gilt PFs Kopf-Zug-Ordnung weiter
-            reihenfolgeAnwenden(data);
-        }
-        growl(text("meldung.festerStand.hergestellt"));
-    }
-
     /** Schalter «Verschieben»: duerfen die Spaltenkoepfe per Ziehen umgeordnet werden? Vorgabe: aus. */
     public boolean isVerschiebenAktiv() {
         return modus == 1;
     }
 
     /**
-     * Schalter «Groesse aendern»: der Verbreitern-Griff haengt auf Seiten mit Spaltenbreiten
-     * immer (Daniel 15.11.) — nicht mehr abhaengig vom Modus, der seitdem nie gespeichert wird
-     * und je Anmeldung mit «Anpassen» startet.
+     * Schalter «Groesse aendern»: der Verbreitern-Griff haengt nur im Modus «Vergroessern»
+     * (Karte 2333, Daniel 17.11.: bei «Anpassen» keine Knoepfe an den Spalten, bei «Verschieben»
+     * nur die Verschiebe-Griffe). Gespeicherte Breiten gelten in jedem Modus.
      */
     public boolean isGroesseAendernAktiv() {
-        return mitBreiten;
+        return mitBreiten && modus == 2;
     }
 
     // ── Breiten ─────────────────────────────────────────────────────────────
@@ -790,86 +769,96 @@ public class TableSettings implements Serializable {
             return;
         }
         state.getColumnWidths().put(key, event.getWidth() + "px");
-        breiteFixSpalte = key;
         persist();
         growl(text("meldung.breiteGeaendert"));
         log.debug("[TableSettings:{}] onColumnResize | column={} | width={}px", page, key, event.getWidth());
     }
 
-    // ── Breite fix eintragen (Karte 2160; Daniel 15.11.: Doppelklick auf den Verbreitern-Griff) ─
+    // ── Feste Breite (Karte 2160; neu geregelt mit Karte 2333, Daniel 17.11.) ─────────────
 
     /**
-     * Die Spalte, deren Breite exakt einzutragen ist — gesetzt vom Doppelklick auf den
-     * Resize-Griff ihres Kopfes ({@link #breiteFixOeffnen(String)}) oder als zuletzt gezogene
-     * ({@link #onColumnResize}). {@code null}, solange nichts gewaehlt wurde; das Feld zeigt
-     * dann einen Hinweis statt der Eingabe.
+     * Der Wert des Felds «Feste Breite» in Pixeln. Lebt nur in dieser Instanz, also in der
+     * Sitzung, und wird nie gespeichert. Das Tag zeigt das Feld nur im Modus «Vergroessern».
      */
     @Getter
-    private String breiteFixSpalte;
-
-    /** Der eingetragene Wert fuer {@link #breiteFixUebernehmen(String)}. */
-    @Getter
-    @Setter
     private Integer breiteFixWert;
 
-    /**
-     * Doppelklick auf den Verbreitern-Griff: das Skript (js/table-settings.js) meldet die
-     * Position des Kopfes als {@code kopf}-Parameter; die Spalte dazu wird ueber
-     * {@link TableKomponenten#kopfKey} aufgeloest und der aktuellen Breite vorbesetzt.
-     * Ohne Aufloesung bleibt die zuletzt gezogene Spalte das Ziel (Zug im Kopf vor dem
-     * Doppelklick). Das Feld steht dauerhaft im Ansicht-Reiter — es gibt nichts aufzuklappen.
-     */
-    public void breiteFixOeffnen(String tabelle) {
-        Map<String, String> params = FacesContext.getCurrentInstance()
-                .getExternalContext().getRequestParameterMap();
-        String kopf = params.get("kopf");
-        int index = -1;
-        if (kopf != null) {
-            try {
-                index = Integer.parseInt(kopf.trim());
-            } catch (NumberFormatException e) { // NOSONAR - ungueltiger Parameter: Ziel bleibt die gezogene Spalte
-                log.debug("[TableSettings:{}] breiteFixOeffnen | kopf ungueltig | {}", page, kopf);
-            }
-        }
-        if (index >= 0) {
-            UIData data = tabelleFinden(tabelle);
-            String key = data == null ? null
-                    : TableKomponenten.kopfKey(data, this::keyFromHeader, index);
-            if (key != null) {
-                breiteFixSpalte = key;
-            }
-        }
-        TableColumn ziel = breiteFixSpalte == null ? null : spalte(breiteFixSpalte);
-        breiteFixWert = ziel == null ? null : breiteVon(ziel);
+    /** Leer oder nicht positiv heisst "kein Wert": der naechste Doppelklick fuellt das Feld wieder. */
+    public void setBreiteFixWert(Integer wert) {
+        this.breiteFixWert = wert != null && wert > 0 ? wert : null;
     }
 
-    /** Die Zielspalte als Column; {@code null} bei unbekanntem Schluessel (Sitzungsreste). */
+    /**
+     * Doppelklick auf den Verbreitern-Griff einer Spalte: das Skript (js/table-settings.js) meldet
+     * die Position des Kopfes als {@code kopf}-Parameter, {@link TableKomponenten#kopfKey} loest
+     * sie auf den Spaltenschluessel auf.
+     */
+    public void breiteFixDoppelklick(String tabelle) {
+        String kopf = FacesContext.getCurrentInstance().getExternalContext().getRequestParameterMap().get("kopf");
+        UIData data = tabelleFinden(tabelle);
+        try {
+            breiteFixAufSpalte(data == null || kopf == null ? null
+                    : TableKomponenten.kopfKey(data, this::keyFromHeader, Integer.parseInt(kopf.trim())), data);
+        } catch (NumberFormatException e) { // NOSONAR - ungueltiger Parameter: nichts tun
+            log.debug("[TableSettings:{}] breiteFixDoppelklick | kopf ungueltig | {}", page, kopf);
+        }
+    }
+
+    /**
+     * Kern des Doppelklicks, ohne Faces testbar. Ist das Feld leer, uebernimmt es die Breite der
+     * Spalte (und aendert nichts). Steht ein Wert im Feld, bekommt die Spalte genau diese Breite;
+     * die Spaltenbreite wird wie jede andere gespeichert, der Feldwert nicht. Zu kleine Werte
+     * werden verworfen statt beanstandet. Die ColumnMeta der Tabelle wird mitgesetzt, sonst ginge
+     * die gezogene Breite bis zum Neuladen vor ({@link TableKomponenten#metaBreiteSetzen}).
+     */
+    void breiteFixAufSpalte(String key, UIData data) {
+        TableColumn ziel = key == null ? null : spalte(key);
+        if (ziel == null) {
+            return;
+        }
+        if (breiteFixWert == null) {
+            breiteFixWert = breiteVon(ziel);
+            return;
+        }
+        if (breiteFixWert < MIN_SPALTE_PX) {
+            return;
+        }
+        state.getColumnWidths().put(key, breiteFixWert + "px");
+        persist();
+        if (data != null) {
+            TableKomponenten.metaBreiteSetzen(data, this::keyFromHeader, key, breiteFixWert + "px");
+        }
+        growl(text("meldung.breiteGespeichert"));
+    }
+
+    /** Die Spalte zum Schluessel; {@code null} bei unbekanntem Schluessel. */
     private TableColumn spalte(String key) {
         return columns.stream().filter(c -> c.getKey().equals(key)).findFirst().orElse(null);
     }
 
-    /**
-     * Uebernimmt den eingetragenen Wert fuer die gewaehlte Spalte — ausgeloest vom change-Event
-     * des Eingabefelds, ein Save-Button existiert nicht (Daniel 15.11.: «immer speichern bei
-     * jeder Aktion»). Zu kleine Werte werden verworfen statt beanstandet — wie an dieser Stelle
-     * immer, haelt ein Wert das Formular nicht auf. Die Tabelle zeigt den Wert sofort, die
-     * DataTables-ColumnMeta wird mitgesetzt, sonst ginge die gezogene Breite bis zum Neuladen
-     * vor ({@link TableKomponenten#metaBreiteSetzen}).
-     */
-    public void breiteFixUebernehmen(String tabelle) {
-        if (breiteFixSpalte == null || spalte(breiteFixSpalte) == null
-                || breiteFixWert == null || breiteFixWert < MIN_SPALTE_PX) {
-            log.debug("[TableSettings:{}] breiteFixUebernehmen | verworfen | spalte={} | wert={}",
-                    page, breiteFixSpalte, breiteFixWert);
-            return;
+    // ── Hoehe der Spaltenliste im Panel (Karte 2333) ───────────────────────
+
+    /** Von Hand gezogene Hoehe der Reihenfolge-Liste in Pixeln; {@code null} = Vorgabe des Stils. */
+    public Integer getListenHoehe() {
+        return state.getListenHoehe();
+    }
+
+    /** Das Skript meldet die gezogene Hoehe als Parameter {@code hoehe} (remoteCommand ListenHoehe). */
+    public void onListenHoeheGemeldet() {
+        listenHoeheSetzen(FacesContext.getCurrentInstance().getExternalContext().getRequestParameterMap().get("hoehe"));
+    }
+
+    /** Kern von {@link #onListenHoeheGemeldet()}; Unsinn (kein Zahlwert, ausserhalb 100 bis 4000) wird verworfen. */
+    void listenHoeheSetzen(String hoehe) {
+        try {
+            int px = Integer.parseInt(hoehe == null ? "" : hoehe.trim());
+            if (px >= 100 && px <= 4000) {
+                state.setListenHoehe(px);
+                save();
+            }
+        } catch (NumberFormatException e) { // NOSONAR - ungueltiger Parameter: nichts tun
+            log.debug("[TableSettings:{}] listenHoeheSetzen | ungueltig | {}", page, hoehe);
         }
-        state.getColumnWidths().put(breiteFixSpalte, breiteFixWert + "px");
-        persist();
-        UIData data = tabelleFinden(tabelle);
-        if (data != null) {
-            TableKomponenten.metaBreiteSetzen(data, this::keyFromHeader, breiteFixSpalte, breiteFixWert + "px");
-        }
-        growl(text("meldung.breiteGespeichert"));
     }
 
     /** Kurzes Growl-Overlay fuer gelungene Aenderungen (Runde 4, Karte 1853), siehe {@link TableSettingsTexte#growl}. */
@@ -1352,7 +1341,22 @@ public class TableSettings implements Serializable {
             // bleibt bedienbar, nur das Speichern setzt bis zum Neuaufbau aus.
             return;
         }
-        store.save(page, state);
+        try {
+            store.save(page, state);
+        } catch (RuntimeException e) {
+            // Karte 2333 (Daniel 17.11.): scheitert das Speichern, gelten die neuen Werte und der
+            // Altbestand faellt weg: nur der laufende Stand als einziges Profil, zweiter Versuch.
+            log.warn("[TableSettings:{}] Speichern gescheitert, Altbestand wird verworfen | {}", page, e.toString());
+            state.getProfiles().clear();
+            state.setFesterStand(null);
+            writeActiveProfile();
+            try {
+                store.save(page, state);
+            } catch (RuntimeException zweiter) {
+                log.warn("[TableSettings:{}] Speichern erneut gescheitert, Stand gilt nur in der Sitzung | {}",
+                        page, zweiter.toString());
+            }
+        }
     }
 
     /**

@@ -276,11 +276,12 @@ class TableSettingsTest {
         anzeige.modusWechseln();
         assertThat(anzeige.getModus()).isEqualTo(1);
         assertThat(anzeige.isVerschiebenAktiv()).isTrue();
-        assertThat(anzeige.isGroesseAendernAktiv()).isTrue();   // Griff haengt immer (mitBreiten)
+        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();   // Karte 2333: Griff nur im Modus Vergroessern
 
         anzeige.modusWechseln();
         assertThat(anzeige.getModus()).isEqualTo(2);
         assertThat(anzeige.isVerschiebenAktiv()).isFalse();
+        assertThat(anzeige.isGroesseAendernAktiv()).isTrue();
 
         anzeige.modusWechseln();
         assertThat(anzeige.getModus()).isEqualTo(0);
@@ -311,72 +312,65 @@ class TableSettingsTest {
     }
 
     @Test
-    @DisplayName("Runde 7: fester Stand - festhalten, verstellen, genau zurueck; wandert mit ins Profil")
-    void festerStandFesthaltenUndHerstellen() {
-        anzeige.getState().getColumnWidths().put("name", "180px");
-        anzeige.getState().setColumnOrder(java.util.List.of("team", "name", "extra"));
-        assertThat(anzeige.isFesterStandErfasst()).isFalse();
+    @DisplayName("Karte 2333: Verbreitern-Griff nur im Modus Vergroessern, Verschieben nur im Modus Verschieben")
+    void griffeJeModus() {
+        TableSettings mitBreiten = new TableSettings("griffe", true);
+        assertThat(mitBreiten.isGroesseAendernAktiv()).isFalse();
+        assertThat(mitBreiten.isVerschiebenAktiv()).isFalse();
+        mitBreiten.modusWechseln();   // Verschieben
+        assertThat(mitBreiten.isVerschiebenAktiv()).isTrue();
+        assertThat(mitBreiten.isGroesseAendernAktiv()).isFalse();
+        mitBreiten.modusWechseln();   // Vergroessern
+        assertThat(mitBreiten.isVerschiebenAktiv()).isFalse();
+        assertThat(mitBreiten.isGroesseAendernAktiv()).isTrue();
 
-        anzeige.festerStandErfassen();
-        assertThat(anzeige.isFesterStandErfasst()).isTrue();
-        assertThat(anzeige.getState().getProfiles().get(TableSettings.PROFILE_DEFAULT).getFesterStand())
-                .isEqualTo(anzeige.getState().getFesterStand());
-
-        // verstellen: andere Breite, neue Spalte mit Breite, andere Reihenfolge
-        anzeige.getState().getColumnWidths().put("name", "300px");
-        anzeige.getState().getColumnWidths().put("team", "77px");
-        anzeige.getState().setColumnOrder(java.util.List.of("extra", "name", "team"));
-
-        anzeige.festerStandHerstellen(":fm:tbl");
-
-        assertThat(anzeige.getState().getColumnWidths()).containsExactly(java.util.Map.entry("name", "180px"));
-        assertThat(anzeige.getState().getColumnOrder()).containsExactly("team", "name", "extra");
-
-        // Der feste Stand bleibt unberuehrt, wenn danach weiter gezogen wird.
-        anzeige.getState().getColumnWidths().put("name", "222px");
-        assertThat(anzeige.getState().getFesterStand().columnWidths()).containsEntry("name", "180px");
+        TableSettings ohneBreiten = new TableSettings("griffe", false);
+        ohneBreiten.modusWechseln();
+        ohneBreiten.modusWechseln();
+        assertThat(ohneBreiten.isGroesseAendernAktiv()).isFalse();
     }
 
     @Test
-    @DisplayName("Runde 7: nie verschoben - der feste Stand haelt die Markup-Reihenfolge fest, nicht null")
-    void festerStandOhneVerschiebenHaeltReihenfolgeFest() {
-        anzeige.festerStandErfassen();
-        anzeige.getState().setColumnOrder(java.util.List.of("extra", "team", "name"));
+    @DisplayName("Karte 2333: scheitert das Speichern, faellt der Altbestand weg und die neuen Werte werden gespeichert")
+    void speichernScheitertAltbestandFaelltWeg() {
+        TableStateStore ablage = Mockito.mock(TableStateStore.class);
+        TableState alt = new TableState();
+        alt.getProfiles().put("Alt", new TableColumnProfile());
+        alt.setActiveProfile("Alt");
+        Mockito.when(ablage.load(Mockito.any(), Mockito.any())).thenReturn(alt);
+        TableSettings a = new TableSettings("kaputt", true);
+        a.init(ablage, anzeige.getColumns());
+        a.getState().getProfiles().put("Uralt", new TableColumnProfile());
+        Mockito.doThrow(new IllegalStateException("kaputt")).doNothing().when(ablage).save(Mockito.any(), Mockito.any());
 
-        anzeige.festerStandHerstellen(":fm:tbl");
+        a.getState().getColumnWidths().put("name", "200px");
+        a.persist();
 
-        assertThat(anzeige.getState().getColumnOrder()).containsExactly("name", "team", "extra");
+        assertThat(a.getState().getProfiles()).containsOnlyKeys("Alt");
+        assertThat(a.getState().getProfiles().get("Alt").getColumnWidths()).containsEntry("name", "200px");
+        Mockito.verify(ablage, Mockito.times(2)).save(Mockito.eq("kaputt"), Mockito.any());
     }
 
     @Test
-    @DisplayName("Runde 7: Restore vergisst PFs Kopf-Zug-Ordnung (displayPriority), Breite/Sichtbarkeit bleiben")
-    void pfReihenfolgeVergessen() {
-        org.primefaces.component.datatable.DataTable tabelle = Mockito.mock(org.primefaces.component.datatable.DataTable.class);
-        org.primefaces.model.ColumnMeta meta = new org.primefaces.model.ColumnMeta("fm:tbl:c1");
-        meta.setDisplayPriority(3);
-        meta.setWidth("120");
-        meta.setVisible(Boolean.FALSE);
-        Mockito.when(tabelle.getColumnMeta()).thenReturn(new java.util.HashMap<>(java.util.Map.of("fm:tbl:c1", meta)));
-
-        TableKomponenten.pfReihenfolgeVergessen(tabelle);
-
-        @SuppressWarnings("unchecked")
-        org.mockito.ArgumentCaptor<java.util.Map<String, org.primefaces.model.ColumnMeta>> neu =
-                org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
-        Mockito.verify(tabelle).setColumnMeta(neu.capture());
-        org.primefaces.model.ColumnMeta kopie = neu.getValue().get("fm:tbl:c1");
-        assertThat(kopie.getDisplayPriority()).isNull();
-        assertThat(kopie.getWidth()).isEqualTo("120");
-        assertThat(kopie.getVisible()).isFalse();
-        Mockito.verify(tabelle).setColumns(null);
+    @DisplayName("Karte 2333: ein unlesbarer Stand sperrt die Seite nicht")
+    void ladenScheitertFrischerStand() {
+        TableStateStore ablage = Mockito.mock(TableStateStore.class);
+        Mockito.when(ablage.load(Mockito.any(), Mockito.any())).thenThrow(new IllegalStateException("kaputt"));
+        TableSettings a = new TableSettings("kaputt", true);
+        a.init(ablage, anzeige.getColumns());
+        assertThat(a.getSelectedProfile()).isEqualTo(TableSettings.PROFILE_DEFAULT);
     }
 
     @Test
-    @DisplayName("Runde 7: ohne festen Stand aendert der Doppelklick nichts")
-    void festerStandFehlt() {
-        anzeige.getState().getColumnWidths().put("name", "300px");
-        anzeige.festerStandHerstellen(":fm:tbl");
-        assertThat(anzeige.getState().getColumnWidths()).containsEntry("name", "300px");
+    @DisplayName("Karte 2333: gezogene Hoehe der Spaltenliste wird gespeichert, Unsinn verworfen")
+    void listenHoehe() {
+        assertThat(anzeige.getListenHoehe()).isNull();
+        anzeige.listenHoeheSetzen("abc");
+        anzeige.listenHoeheSetzen("20");
+        anzeige.listenHoeheSetzen(null);
+        assertThat(anzeige.getListenHoehe()).isNull();
+        anzeige.listenHoeheSetzen(" 340 ");
+        assertThat(anzeige.getListenHoehe()).isEqualTo(340);
     }
 
     @Test
