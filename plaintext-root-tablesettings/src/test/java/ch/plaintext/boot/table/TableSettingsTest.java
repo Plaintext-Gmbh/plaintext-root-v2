@@ -276,11 +276,12 @@ class TableSettingsTest {
         anzeige.modusWechseln();
         assertThat(anzeige.getModus()).isEqualTo(1);
         assertThat(anzeige.isVerschiebenAktiv()).isTrue();
-        assertThat(anzeige.isGroesseAendernAktiv()).isTrue();   // Griff haengt immer (mitBreiten)
+        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();   // Karte 2333: je Modus nur sein Griff
 
         anzeige.modusWechseln();
         assertThat(anzeige.getModus()).isEqualTo(2);
         assertThat(anzeige.isVerschiebenAktiv()).isFalse();
+        assertThat(anzeige.isGroesseAendernAktiv()).isTrue();
 
         anzeige.modusWechseln();
         assertThat(anzeige.getModus()).isEqualTo(0);
@@ -303,49 +304,45 @@ class TableSettingsTest {
     }
 
     @Test
+    @DisplayName("Karte 2333: je Modus nur sein Griff - Adjust keiner, Reorder verschieben, Resize verbreitern; Breite fix wird beim Wechsel geleert")
+    void griffeJeModus() {
+        assertThat(anzeige.isVerschiebenAktiv()).isFalse();
+        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();
+        anzeige.modusWechseln();   // 1 Verschieben
+        assertThat(anzeige.isVerschiebenAktiv()).isTrue();
+        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();
+        anzeige.modusWechseln();   // 2 Vergroessern
+        assertThat(anzeige.isVerschiebenAktiv()).isFalse();
+        assertThat(anzeige.isGroesseAendernAktiv()).isTrue();
+        anzeige.setBreiteFixWert(222);
+        anzeige.modusWechseln();   // 0 Anpassen
+        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();
+        assertThat(anzeige.getBreiteFixWert()).as("Sitzungswert faellt beim Modus-Wechsel weg").isNull();
+
+        TableSettings ohneBreiten = new TableSettings("testpage", false);
+        ohneBreiten.init(store, COLUMNS);
+        ohneBreiten.modusWechseln();
+        ohneBreiten.modusWechseln();
+        assertThat(ohneBreiten.isGroesseAendernAktiv()).as("ohne Breiten nie").isFalse();
+    }
+
+    @Test
+    @DisplayName("Karte 2333: die gezogene Hoehe der Spaltenliste wird gespeichert und als Variable gerendert")
+    void listeHoehe() {
+        assertThat(anzeige.getSpaltenListeStyle()).isEmpty();
+        anzeige.listeHoeheSetzen(12);   // Unsinn
+        assertThat(anzeige.getState().getSpaltenListeHoehe()).isNull();
+        anzeige.listeHoeheSetzen(310);
+        assertThat(anzeige.getSpaltenListeStyle()).isEqualTo("--pt-ts-liste-hoehe:310px");
+        Mockito.verify(store, Mockito.atLeastOnce()).save(eq("testpage"), any(TableState.class));
+    }
+
+    @Test
     @DisplayName("Runde 7: Modus Verschieben hat ein eigenes Symbol, Resize kein erfundenes")
     void modusIconsExistieren() {
         anzeige.modusWechseln();   // 0 -> 1 Verschieben
         assertThat(anzeige.getModusIcon()).isEqualTo("pi pi-arrow-right-arrow-left");
         assertThat(anzeige.text("modus.anpassen")).isEqualTo("Anpassen");
-    }
-
-    @Test
-    @DisplayName("Runde 7: fester Stand - festhalten, verstellen, genau zurueck; wandert mit ins Profil")
-    void festerStandFesthaltenUndHerstellen() {
-        anzeige.getState().getColumnWidths().put("name", "180px");
-        anzeige.getState().setColumnOrder(java.util.List.of("team", "name", "extra"));
-        assertThat(anzeige.isFesterStandErfasst()).isFalse();
-
-        anzeige.festerStandErfassen();
-        assertThat(anzeige.isFesterStandErfasst()).isTrue();
-        assertThat(anzeige.getState().getProfiles().get(TableSettings.PROFILE_DEFAULT).getFesterStand())
-                .isEqualTo(anzeige.getState().getFesterStand());
-
-        // verstellen: andere Breite, neue Spalte mit Breite, andere Reihenfolge
-        anzeige.getState().getColumnWidths().put("name", "300px");
-        anzeige.getState().getColumnWidths().put("team", "77px");
-        anzeige.getState().setColumnOrder(java.util.List.of("extra", "name", "team"));
-
-        anzeige.festerStandHerstellen(":fm:tbl");
-
-        assertThat(anzeige.getState().getColumnWidths()).containsExactly(java.util.Map.entry("name", "180px"));
-        assertThat(anzeige.getState().getColumnOrder()).containsExactly("team", "name", "extra");
-
-        // Der feste Stand bleibt unberuehrt, wenn danach weiter gezogen wird.
-        anzeige.getState().getColumnWidths().put("name", "222px");
-        assertThat(anzeige.getState().getFesterStand().columnWidths()).containsEntry("name", "180px");
-    }
-
-    @Test
-    @DisplayName("Runde 7: nie verschoben - der feste Stand haelt die Markup-Reihenfolge fest, nicht null")
-    void festerStandOhneVerschiebenHaeltReihenfolgeFest() {
-        anzeige.festerStandErfassen();
-        anzeige.getState().setColumnOrder(java.util.List.of("extra", "team", "name"));
-
-        anzeige.festerStandHerstellen(":fm:tbl");
-
-        assertThat(anzeige.getState().getColumnOrder()).containsExactly("name", "team", "extra");
     }
 
     @Test
@@ -369,14 +366,6 @@ class TableSettingsTest {
         assertThat(kopie.getWidth()).isEqualTo("120");
         assertThat(kopie.getVisible()).isFalse();
         Mockito.verify(tabelle).setColumns(null);
-    }
-
-    @Test
-    @DisplayName("Runde 7: ohne festen Stand aendert der Doppelklick nichts")
-    void festerStandFehlt() {
-        anzeige.getState().getColumnWidths().put("name", "300px");
-        anzeige.festerStandHerstellen(":fm:tbl");
-        assertThat(anzeige.getState().getColumnWidths()).containsEntry("name", "300px");
     }
 
     @Test

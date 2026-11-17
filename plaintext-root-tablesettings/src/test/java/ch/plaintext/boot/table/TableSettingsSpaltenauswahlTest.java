@@ -84,14 +84,14 @@ class TableSettingsSpaltenauswahlTest {
     }
 
     @Test
-    @DisplayName("Schalter: ohne Modus kein Verschieben — der Verbreitern-Griff hängt immer (mitBreiten)")
+    @DisplayName("Schalter: ohne Modus weder Verschieben noch Verbreitern (Karte 2333)")
     void schalterDefaults() {
         assertThat(anzeige.isVerschiebenAktiv()).isFalse();
-        assertThat(anzeige.isGroesseAendernAktiv()).isTrue();
+        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();
 
         anzeige.modusWechseln();   // 0 -> 1 Verschieben
         assertThat(anzeige.isVerschiebenAktiv()).isTrue();
-        assertThat(anzeige.isGroesseAendernAktiv()).isTrue();
+        assertThat(anzeige.isGroesseAendernAktiv()).isFalse();
     }
 
     @Test

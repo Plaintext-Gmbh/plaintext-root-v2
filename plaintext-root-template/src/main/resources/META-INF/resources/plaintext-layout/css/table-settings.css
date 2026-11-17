@@ -532,24 +532,8 @@
     color: var(--pt-tablesettings-akzent, #2563eb);
 }
 
-/* (2) Fester Stand im Ansicht-Reiter: unter Paginator und Seitengroesse, durch eine Linie
-   getrennt. */
-.pt-ts-fester-stand {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px 10px;
-    margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px solid var(--content-border-color, #e2e8f0);
-}
-
-.pt-ts-fester-stand .pt-tablesettings-hint {
-    margin-left: 0;
-    flex-basis: 100%;
-}
-
-/* Breite fix eintragen (Karte 2160): dieselbe Zeilenanordnung wie der feste Stand darueber. */
+/* Breite fix eintragen (Karte 2160/2333): unter Paginator und Seitengroesse, durch eine Linie
+   getrennt; nur im Modus Resize gerendert. */
 .pt-ts-breite-fix {
     display: flex;
     align-items: center;
@@ -567,4 +551,23 @@
 
 .pt-ts-breite-fix .pt-ts-breite-fix-wert {
     width: 90px;
+}
+
+/* ── Karte 2333 (Daniel 17.11.) ──────────────────────────────────────────── */
+
+/* Die Spaltenliste nutzt die ganze Breite: ohne Pfeil-Knoepfe (seit Runde 6 alle weg) braucht
+   die Knopfspalte des OrderList (ui-orderlist-controls, PF 16 im ui-g-Raster links der Liste)
+   keinen Platz mehr; die Listenspalte (ui-md-10) wird zur vollen Breite. */
+.pt-ts-reihenfolge .ui-orderlist-controls {
+    display: none;
+}
+
+.pt-ts-reihenfolge .ui-md-10 {
+    width: 100%;
+}
+
+/* Die am Griff (resize: vertical) gezogene Hoehe der Liste bleibt: table-settings.js meldet sie,
+   das Tag rendert sie als Variable am OrderList. Ohne Wert gilt die Vorgabe (min/max oben). */
+.pt-ts-reihenfolge .ui-orderlist-list {
+    height: var(--pt-ts-liste-hoehe, auto);
 }

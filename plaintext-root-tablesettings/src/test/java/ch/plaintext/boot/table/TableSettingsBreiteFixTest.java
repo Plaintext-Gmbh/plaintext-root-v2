@@ -4,33 +4,26 @@
 package ch.plaintext.boot.table;
 
 import jakarta.faces.component.UIData;
-import jakarta.faces.context.ExternalContext;
-import jakarta.faces.context.FacesContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.mockito.MockedStatic;
 import org.primefaces.component.api.UIColumn;
 import org.primefaces.component.api.UITable;
-import org.primefaces.event.ColumnResizeEvent;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mockStatic;
 
 /**
- * Karte 2160, Daniel 15.11.: exakte Breite per Doppelklick auf den Verbreitern-Griff der Spalte —
- * das Feld im Ansicht-Reiter gilt der gewaehlten (sonst der zuletzt gezogenen) Spalte und speichert
- * beim change-Event sofort, ohne Uebernehmen-Knopf.
+ * Karte 2160/2333 (Daniel 17.11.): «Breite fix» ist ein Sitzungswert im Modus Resize. Leer:
+ * der Doppelklick auf den Griff einer Spalte uebernimmt deren gerenderte Breite ins Feld.
+ * Gefuellt: jeder Doppelklick setzt die jeweilige Spalte auf den Wert und speichert wie ein Zug.
+ * Der Modus-Wechsel leert das Feld (TableSettingsTest#griffeJeModus).
  *
- * <p>Der Zug im Tabellenkopf kommt als {@link ColumnResizeEvent}; wie im Bestand (TableSettingsTest)
- * als Mockito-Mock, statt Faces-Komponenten aufzubauen. Der Doppelklick selbst meldet die Position
- * des Kopfes ({@code kopf}-Parameter) — die Aufloesung auf den Schluessel steckt in
- * {@link TableKomponenten#kopfKey} und wird mit einer gemockten Tabelle geprueft.</p>
+ * <p>Der Doppelklick meldet die Position des Kopfes; die Aufloesung auf den Schluessel steckt in
+ * {@link TableKomponenten#kopfKey} und laeuft hier gegen eine gemockte Tabelle.</p>
  *
  * @author info@plaintext.ch
  * @since 2026
@@ -54,85 +47,60 @@ class TableSettingsBreiteFixTest {
     }
 
     @Test
-    @DisplayName("Doppelklick waehlt die Spalte ueber die Kopf-Position und schlaegt ihre Breite vor")
-    void oeffnenMitKopfPosition() {
-        FacesContext faces = facesMit(Map.of("kopf", "0"));
-        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
-            holder.when(FacesContext::getCurrentInstance).thenReturn(faces);
+    @DisplayName("Leeres Feld: der Doppelklick uebernimmt die gerenderte Breite der Spalte, speichert nichts")
+    void leerUebernimmtBreite() {
+        Mockito.clearInvocations(store);   // init() legt das Standardprofil ab - nicht zaehlen
+        anzeige.breiteFixDoppelklick(tabelleMitZweiSpalten(), 1, 137);
 
-            anzeige.breiteFixOeffnen(null);   // tabelle null: keine Aufloesung, Ziel bleibt die gezogene Spalte
-            assertThat(anzeige.getBreiteFixSpalte()).isNull();
-            assertThat(anzeige.getBreiteFixWert()).isNull();
-        }
-        assertThat(TableKomponenten.kopfKey(tabelleMitZweiSpalten(), anzeige::keyFromHeader, 0))
-                .isEqualTo("name");
-        assertThat(TableKomponenten.kopfKey(tabelleMitZweiSpalten(), anzeige::keyFromHeader, 1))
-                .isEqualTo("team");
-        assertThat(TableKomponenten.kopfKey(tabelleMitZweiSpalten(), anzeige::keyFromHeader, 5))
-                .isNull();
-        assertThat(TableKomponenten.kopfKey(Mockito.mock(UIData.class),
-                anzeige::keyFromHeader, 0)).isNull();
+        assertThat(anzeige.getBreiteFixWert()).isEqualTo(137);
+        assertThat(anzeige.getState().getColumnWidths()).isEmpty();
+        Mockito.verify(store, Mockito.never()).save(any(), any());
     }
 
     @Test
-    @DisplayName("Ziehen vor dem Doppelklick: das Feld schlaegt die Breite der zuletzt gezogenen Spalte vor")
-    void oeffnenNachResize() {
-        resizeGemeldet("Name", 123);
-        oeffneOhneKopf();
+    @DisplayName("Leeres Feld, Spalte schon gezogen: die gespeicherte Breite, nicht die gerenderte")
+    void leerBevorzugtGespeicherteBreite() {
+        anzeige.getState().getColumnWidths().put("team", "150px");
 
-        assertThat(anzeige.getBreiteFixSpalte()).isEqualTo("name");
-        assertThat(anzeige.getBreiteFixWert()).isEqualTo(123);
+        anzeige.breiteFixDoppelklick(tabelleMitZweiSpalten(), 1, 137);
+
+        assertThat(anzeige.getBreiteFixWert()).isEqualTo(150);
     }
 
     @Test
-    @DisplayName("change speichert die Breite in den Stand und ins aktive Profil")
-    void uebernehmenLandetImProfil() {
-        resizeGemeldet("Name", 123);
-        oeffneOhneKopf();
+    @DisplayName("Leeres Feld ohne brauchbare gerenderte Breite: die Vorgabe der Spalte")
+    void leerOhneGerenderteBreite() {
+        anzeige.breiteFixDoppelklick(tabelleMitZweiSpalten(), 0, -1);
+
+        assertThat(anzeige.getBreiteFixWert()).isEqualTo(Math.round(160 * 1.3f));
+    }
+
+    @Test
+    @DisplayName("Gefuelltes Feld: der Doppelklick setzt die Spalte auf den Wert, Stand und Profil")
+    void gefuelltStempeltSpalte() {
         anzeige.setBreiteFixWert(222);
 
-        anzeige.breiteFixUebernehmen(null);
+        anzeige.breiteFixDoppelklick(tabelleMitZweiSpalten(), 1, 137);
 
-        assertThat(anzeige.widthStyle("name")).isEqualTo("width:222px;");
+        assertThat(anzeige.widthStyle("team")).isEqualTo("width:222px;");
+        assertThat(anzeige.widthStyle("name")).isEqualTo("width:208px;");   // unberuehrt: Vorgabe
         assertThat(anzeige.getState().getProfiles().get(TableSettings.PROFILE_DEFAULT).getColumnWidths())
-                .containsEntry("name", "222px");
+                .containsEntry("team", "222px");
+        assertThat(anzeige.getBreiteFixWert()).as("der Stempel bleibt fuer die naechste Spalte").isEqualTo(222);
         Mockito.verify(store, Mockito.atLeastOnce()).save(Mockito.eq("testpage"), any(TableState.class));
     }
 
     @Test
-    @DisplayName("Ohne gewaehlte Spalte oder unter dem Minimum passiert nichts")
+    @DisplayName("Unbekannter Kopf oder Wert unter dem Minimum: nichts passiert")
     void ungueltigeEingaben() {
-        oeffneOhneKopf();
+        anzeige.breiteFixDoppelklick(tabelleMitZweiSpalten(), 5, 137);
         assertThat(anzeige.getBreiteFixWert()).isNull();
-        anzeige.setBreiteFixWert(222);
-        anzeige.breiteFixUebernehmen(null);
-        assertThat(anzeige.getState().getColumnWidths()).isEmpty();
+        anzeige.breiteFixDoppelklick(null, 0, 137);
+        assertThat(anzeige.getBreiteFixWert()).isNull();
 
-        resizeGemeldet("Name", 123);
         anzeige.setBreiteFixWert(10);
-        anzeige.breiteFixUebernehmen(null);
-        // Der Zug selbst steht im Stand (123px); der zu kleine Eintrag wurde verworfen.
-        assertThat(anzeige.getState().getColumnWidths()).containsExactly(
-                org.assertj.core.api.Assertions.entry("name", "123px"));
-    }
-
-    /** Der Doppelklick-Pfad ohne gueltige Kopf-Position: leere Parameter, keine Tabelle. */
-    private void oeffneOhneKopf() {
-        FacesContext faces = facesMit(Map.of());
-        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
-            holder.when(FacesContext::getCurrentInstance).thenReturn(faces);
-            anzeige.breiteFixOeffnen(null);
-        }
-    }
-
-    /** Meldet einen Zug per {@link ColumnResizeEvent}-Mock — wie im Bestand (TableSettingsTest). */
-    private void resizeGemeldet(String header, int breite) {
-        ColumnResizeEvent event = Mockito.mock(ColumnResizeEvent.class);
-        UIColumn column = Mockito.mock(UIColumn.class);
-        Mockito.when(column.getHeaderText()).thenReturn(header);
-        Mockito.when(event.getColumn()).thenReturn(column);
-        Mockito.when(event.getWidth()).thenReturn(breite);
-        anzeige.onColumnResize(event);
+        anzeige.breiteFixDoppelklick(tabelleMitZweiSpalten(), 0, 137);
+        assertThat(anzeige.getState().getColumnWidths()).isEmpty();
     }
 
     /** Eine gemockte Tabelle mit zwei gerenderten Spalten, wie TableSettingsTest sie aufbaut. */
@@ -147,13 +115,5 @@ class TableSettingsBreiteFixTest {
                 Mockito.withSettings().extraInterfaces(UITable.class));
         Mockito.doReturn(List.of(col1, col2)).when((UITable<?>) tabelle).getColumns();
         return tabelle;
-    }
-
-    private static FacesContext facesMit(Map<String, String> params) {
-        ExternalContext external = Mockito.mock(ExternalContext.class);
-        Mockito.when(external.getRequestParameterMap()).thenReturn(params);
-        FacesContext faces = Mockito.mock(FacesContext.class);
-        Mockito.when(faces.getExternalContext()).thenReturn(external);
-        return faces;
     }
 }

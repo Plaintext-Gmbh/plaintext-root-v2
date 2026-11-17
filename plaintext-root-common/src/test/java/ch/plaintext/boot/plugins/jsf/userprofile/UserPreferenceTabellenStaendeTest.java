@@ -5,14 +5,12 @@ package ch.plaintext.boot.plugins.jsf.userprofile;
 
 import ch.plaintext.boot.plugins.objstore.SimpleStorable;
 import ch.plaintext.boot.plugins.objstore.SimpleStorableConverter;
-import ch.plaintext.boot.table.FesterStand;
 import ch.plaintext.boot.table.TableColumnProfile;
 import ch.plaintext.boot.table.TableState;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -60,9 +58,7 @@ class UserPreferenceTabellenStaendeTest {
         profil.getColumnVisible().put("typ", false);
         profil.setPaginatorBottom(false);
         profil.setRowsPerPage(3000);
-        FesterStand fest = new FesterStand(Map.of("nr", "90px"), List.of("nr", "typ"));   // Karte 1853 R7
-        stand.setFesterStand(fest);
-        profil.setFesterStand(fest);
+        stand.setSpaltenListeHoehe(310);   // Karte 2333
         stand.getProfiles().put("Breit", profil);
 
         UserPreference pref = new UserPreference();
@@ -102,9 +98,7 @@ class UserPreferenceTabellenStaendeTest {
         assertThat(geladen.getProfiles().get("Breit").getPaginatorBottom()).isFalse();
         assertThat(geladen.getProfiles().get("Breit").getPaginatorTop()).isNull();
         assertThat(geladen.getProfiles().get("Breit").getRowsPerPage()).isEqualTo(3000);
-        // Karte 1853 Runde 7: der feste Stand (Record) ueberlebt den Konverter, am Stand und im Profil.
-        assertThat(geladen.getFesterStand()).isEqualTo(fest);
-        assertThat(geladen.getProfiles().get("Breit").getFesterStand()).isEqualTo(fest);
+        assertThat(geladen.getSpaltenListeHoehe()).isEqualTo(310);   // Karte 2333
     }
 
     /**
@@ -148,22 +142,23 @@ class UserPreferenceTabellenStaendeTest {
         TableColumnProfile profil = new TableColumnProfile();
         profil.getColumnWidths().put("nr", "120px");
         stand.getProfiles().put("Breit", profil);
-        stand.setFesterStand(new FesterStand(Map.of("nr", "90px"), List.of("nr", "typ")));
 
         UserPreference pref = new UserPreference();
         pref.setUniqueId("daniel@plaintext.ch");
         pref.getTabellenStaende().put("guild42/guild-member", stand);
         String json = converter.convertToDatabaseColumn(pref);
 
-        // Die Felder aus der Zeit vor Karte 2160 in ALLE drei Ebenen injizieren: der Stand, das
-        // Profil und der feste Stand tragen je ein columnWidths-Map — der Ersetzungspunkt.
+        // Die Felder aus der Zeit vor Karte 2160 in beide Ebenen injizieren: Stand und Profil
+        // tragen je ein columnWidths-Map — der Ersetzungspunkt. Dazu der feste Stand (Karte 1853
+        // Runde 7, mit Karte 2333 entfernt): Alt-Staende und Profile mit ihm muessen laden.
         // (Hier KEINE Zukunftsfelder: genau diese Namen existierten bis 3.31.0 wirklich.)
         // Daniel 15.11.: dazu die Modus-Schalter der Runde 6/7 — der Modus wird nicht mehr
         // gespeichert, Alt-Staende und Profile mit ihnen muessen trotzdem laden.
         String alt = json.replace("\"columnWidths\"",
                 "\"totalWidth\":1000,\"targetColumnWidth\":120,\"columnWidths\"");
         alt = alt.replace("\"colsExpanded\"",
-                "\"moveEnabled\":true,\"resizeEnabled\":false,\"colsExpanded\"");
+                "\"moveEnabled\":true,\"resizeEnabled\":false,"
+                + "\"festerStand\":{\"columnWidths\":{\"nr\":\"90px\"},\"columnOrder\":[\"nr\",\"typ\"]},\"colsExpanded\"");
         assertThat(alt).isNotEqualTo(json);
 
         SimpleStorable gelesen = converter.convertToEntityAttribute(alt);
@@ -174,7 +169,5 @@ class UserPreferenceTabellenStaendeTest {
         assertThat(geladen.getColumnWidths()).containsEntry("nr", "88px");
         assertThat(geladen.getProfiles()).containsKey("Breit");
         assertThat(geladen.getProfiles().get("Breit").getColumnWidths()).containsEntry("nr", "120px");
-        assertThat(geladen.getFesterStand())
-                .isEqualTo(new FesterStand(Map.of("nr", "90px"), List.of("nr", "typ")));
     }
 }
