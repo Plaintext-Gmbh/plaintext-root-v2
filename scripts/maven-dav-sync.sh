@@ -32,14 +32,29 @@ STAGE="$(mktemp -d /tmp/maven-dav.XXXXXX)"; chmod 700 "$STAGE"
 trap 'rm -rf "$STAGE"' EXIT
 NETRC="$STAGE/netrc"; : > "$NETRC"
 
+dav() { curl -sS --fail --max-time 300 --netrc-file "$NETRC" "$@"; }
+if [ -n "$DAV" ] && [ -n "$AUTH" ]; then
+    [[ "$AUTH" == *:* ]] || fehler "MAVEN_NEXTCLOUD ohne ':' (erwartet <user>:<passwort>)"
+    ( umask 077
+      printf 'machine %s login %s password %s\n' "$(echo "$DAV" | awk -F/ '{print $3}')" \
+          "${AUTH%%:*}" "${AUTH#*:}" > "$NETRC" )
+fi
+
 # ── 1. Staging: je Artefakt ein deploy:deploy-file ins file://-Repo (Plugin baut Layout + Metadata)
+# Das Staging ist bei jedem Lauf leer. Damit die maven-metadata.xml auf Nextcloud die frueheren
+# Versionen behaelt (3.49.0 hatte 3.47.0 aus der Liste verdraengt), kommt die vorhandene Metadatei
+# je Artefakt vorher ins Staging — deploy-file mergt dann die neue Version hinein.
 ARTEFAKTE=0
 for art in "$QUELLE"/*/"$V"; do
     a="$(basename "$(dirname "$art")")"
     [ -f "$art/$a-$V.pom" ] || fehler "$a: POM fehlt ($art/$a-$V.pom)"
     # deploy-file verweigert Dateien, die im lokalen Maven-Repo liegen ("Cannot deploy artifact from
     # the local repository", Pipeline 213) — darum erst eine Kopie ausserhalb von ~/.m2.
-    Q="$STAGE/quelle/$a"; mkdir -p "$Q"
+    Q="$STAGE/quelle/$a"; mkdir -p "$Q" "$STAGE/$GRUPPE_PFAD/$a"
+    if [ -n "$DAV" ] && [ -n "$AUTH" ]; then
+        dav -o "$STAGE/$GRUPPE_PFAD/$a/maven-metadata.xml" "$DAV/$GRUPPE_PFAD/$a/maven-metadata.xml" 2>/dev/null \
+            || rm -f "$STAGE/$GRUPPE_PFAD/$a/maven-metadata.xml"   # neues Artefakt: noch keine Metadatei
+    fi
     cp "$art/$a-$V.pom" "$Q/"
     POM="$Q/$a-$V.pom"
     ARGS=(-Durl="file://$STAGE" -DcreateChecksum=true -DpomFile="$POM")
@@ -64,11 +79,6 @@ if [ -z "$DAV" ] || [ -z "$AUTH" ]; then
     sag "Dry-Run: $(find "$STAGE" -type f | wc -l) Dateien waeren es."
     exit 0
 fi
-[[ "$AUTH" == *:* ]] || fehler "MAVEN_NEXTCLOUD ohne ':' (erwartet <user>:<passwort>)"
-( umask 077
-  printf 'machine %s login %s password %s\n' "$(echo "$DAV" | awk -F/ '{print $3}')" \
-      "${AUTH%%:*}" "${AUTH#*:}" > "$NETRC" )
-dav() { curl -sS --fail --max-time 300 --netrc-file "$NETRC" "$@"; }
 
 # Zielverzeichnisse zuerst anlegen (MKCOL ist idempotent; 405 = existiert bereits),
 # dann PUTs ohne MKCOL — so bleibt der Upload ~1 Request pro Datei.
