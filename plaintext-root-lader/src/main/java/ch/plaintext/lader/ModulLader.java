@@ -220,6 +220,11 @@ public final class ModulLader {
         try {
             List<ModulAuswahl.Wahl> wahl = mitAusgerollterVersion(
                     ModulAuswahl.auswahlParsen(Files.readString(auswahl), auswahl.toString()), ausgerollt);
+            List<String> fehlend = nichtAusgewaehlt(ausgerollt, wahl);
+            if (!fehlend.isEmpty()) {
+                log("ACHTUNG: ausgerollt (" + KONFIG + "), aber NICHT in der Auswahl und darum nicht geladen: " + fehlend
+                        + " - hat eines davon Migrationen in der DB, bricht Flyway den Start ab (Karte 2343)");
+            }
             huellePruefen();
             ModulAuswahl.Angebot angebot = wahl.isEmpty() ? new ModulAuswahl.Angebot(List.of(), java.util.Map.of())
                     : ModulAuswahl.angebot(q, quelle);
@@ -299,6 +304,17 @@ public final class ModulLader {
         log("kein letzter guter Stand (" + stand + "), keine " + KONFIG + ": Start ohne Module");
         ModulAuswahl.statusSchreiben(verzeichnis, "OHNE-MODULE", grund, List.of());
         return List.of();
+    }
+
+    /**
+     * Karte 2343 (Vorfall 17.11.2026, board fehlte in der Auswahl): Module des ausgerollten App-Jars, die die Auswahl
+     * nicht nennt, als {@code name:version} in der Reihenfolge von {@code module.yaml}.
+     */
+    static List<String> nichtAusgewaehlt(java.util.Map<String, String> ausgerollt, List<ModulAuswahl.Wahl> wahl) {
+        Set<String> gewaehlt = new HashSet<>();
+        wahl.forEach(w -> gewaehlt.add(w.name()));
+        return ausgerollt.entrySet().stream().filter(e -> !gewaehlt.contains(e.getKey()))
+                .map(e -> e.getKey() + ":" + e.getValue()).toList();
     }
 
     /**

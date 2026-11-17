@@ -3,10 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.boot.huelle;
 
+import ch.plaintext.boot.flyway.FlywayMigrationStrategieConfig;
 import ch.plaintext.testsupport.EmbeddedPg;
 import io.modelcontextprotocol.server.McpSyncServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.flyway.autoconfigure.FlywayMigrationStrategy;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.ApplicationContext;
@@ -50,6 +52,13 @@ class HuelleKontextTest {
     void startetOhnePvKonfigMitMcpServer() {
         assertThat(ctx.getBeansOfType(McpSyncServer.class)).hasSize(1);
         assertThat(ctx.getEnvironment().getProperty("spring.ai.mcp.server.name")).isEqualTo("plaintext-root");
+    }
+
+    /** Karte 2343: die Flyway-Vorpruefung haengt im Huellen-Kontext, genau einmal (die app-Fassung aus 2341 lief dort nie). */
+    @Test
+    void flywayVorpruefungIstImHuellenKontext() {
+        assertThat(ctx.getBeansOfType(FlywayMigrationStrategy.class)).hasSize(1);
+        assertThat(ctx.getBeansOfType(FlywayMigrationStrategieConfig.class)).hasSize(1);
     }
 
     @Test
