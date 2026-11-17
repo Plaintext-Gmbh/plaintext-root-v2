@@ -344,8 +344,9 @@ class TabellenStandZweiBenutzerTest {
         private final Map<String, String> zeilen = new HashMap<>();
 
         @Override
-        public void save(UserPreference object) {
+        public boolean save(UserPreference object) {
             zeilen.put(object.getUniqueId(), konverter.convertToDatabaseColumn(object));
+            return true;
         }
 
         @Override

@@ -1,7 +1,17 @@
 # `pt:tableSettings` einsetzen — Anleitung für KIs
 
-Stand: Karte 2160 (14.11.2026). Repo: `Plaintext-Gmbh/plaintext-root-v2`
+Stand: Karte 2333 (17.11.2026). Repo: `Plaintext-Gmbh/plaintext-root-v2`
 (Tag + CSS + JS in `plaintext-root-template`, Java in `plaintext-root-tablesettings`).
+
+Karte 2333 (17.11., gilt vor allem Älteren weiter unten): Die Griffe im Tabellenkopf hängen am
+Modus: «Anpassen» keine, «Verschieben» nur Verschiebe-Griffe, «Vergrössern» nur der
+Verbreitern-Griff. Der **feste Stand ist entfernt** (kein «Aktuellen Stand festhalten», kein
+Doppelklick auf den Modus-Knopf); jede Änderung speichert sofort. Das Feld **«Feste Breite»**
+steht nur im Modus «Vergrössern» neben dem Modus-Knopf und lebt nur in der Sitzung: Doppelklick
+auf einen Verbreitern-Griff füllt das leere Feld mit der Breite dieser Spalte (das Panel geht
+dabei am Regler-Symbol auf), mit einem Wert im Feld bekommt die Spalte genau diese Breite
+(Wert < 44 px wird verworfen). Das Panel bleibt beim Anlegen eines Profils offen, die
+Spaltenliste nutzt die ganze Breite und merkt sich ihre gezogene Höhe.
 
 Karte 2160 (14.11.): Gesamtbreite und Zielspaltenbreite samt Java entfernt
 (`getGesamtBreite`/`getZielSpaltenBreite`/Verteilen/«Breiten zurücksetzen» — alte Stände mit

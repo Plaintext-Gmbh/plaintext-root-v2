@@ -198,6 +198,38 @@ class UserPreferencesBackingBeanTest {
     }
 
     @Test
+    void merkeTabellenStand_neuerStandGewinntWennSpeichernScheitert() {
+        // Karte 2333: MY_OBJECT ist VARCHAR(30000) - passt der Stand nicht mehr, fallen die alten
+        // Staende der anderen Tabellen weg und der neue wird allein gespeichert.
+        when(storage.findByUniqueId("test@example.com")).thenReturn(existingPrefs);
+        existingPrefs.getTabellenStaende().put("m/alt", new ch.plaintext.boot.table.TableState());
+        bean.init();
+        reset(storage);
+        when(storage.save(any())).thenReturn(false, true);
+
+        ch.plaintext.boot.table.TableState neu = new ch.plaintext.boot.table.TableState();
+        bean.merkeTabellenStand("m/neu", neu);
+
+        verify(storage, times(2)).save(existingPrefs);
+        assertEquals(java.util.Set.of("m/neu"), existingPrefs.getTabellenStaende().keySet());
+        assertSame(neu, existingPrefs.getTabellenStaende().get("m/neu"));
+    }
+
+    @Test
+    void merkeTabellenStand_gelungenLaesstAlteStaendeStehen() {
+        when(storage.findByUniqueId("test@example.com")).thenReturn(existingPrefs);
+        existingPrefs.getTabellenStaende().put("m/alt", new ch.plaintext.boot.table.TableState());
+        bean.init();
+        reset(storage);
+        when(storage.save(any())).thenReturn(true);
+
+        bean.merkeTabellenStand("m/neu", new ch.plaintext.boot.table.TableState());
+
+        verify(storage, times(1)).save(existingPrefs);
+        assertEquals(2, existingPrefs.getTabellenStaende().size());
+    }
+
+    @Test
     void save_shouldHandleException() {
         when(storage.findByUniqueId("test@example.com")).thenReturn(existingPrefs);
         bean.init();

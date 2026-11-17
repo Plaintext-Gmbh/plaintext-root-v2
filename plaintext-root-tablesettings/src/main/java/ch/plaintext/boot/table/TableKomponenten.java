@@ -161,33 +161,6 @@ final class TableKomponenten {
     }
 
     /**
-     * Vergisst die Spaltenordnung, die PrimeFaces 16 nach einem Zug im Tabellenkopf selbst haelt
-     * (Karte 1853 Runde 7, claude2-Befund): {@code decodeColumnDisplayOrderState} schreibt sie als
-     * {@link ColumnMeta#getDisplayPriority()} in den View-State, {@code collectColumns} sortiert
-     * danach und cacht die Liste ({@code setColumns}). Ohne das rendert die Tabelle bis zum
-     * naechsten View in der gezogenen Ordnung, egal wie die Kinder stehen. Breite und
-     * Sichtbarkeit der Metadaten bleiben; neue Map statt Mutation, damit der Zustand als
-     * geaendert gilt.
-     */
-    static void pfReihenfolgeVergessen(UIData data) {
-        if (!(data instanceof UITable<?> tabelle)) {
-            return;
-        }
-        Map<String, ColumnMeta> alt = tabelle.getColumnMeta();
-        if (alt != null) {
-            Map<String, ColumnMeta> neu = new HashMap<>();
-            alt.forEach((key, meta) -> {
-                ColumnMeta kopie = new ColumnMeta(meta.getColumnKey());
-                kopie.setWidth(meta.getWidth());
-                kopie.setVisible(meta.getVisible());
-                neu.put(key, kopie);
-            });
-            tabelle.setColumnMeta(neu);
-        }
-        tabelle.setColumns(null);
-    }
-
-    /**
      * Ordnet die Spalten-Kinder der Tabelle nach {@code order} an. Idempotent, schluesselbasiert
      * (ueber den Kopftext); Kinder ohne zuordenbaren Kopftext bleiben an ihrem Platz.
      */

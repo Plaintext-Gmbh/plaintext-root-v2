@@ -7,9 +7,13 @@
  * Karte 1336) ist mit dem Reiter «Breiten» weggefallen - die Wiederholbarkeit, fuer die er da
  * war, liefert jetzt der feste Stand (Ansicht festhalten, Doppelklick auf den Modus-Knopf).
  * Karte 2160: Gesamt-/Zielbreite samt Java entfernt; der Doppelklick auf den Verbreitern-Griff
- * oeffnet das Feld fuer eine exakte Breite (Ansicht-Reiter, remoteCommand BreiteFix). Daniel
+ * meldet die Spalte fuer das Feld «Feste Breite» (remoteCommand BreiteFix). Daniel
  * 15.11.: Resize haengt nicht mehr am Modus — der Griff ist auf Seiten mit Breiten immer da,
  * der Modus wird nie gespeichert und startet je Anmeldung mit «Anpassen».
+ * Karte 2333 (Daniel 17.11.): der Griff haengt wieder nur im Modus «Vergroessern», der feste
+ * Stand ist weg (Klick auf den Modus-Knopf wechselt sofort), der Doppelklick auf den Griff
+ * fuellt das leere Feld «Feste Breite» oder setzt dessen Wert auf die Spalte, das Panel geht
+ * immer am Regler-Symbol auf, die Spaltenliste merkt sich ihre gezogene Hoehe.
  *
  * WARUM ALS EIGENE DATEI (Welle 4, CSP ohne 'unsafe-inline'):
  * Solange irgendwo ein Inline-<script> steht, muss die Content-Security-Policy
@@ -39,6 +43,7 @@
      * Idempotent: nach jedem Teilupdate ist der Tabellenknoten neu, der Beobachter setzt nach.
      */
     function einrichten() {
+        listenHoeheAnwenden();
         var rahmen = document.querySelectorAll('[data-pt-tablesettings]');
         for (var i = 0; i < rahmen.length; i++) {
             var tabelle = document.getElementById(rahmen[i].getAttribute('data-pt-tablesettings'));
@@ -53,32 +58,52 @@
     }
 
     /*
-     * Modus-Knopf (Runde 7, Punkt 3): Klick wechselt den Modus, Doppelklick stellt den festen
-     * Stand her — unabhaengig vom Modus (Daniel 15.11.; das exakte Breiten-Feld oeffnet seitdem
-     * der Doppelklick auf den Verbreitern-Griff, unten). Der Klick wartet kurz, ob ein zweiter
-     * folgt - sonst wechselte ein Doppelklick zuerst zweimal den Modus. Beide Aktionen laufen
-     * ueber p:remoteCommand des Tags (<settingsId>ModusWechseln / <settingsId>FesterStand); die
-     * settingsId steht in der Id des Knopfs (<settingsId>-modus). Delegation am document:
-     * der Knopf wird bei jedem Wechsel neu gerendert.
+     * Modus-Knopf: ein Klick wechselt den Modus ueber p:remoteCommand <settingsId>ModusWechseln;
+     * die settingsId steht in der Id des Knopfs (<settingsId>-modus). Delegation am document:
+     * der Knopf wird bei jedem Wechsel neu gerendert. Der Doppelklick (fester Stand) ist mit
+     * Karte 2333 weggefallen, damit auch die Wartezeit auf einen zweiten Klick.
      */
-    var modusWartet = null;
     document.addEventListener('click', function (e) {
         var knopf = e.target && e.target.closest ? e.target.closest('.pt-ts-modus') : null;
         if (!knopf || !knopf.id) {
             return;
         }
         e.preventDefault();
-        var settingsId = knopf.id.split(':').pop().replace(/-modus$/, '');
-        if (modusWartet) {
-            clearTimeout(modusWartet);
-            modusWartet = null;
-            aufrufen(settingsId + 'FesterStand');
+        aufrufen(knopf.id.split(':').pop().replace(/-modus$/, '') + 'ModusWechseln');
+    });
+
+    /*
+     * Hoehe der Spaltenliste (Karte 2333): die Liste laesst sich per CSS-resize von Hand ziehen.
+     * Der Rahmen (.pt-ts-listenrahmen) traegt die gespeicherte Hoehe in data-pt-listenhoehe und
+     * den Namen des remoteCommand in data-pt-remote. Nach jedem Teilupdate ist die Liste neu,
+     * einrichten() setzt die Hoehe wieder. Der Browser schreibt beim Ziehen style.height an die
+     * Liste; weicht sie beim Loslassen vom gemerkten Wert ab, wird sie gemeldet.
+     */
+    function listenHoeheAnwenden() {
+        var rahmen = document.querySelectorAll('.pt-ts-listenrahmen[data-pt-listenhoehe]');
+        for (var i = 0; i < rahmen.length; i++) {
+            var liste = rahmen[i].querySelector('.ui-orderlist-list');
+            var hoehe = rahmen[i].getAttribute('data-pt-listenhoehe');
+            if (liste && hoehe && !liste.style.height) {
+                liste.style.height = hoehe + 'px';
+            }
+        }
+    }
+
+    document.addEventListener('mouseup', function (e) {
+        var rahmen = e.target && e.target.closest ? e.target.closest('.pt-ts-listenrahmen') : null;
+        var liste = rahmen ? rahmen.querySelector('.ui-orderlist-list') : null;
+        if (!liste || !liste.style.height) {
             return;
         }
-        modusWartet = setTimeout(function () {
-            modusWartet = null;
-            aufrufen(settingsId + 'ModusWechseln');
-        }, 300);
+        var hoehe = String(Math.round(liste.offsetHeight));
+        if (hoehe !== rahmen.getAttribute('data-pt-listenhoehe')) {
+            rahmen.setAttribute('data-pt-listenhoehe', hoehe);
+            var melde = window[rahmen.getAttribute('data-pt-remote')];
+            if (typeof melde === 'function') {
+                melde([{name: 'hoehe', value: hoehe}]);
+            }
+        }
     });
 
     /*
@@ -122,12 +147,14 @@
         if (typeof window[settingsId + 'BreiteFix'] === 'function') {
             window[settingsId + 'BreiteFix']([{name: 'kopf', value: String(index)}]);
         }
-        if (window.PF) {
-            var panel = PF(settingsId + 'PanelWv');
-            if (panel && typeof panel.isVisible === 'function' && !panel.isVisible()
-                    && typeof panel.show === 'function') {
-                panel.show(griff);
-            }
+        // Karte 2333: das Panel geht nur auf, solange das Feld leer ist (der Doppelklick fuellt
+        // es dann), und immer am Regler-Symbol, nie am Griff der Spalte.
+        var panel = window.PF ? PF(settingsId + 'PanelWv') : null;
+        var feld = panel && panel.jq && panel.jq[0] ? panel.jq[0].querySelector('.pt-ts-breite-fix-wert') : null;
+        var oeffner = wrap.querySelector('.pt-ts-oeffner');
+        if (panel && oeffner && !(feld && feld.value) && typeof panel.show === 'function'
+                && !(typeof panel.isVisible === 'function' && panel.isVisible())) {
+            panel.show(oeffner.id);
         }
     }, true);
 

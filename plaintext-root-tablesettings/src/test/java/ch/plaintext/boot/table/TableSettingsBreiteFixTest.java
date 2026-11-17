@@ -23,14 +23,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mockStatic;
 
 /**
- * Karte 2160, Daniel 15.11.: exakte Breite per Doppelklick auf den Verbreitern-Griff der Spalte —
- * das Feld im Ansicht-Reiter gilt der gewaehlten (sonst der zuletzt gezogenen) Spalte und speichert
- * beim change-Event sofort, ohne Uebernehmen-Knopf.
+ * Feld «Feste Breite» (Karte 2160, neu geregelt mit Karte 2333, Daniel 17.11.): der Wert lebt nur
+ * in der Sitzung. Ein Doppelklick auf den Verbreitern-Griff fuellt das leere Feld mit der Breite
+ * der Spalte; steht ein Wert im Feld, bekommt die Spalte genau diese Breite.
  *
- * <p>Der Zug im Tabellenkopf kommt als {@link ColumnResizeEvent}; wie im Bestand (TableSettingsTest)
- * als Mockito-Mock, statt Faces-Komponenten aufzubauen. Der Doppelklick selbst meldet die Position
- * des Kopfes ({@code kopf}-Parameter) — die Aufloesung auf den Schluessel steckt in
- * {@link TableKomponenten#kopfKey} und wird mit einer gemockten Tabelle geprueft.</p>
+ * <p>Der Doppelklick meldet die Position des Kopfes ({@code kopf}-Parameter) — die Aufloesung auf
+ * den Schluessel steckt in {@link TableKomponenten#kopfKey} und wird mit einer gemockten Tabelle
+ * geprueft; der Kern {@code breiteFixAufSpalte} laeuft ohne Faces.</p>
  *
  * @author info@plaintext.ch
  * @since 2026
@@ -54,14 +53,12 @@ class TableSettingsBreiteFixTest {
     }
 
     @Test
-    @DisplayName("Doppelklick waehlt die Spalte ueber die Kopf-Position und schlaegt ihre Breite vor")
-    void oeffnenMitKopfPosition() {
+    @DisplayName("Kopf-Position wird auf den Spaltenschluessel aufgeloest; ohne Tabelle passiert nichts")
+    void kopfPosition() {
         FacesContext faces = facesMit(Map.of("kopf", "0"));
         try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
             holder.when(FacesContext::getCurrentInstance).thenReturn(faces);
-
-            anzeige.breiteFixOeffnen(null);   // tabelle null: keine Aufloesung, Ziel bleibt die gezogene Spalte
-            assertThat(anzeige.getBreiteFixSpalte()).isNull();
+            anzeige.breiteFixDoppelklick(null);   // keine Tabelle: keine Spalte, nichts geschieht
             assertThat(anzeige.getBreiteFixWert()).isNull();
         }
         assertThat(TableKomponenten.kopfKey(tabelleMitZweiSpalten(), anzeige::keyFromHeader, 0))
@@ -75,54 +72,45 @@ class TableSettingsBreiteFixTest {
     }
 
     @Test
-    @DisplayName("Ziehen vor dem Doppelklick: das Feld schlaegt die Breite der zuletzt gezogenen Spalte vor")
-    void oeffnenNachResize() {
+    @DisplayName("Leeres Feld: der erste Doppelklick uebernimmt die Breite der Spalte und aendert nichts")
+    void ersterDoppelklickFuelltDasFeld() {
         resizeGemeldet("Name", 123);
-        oeffneOhneKopf();
+        Mockito.clearInvocations(store);
 
-        assertThat(anzeige.getBreiteFixSpalte()).isEqualTo("name");
+        anzeige.breiteFixAufSpalte("name", null);
+
         assertThat(anzeige.getBreiteFixWert()).isEqualTo(123);
+        assertThat(anzeige.getState().getColumnWidths()).doesNotContainKey("team");
+        Mockito.verifyNoInteractions(store);
     }
 
     @Test
-    @DisplayName("change speichert die Breite in den Stand und ins aktive Profil")
-    void uebernehmenLandetImProfil() {
-        resizeGemeldet("Name", 123);
-        oeffneOhneKopf();
+    @DisplayName("Wert im Feld: jeder weitere Doppelklick setzt ihn auf die jeweilige Spalte und speichert die Breite")
+    void weitereDoppelklicksSetzenDenWert() {
         anzeige.setBreiteFixWert(222);
 
-        anzeige.breiteFixUebernehmen(null);
+        anzeige.breiteFixAufSpalte("team", null);
+        anzeige.breiteFixAufSpalte("name", null);
 
+        assertThat(anzeige.widthStyle("team")).isEqualTo("width:222px;");
         assertThat(anzeige.widthStyle("name")).isEqualTo("width:222px;");
+        assertThat(anzeige.getBreiteFixWert()).isEqualTo(222);
         assertThat(anzeige.getState().getProfiles().get(TableSettings.PROFILE_DEFAULT).getColumnWidths())
                 .containsEntry("name", "222px");
         Mockito.verify(store, Mockito.atLeastOnce()).save(Mockito.eq("testpage"), any(TableState.class));
     }
 
     @Test
-    @DisplayName("Ohne gewaehlte Spalte oder unter dem Minimum passiert nichts")
+    @DisplayName("Unbekannte Spalte, zu kleiner Wert, geleertes Feld")
     void ungueltigeEingaben() {
-        oeffneOhneKopf();
-        assertThat(anzeige.getBreiteFixWert()).isNull();
-        anzeige.setBreiteFixWert(222);
-        anzeige.breiteFixUebernehmen(null);
+        anzeige.setBreiteFixWert(10);
+        anzeige.breiteFixAufSpalte("name", null);
+        anzeige.breiteFixAufSpalte("gibtEsNicht", null);
+        anzeige.breiteFixAufSpalte(null, null);
         assertThat(anzeige.getState().getColumnWidths()).isEmpty();
 
-        resizeGemeldet("Name", 123);
-        anzeige.setBreiteFixWert(10);
-        anzeige.breiteFixUebernehmen(null);
-        // Der Zug selbst steht im Stand (123px); der zu kleine Eintrag wurde verworfen.
-        assertThat(anzeige.getState().getColumnWidths()).containsExactly(
-                org.assertj.core.api.Assertions.entry("name", "123px"));
-    }
-
-    /** Der Doppelklick-Pfad ohne gueltige Kopf-Position: leere Parameter, keine Tabelle. */
-    private void oeffneOhneKopf() {
-        FacesContext faces = facesMit(Map.of());
-        try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
-            holder.when(FacesContext::getCurrentInstance).thenReturn(faces);
-            anzeige.breiteFixOeffnen(null);
-        }
+        anzeige.setBreiteFixWert(0);   // geleertes Feld: der naechste Doppelklick fuellt es wieder
+        assertThat(anzeige.getBreiteFixWert()).isNull();
     }
 
     /** Meldet einen Zug per {@link ColumnResizeEvent}-Mock — wie im Bestand (TableSettingsTest). */

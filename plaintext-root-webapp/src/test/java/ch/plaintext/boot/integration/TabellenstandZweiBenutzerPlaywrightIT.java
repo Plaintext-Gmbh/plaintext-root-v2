@@ -227,30 +227,29 @@ TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder()
     }
 
     @Test
-    @DisplayName("Daniel 15.11.: Modus startet mit Adjust und wird nie gespeichert, Verbreitern-Griff haengt immer, fester Stand per Doppelklick")
-    void runde7ModusGriffeUndFesterStand() {
+    @DisplayName("Karte 2333: Adjust ohne Griffe, Reorder nur Verschiebe-Griffe, Resize nur Verbreitern-Griff; Modus wird nie gespeichert")
+    void modusUndGriffe() {
         try (BrowserContext c = neuerKontext()) {
             Page seite = benutzerverwaltung(c, CARLA);
             seite.click("#fm\\:anz-oeffnen");
             seite.locator(".pt-ts-panel").waitFor();
             Locator modus = seite.locator("#fm\\:anz-modus");
 
-            // Daniel 15.11.: Start = neutral «Anpassen» (outline) — und der Verbreitern-Griff ist
-            // TROTZDEM sichtbar: Resize haengt nicht mehr am Modus, sondern ist immer da, wo die
-            // Seite Breiten fuehrt («wird aktuell gar nicht angezeigt — fixen»). Kein Verschiebe-Griff.
+            // Start = neutral «Anpassen» (outline): keine Griffe im Kopf, kein Feld «Feste Breite»,
+            // der feste Stand ist aus dem Panel verschwunden.
             seite.locator("#fm\\:anz-modus.ui-button-outlined").waitFor();
             assertEquals(0, seite.locator("#fm\\:tbl thead th.ui-draggable-column").count(),
                     "Adjust: kein Verschiebe-Griff im Kopf");
-            seite.locator("#fm\\:tbl thead th .ui-column-resizer").first().waitFor();
-            assertEquals("\"\u2194\"", seite.evaluate("""
-                    () => getComputedStyle(document.querySelector('#fm\\\\:tbl thead th .ui-column-resizer'), '::after').content
-                    """), "Resize-Viereck ohne Zeichen");
+            assertEquals(0, seite.locator("#fm\\:tbl thead th .ui-column-resizer").count(),
+                    "Adjust: kein Verbreitern-Griff im Kopf");
+            assertEquals(0, seite.locator(".pt-ts-breite-fix-wert").count(), "Adjust: kein Feld Feste Breite");
+            assertEquals(0, seite.locator("[id$='anz-festhalten']").count(), "Fester Stand muss entfallen");
 
-            // Klick -> Verschieben (1): gefuellt, Verschiebe-Viereck links am Titel — der
-            // Verbreitern-Griff bleibt auch in diesem Modus haengen.
+            // Klick -> Verschieben (1): gefuellt, Verschiebe-Viereck links am Titel, kein Verbreitern-Griff.
             modus.click();
             seite.locator("#fm\\:tbl thead th.ui-draggable-column").first().waitFor();
-            seite.locator("#fm\\:tbl thead th .ui-column-resizer").first().waitFor();
+            assertEquals(0, seite.locator("#fm\\:tbl thead th .ui-column-resizer").count(),
+                    "Reorder: kein Verbreitern-Griff im Kopf");
             assertFalse(seite.locator("#fm\\:anz-modus").getAttribute("class").contains("ui-button-outlined"),
                     "Verschieben muss gefuellt sein");
             Object griff = seite.evaluate("""
@@ -258,99 +257,134 @@ TableState mitReihenfolge = warteAufStand(seite, ANNA, st -> st.getColumnOrder()
                     """);
             assertTrue(griff != null && !"none".equals(griff) && !"normal".equals(griff), "Verschieben: kein Griff im Kopf, content=" + griff);
 
-            // Fester Stand: festhalten (Ansicht), Doppelklick stellt her, ohne den Modus zu wechseln.
-            seite.click("[id$='anz-festhalten']");
-            warteAufStand(seite, CARLA, st -> st.getFesterStand() != null
-                    && st.getProfiles().values().stream().anyMatch(pr -> pr.getFesterStand() != null));
-            // Im KOPF ziehen (Modus Verschieben), nicht in der Liste: danach haelt PF die Ordnung selbst
-            // im View-State - genau der Fall, in dem der Doppelklick erst nach Reload wirkte (claude2).
-            // Panel zu, sonst liegt es ueber den Koepfen und der Zug trifft das Panel.
-            seite.click("#fm\\:anz-oeffnen");
-            seite.locator(".pt-ts-panel").waitFor(new Locator.WaitForOptions()
-                    .setState(com.microsoft.playwright.options.WaitForSelectorState.HIDDEN));
-            kopfZiehen(seite, "Vorname", "Benutzername");
-            warteAufStand(seite, CARLA, st -> st.getColumnOrder() != null
-                    && st.getColumnOrder().indexOf("vorname") < st.getColumnOrder().indexOf("username"));
-            java.util.List<String> gezogen = seite.locator("#fm\\:tbl thead th .ui-column-title").allInnerTexts();
-            assertTrue(gezogen.indexOf("Vorname") < gezogen.indexOf("Benutzername"), "Ziehen wirkt nicht: " + gezogen);
+            // Klick -> Vergroessern (2): Verbreitern-Griff mit Zeichen, kein Verschiebe-Griff, Feld da.
+            seite.locator("#fm\\:anz-modus").click();
+            seite.locator("#fm\\:tbl thead th .ui-column-resizer").first().waitFor();
+            assertEquals(0, seite.locator("#fm\\:tbl thead th.ui-draggable-column").count(),
+                    "Resize: kein Verschiebe-Griff im Kopf");
+            assertEquals("\"\u2194\"", seite.evaluate("""
+                    () => getComputedStyle(document.querySelector('#fm\\\\:tbl thead th .ui-column-resizer'), '::after').content
+                    """), "Resize-Viereck ohne Zeichen");
+            seite.locator(".pt-ts-breite-fix-wert").waitFor();
 
-            seite.click("#fm\\:anz-oeffnen");
-            seite.locator(".pt-ts-panel").waitFor();
-            seite.locator("#fm\\:anz-modus").dblclick();
-            seite.locator(".ui-growl-message").filter(new Locator.FilterOptions()
-                    .setHasText(java.util.regex.Pattern.compile("festen Stand gesetzt|fixed layout"))).first().waitFor();
-            seite.waitForTimeout(800);   // ein faelschlich ausgeloester Einzelklick kaeme nach 300 ms
-            // Der Doppelklick wechselt den Modus nicht (kein persistiertes moveEnabled mehr) — er
-            // bleibt Verschieben: gefuellt. claude2-Befund: Growl kam, die Tabelle stand aber erst
-            // nach dem Neuladen richtig.
-            java.util.List<String> zurueck = seite.locator("#fm\\:tbl thead th .ui-column-title").allInnerTexts();
-            assertTrue(zurueck.indexOf("Benutzername") < zurueck.indexOf("Vorname"),
-                    "Doppelklick stellt die Reihenfolge nicht ohne Neuladen her: " + zurueck);
-            assertFalse(seite.locator("#fm\\:anz-modus").getAttribute("class").contains("ui-button-outlined"),
-                    "Der Doppelklick darf den Modus nicht wechseln");
+            // Klick -> zurueck auf Anpassen: Feld und Griffe wieder weg.
+            seite.locator("#fm\\:anz-modus").click();
+            seite.locator("#fm\\:anz-modus.ui-button-outlined").waitFor();
+            assertEquals(0, seite.locator(".pt-ts-breite-fix-wert").count(), "Feld muss mit dem Modus verschwinden");
+            assertEquals(0, seite.locator("#fm\\:tbl thead th .ui-column-resizer").count());
 
-            // Daniel 15.11.: der Modus wird nicht gespeichert — nach einer NEUEN ANMELDUNG
-            // (neue Session, neues Bean) startet er wieder neutral mit «Anpassen» (outline).
-            // Ein Reload innerhalb derselben Session darf den Sitzungsmodus dagegen behalten.
+            // Spalten-Reiter: die Liste nutzt die ganze Breite (kein Platz mehr fuer die Pfeil-Spalte).
+            seite.locator(".pt-ts-panel .ui-tabs-nav li").nth(1).click();
+            Locator liste = seite.locator(".pt-ts-reihenfolge .ui-orderlist-list");
+            liste.waitFor();
+            double listenBreite = liste.boundingBox().width;
+            double reiterBreite = seite.locator(".pt-ts-panel .ui-tabs-panel:visible").boundingBox().width;
+            assertTrue(listenBreite > reiterBreite * 0.9,
+                    "Spaltenliste nutzt die Breite nicht: " + listenBreite + " von " + reiterBreite);
+
+            // Von Hand gezogene Hoehe der Liste wird gespeichert (der Browser schreibt beim Ziehen
+            // style.height; das Skript meldet sie beim Loslassen).
+            seite.evaluate("""
+                    () => {
+                      const l = document.querySelector('.pt-ts-reihenfolge .ui-orderlist-list');
+                      l.style.height = '300px';
+                      l.dispatchEvent(new MouseEvent('mouseup', {bubbles: true}));
+                    }
+                    """);
+            warteAufStand(seite, CARLA, st -> Integer.valueOf(300).equals(st.getListenHoehe()));
+
+            // Neues Profil: das Panel bleibt waehrend des Dialogs und nach dem Anlegen offen.
+            seite.locator(".pt-ts-profilzeile button:has(.pi-plus)").click();
+            Locator name = seite.locator("[id$='anz-newProfileName']");
+            name.waitFor();
+            name.fill("Karte2333");
+            seite.locator(".ui-dialog:visible .ui-dialog-footer button").first().click();
+            warteAufStand(seite, CARLA, st -> st.getProfiles().containsKey("Karte2333"));
+            seite.waitForTimeout(500);
+            assertTrue(seite.locator(".pt-ts-panel").isVisible(), "Panel muss nach dem Anlegen des Profils offen bleiben");
+
+            // Der Modus wird nicht gespeichert — nach einer NEUEN ANMELDUNG startet er neutral.
         }
         try (BrowserContext c2 = neuerKontext()) {
             Page frisch = benutzerverwaltung(c2, CARLA);
-            frisch.locator("#fm\\:tbl thead th .ui-column-resizer").first().waitFor();
             frisch.click("#fm\\:anz-oeffnen");
             frisch.locator("#fm\\:anz-modus.ui-button-outlined").waitFor();
+            assertEquals(0, frisch.locator("#fm\\:tbl thead th .ui-column-resizer").count());
+            frisch.locator(".pt-ts-panel .ui-tabs-nav li").nth(1).click();
+            frisch.locator(".pt-ts-reihenfolge .ui-orderlist-list").waitFor();
+            assertEquals(300, Math.round(frisch.locator(".pt-ts-reihenfolge .ui-orderlist-list").boundingBox().height),
+                    "Gespeicherte Hoehe der Spaltenliste wirkt nach neuer Anmeldung nicht");
         }
     }
 
     /**
-     * Karte 2160 (Daniel 15.11.): Doppelklick auf den Verbreitern-Griff der Spalte klappt das
-     * Breite-Feld im Ansicht-Reiter auf (Vorschlag = aktuelle Breite); die Eingabe speichert sich
-     * beim Verlassen selbst — kein Uebernehmen-Knopf — und wirkt nach dem Reload am Tabellenkopf.
+     * Karte 2160/2333: Feld «Feste Breite» im Modus Resize. Der erste Doppelklick auf einen
+     * Verbreitern-Griff fuellt das leere Feld mit der Breite dieser Spalte und oeffnet das Panel
+     * am Regler-Symbol; mit einem Wert im Feld setzt jeder weitere Doppelklick die Spalte genau
+     * darauf. Der Feldwert selbst wird nie gespeichert, die Spaltenbreite schon.
      */
     @Test
-    @DisplayName("Karte 2160: Doppelklick auf den Griff -> Breite-Feld speichert sofort -> Wert wirkt nach Reload")
-    void breiteFixPerDoppelklick() {
+    @DisplayName("Karte 2333: Doppelklick fuellt das Feld, weitere Doppelklicks setzen die Breite; Breite wirkt nach Reload")
+    void festeBreitePerDoppelklick() {
         try (BrowserContext d = neuerKontext()) {
             Page seite = benutzerverwaltung(d, DORA);
-
-            // Kein Modus noetig: der Griff haengt immer (Daniel 15.11.). Spalte «Vorname» ziehen,
-            // damit der Vorschlag die gezogene Breite ist.
+            seite.click("#fm\\:anz-oeffnen");
+            seite.locator(".pt-ts-panel").waitFor();
+            seite.locator("#fm\\:anz-modus").click();   // Verschieben
+            seite.locator("#fm\\:tbl thead th.ui-draggable-column").first().waitFor();
+            seite.locator("#fm\\:anz-modus").click();   // Vergroessern
             seite.locator("#fm\\:tbl thead th .ui-column-resizer").first().waitFor();
+            seite.click("#fm\\:anz-oeffnen");          // Panel zu, es liegt sonst ueber den Koepfen
+            seite.locator(".pt-ts-panel").waitFor(new Locator.WaitForOptions()
+                    .setState(com.microsoft.playwright.options.WaitForSelectorState.HIDDEN));
+
             resizerZiehen(seite, "Vorname", 40);
             TableState gezogen = warteAufStand(seite, DORA,
                     st -> st.getColumnWidths().get("vorname") != null);
             int gezogeneBreite = Math.round(Float.parseFloat(
                     gezogen.getColumnWidths().get("vorname").replace("px", "").trim()));
 
-            // Doppelklick auf den Griff der gezogenen Spalte: das Panel oeffnet sich am Griff,
-            // der 1. Reiter (Ansicht) ist aktiv, Vorschlag = gezogene Breite. Das Eingabefeld
-            // liegt IM TabView (NamingContainer) — seine Client-Id traegt eine Stufe, deshalb
-            // greift der Test per CSS-Klasse wie bei der Reihenfolge-Liste.
-            seite.locator("#fm\\:tbl thead th:has(.ui-column-title:text-is('Vorname')) .ui-column-resizer").dblclick();
+            // Erster Doppelklick, Feld leer: das Panel geht am Regler-Symbol auf (nicht an der
+            // Spalte), das Feld zeigt die Breite der Spalte, an der Tabelle aendert sich nichts.
+            griffDoppelklick(seite, "Vorname");
             seite.locator(".pt-ts-panel").waitFor();
             Locator feld = seite.locator(".pt-ts-breite-fix-wert");
-            feld.waitFor();
-            assertTrue(seite.locator(".pt-ts-panel .ui-tabs-header[aria-selected='true'], "
-                            + ".pt-ts-panel li.ui-state-active").innerText().contains("Ansicht"),
-                    "Der 1. Reiter (Ansicht) muss nach dem Doppelklick aktiv sein");
+            seite.waitForFunction("() => { const f = document.querySelector('.pt-ts-breite-fix-wert'); return f && f.value; }");
             assertEquals(gezogeneBreite, Integer.parseInt(feld.inputValue()),
-                    "Vorschlag muss die gezogene Breite der Spalte sein");
+                    "Das leere Feld muss die Breite der Spalte uebernehmen");
+            double panelLinks = seite.locator(".pt-ts-panel").boundingBox().x;
+            double oeffnerLinks = seite.locator("#fm\\:anz-oeffnen").boundingBox().x;
+            assertTrue(Math.abs(panelLinks - oeffnerLinks) < 40,
+                    "Panel muss am Regler-Symbol aufgehen: panel=" + panelLinks + " oeffner=" + oeffnerLinks);
 
-            // «Immer speichern bei jeder Aktion» (Daniel 15.11.): kein Uebernehmen-Knopf, das
-            // change-Event speichert. Tab verlaesst das Feld und loest change aus.
-            assertEquals(0, seite.locator(".pt-ts-breite-fix-uebernehmen").count(),
-                    "Save-Button am Breite-Feld muss entfallen");
+            // Wert eintragen; weitere Doppelklicks setzen ihn auf die jeweilige Spalte.
             feld.fill("222");
             feld.press("Tab");
-            TableState fix = warteAufStand(seite, DORA, st -> "222px".equals(st.getColumnWidths().get("vorname")));
-            assertEquals("222px", fix.getProfiles().get(fix.getActiveProfile()).getColumnWidths().get("vorname"),
-                    "Der Wert muss im aktiven Profil landen");
+            seite.waitForTimeout(500);   // change-Ajax traegt den Wert in die Sitzung
+            griffDoppelklick(seite, "Nachname");
+            TableState fix = warteAufStand(seite, DORA, st -> "222px".equals(st.getColumnWidths().get("nachname")));
+            assertEquals("222px", fix.getProfiles().get(fix.getActiveProfile()).getColumnWidths().get("nachname"),
+                    "Die Breite muss im aktiven Profil landen");
+            griffDoppelklick(seite, "Vorname");
+            warteAufStand(seite, DORA, st -> "222px".equals(st.getColumnWidths().get("vorname")));
+            // Der Stand ist gespeichert, bevor die Ajax-Antwort die Tabelle neu gezeichnet hat.
+            for (int i = 0; i < 25 && thBreite(seite, "Vorname") != 222; i++) {
+                seite.waitForTimeout(200);
+            }
             assertEquals(222, thBreite(seite, "Vorname"), "Tabellenkopf zeigt die Breite nicht direkt");
+            assertEquals(222, thBreite(seite, "Nachname"), "Tabellenkopf zeigt die Breite nicht direkt");
 
-            // «Breite wirkt nach Reload»: frische Session-Ansicht, kein PF-ColumnMeta mehr im Spiel.
+            // «Breite wirkt nach Reload»: die Spaltenbreite ist gespeichert.
             seite.reload();
             seite.locator("#fm\\:tbl").waitFor();
             assertEquals(222, thBreite(seite, "Vorname"), "Breite wirkt nach dem Reload nicht");
+            assertEquals(222, thBreite(seite, "Nachname"), "Breite wirkt nach dem Reload nicht");
         }
+    }
+
+    /** Doppelklick auf den Verbreitern-Griff der Spalte. */
+    private static void griffDoppelklick(Page seite, String spalte) {
+        seite.locator("#fm\\:tbl thead th:has(.ui-column-title:text-is('" + spalte + "')) .ui-column-resizer").dblclick();
     }
 
     /** Die am Tabellenkopf gerenderte Breite der Spalte, in px gerundet (fehlt sie, -1). */

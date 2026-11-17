@@ -12,6 +12,26 @@ exhaustive.
 
 ## [Unreleased]
 
+### Changed
+- **pt:tableSettings nach Daniels Test** (Karte 2333, 17.11.). Die Griffe im Tabellenkopf folgen wieder dem Modus:
+  «Anpassen» zeigt keine, «Verschieben» nur die Verschiebe-Griffe, «Vergrössern» nur den Verbreitern-Griff
+  (`isGroesseAendernAktiv()` = `mitBreiten` und Modus 2; gespeicherte Breiten gelten in jedem Modus). Das Feld
+  «Feste Breite» steht nur im Modus «Vergrössern» neben dem Modus-Knopf, ohne Spaltenname; sein Wert lebt nur in
+  der Sitzung. Doppelklick auf einen Verbreitern-Griff: leeres Feld übernimmt die Breite dieser Spalte und das
+  Panel öffnet sich am Regler-Symbol (nie an der Spalte); steht ein Wert im Feld, bekommt die Spalte genau diese
+  Breite, die wie jede Spaltenbreite sofort gespeichert wird. Das Panel bleibt beim Anlegen eines Profils offen.
+  Die Spaltenliste im Reiter «Spalten» nutzt die ganze Breite und merkt sich ihre von Hand gezogene Höhe
+  (`TableState.listenHoehe`). Scheitert das Speichern des Stands, werden die Profile des Altbestands verworfen
+  und der laufende Stand neu gespeichert; ein unlesbarer Stand beim Laden ergibt einen frischen.
+  Apps müssen nichts ändern. Playwright-validiert auf `useradmin.xhtml`.
+
+### Removed
+- **pt:tableSettings: fester Stand** (Karte 2333). «Aktuellen Stand festhalten» und der Doppelklick auf den
+  Modus-Knopf sind weg, ebenso `TableSettings.festerStandErfassen()`, `festerStandHerstellen(String)`,
+  `isFesterStandErfasst()`, `getBreiteFixSpalte()`, `breiteFixOeffnen(String)` und `breiteFixUebernehmen(String)`
+  (das Tag war der einzige Aufrufer). `TableState.festerStand` bleibt als Feld, damit gespeicherte Stände lesbar
+  bleiben.
+
 ### Added
 - **pt:tableSettings: exakte Breite per Doppelklick auf den Verbreitern-Griff** (Karte 2160). Ein Doppelklick auf
   das ↔-Viereck im Kopf einer Spalte (Daniel 15.11. — ersetzt die Zwischenlösung über den Modus-Knopf vom 14.11.)

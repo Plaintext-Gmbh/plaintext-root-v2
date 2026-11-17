@@ -532,39 +532,31 @@
     color: var(--pt-tablesettings-akzent, #2563eb);
 }
 
-/* (2) Fester Stand im Ansicht-Reiter: unter Paginator und Seitengroesse, durch eine Linie
-   getrennt. */
-.pt-ts-fester-stand {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px 10px;
-    margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px solid var(--content-border-color, #e2e8f0);
-}
-
-.pt-ts-fester-stand .pt-tablesettings-hint {
-    margin-left: 0;
-    flex-basis: 100%;
-}
-
-/* Breite fix eintragen (Karte 2160): dieselbe Zeilenanordnung wie der feste Stand darueber. */
+/* Feste Breite (Karte 2160/2333): Beschriftung und Feld rechts neben dem Modus-Knopf, nur im
+   Modus «Vergroessern» gerendert. */
 .pt-ts-breite-fix {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 8px 10px;
-    margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px solid var(--content-border-color, #e2e8f0);
-}
-
-.pt-ts-breite-fix .pt-tablesettings-hint {
-    margin-left: 0;
-    flex-basis: 100%;
+    gap: 8px;
+    margin-left: auto;
 }
 
 .pt-ts-breite-fix .pt-ts-breite-fix-wert {
     width: 90px;
+}
+
+/* ── Karte 2333 (Daniel 17.11.) ──────────────────────────────────────────── */
+
+/* Spalten-Reiter: alle Pfeil-Buttons der Liste sind seit Runde 5/7 ausgeblendet, ihre Spalte
+   hielt aber weiter den Platz links frei. Die Spalte ganz weg, die Liste ueber die volle Breite
+   (PrimeFaces 16: ui-orderlist-controls neben dem Listen-Container ui-g-12 ui-md-10). */
+.pt-ts-reihenfolge .ui-orderlist-controls {
+    display: none;
+}
+
+.pt-ts-reihenfolge > div,
+.pt-ts-reihenfolge .ui-md-10 {
+    width: 100%;
+    padding-left: 0;
+    padding-right: 0;
 }
