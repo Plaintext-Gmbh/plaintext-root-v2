@@ -27,7 +27,7 @@
     </licenses>
 
     <properties>
-        <java.version>25</java.version>
+        <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Build Tools -->
@@ -697,6 +697,7 @@
                              *-interfaces wie bisher alle oeffentlichen Schnittstellen). VOR Lombok: dahinter sieht
                              er unter release 25 keine Wurzelelemente (Karte 1405, leerer Katalog in app).
                              Module mit eigener Liste brauchen combine.self="override" und dieselbe Reihenfolge. -->
+                        <release>21</release>
                         <annotationProcessorPaths>
                             <path>
                                 <groupId>ch.plaintext.v2</groupId>
@@ -710,6 +711,7 @@
                             </path>
                         </annotationProcessorPaths>
                         <compilerArgs>
+                            <arg>--enable-preview</arg>
                             <arg>-Aplaintext.katalog.modul=${project.artifactId}</arg>
                         </compilerArgs>
                     </configuration>
@@ -719,7 +721,9 @@
                         <execution>
                             <id>default-testCompile</id>
                             <configuration>
-                                <compilerArgs combine.self="override"/>
+                                <compilerArgs combine.self="override">
+                                    <arg>--enable-preview</arg>
+                                </compilerArgs>
                             </configuration>
                         </execution>
                     </executions>
