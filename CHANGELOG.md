@@ -12,6 +12,15 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+- **Flyway-Vorpruefung mit Modul-Hinweis** (Karte 2343, Folge des app-Vorfalls 17.11.). Neue
+  `FlywayMigrationStrategy` in plaintext-root-webapp (`ch.plaintext.boot.flyway`): bei `validate-on-migrate: true`
+  validiert sie vor dem Migrate genau wie `Flyway.migrate()` (konfigurierte Muster plus `*:pending`) und bricht bei
+  Fehlschlag mit Versionen und dem Hinweis auf `module/gemeinsam/auswahl.yaml` ab, statt mit Flyways nackter
+  Versionsnummer. Bei Erfolg eine INFO-Zeile «Flyway-Vorpruefung ok». Wirkt in der Huelle fuer alle Apps; eine
+  App mit eigener `FlywayMigrationStrategy` muss diese beim Bump entfernen (sonst zwei Beans). Der ModulLader
+  meldet Module aus `module.yaml`, die die Auswahl nicht nennt (`[modul-lader] ACHTUNG: … NICHT in der Auswahl`).
+
 ### Changed
 - **pt:tableSettings nach Daniels Test** (Karte 2333, 17.11.). Die Griffe im Tabellenkopf folgen wieder dem Modus:
   «Anpassen» zeigt keine, «Verschieben» nur die Verschiebe-Griffe, «Vergrössern» nur den Verbreitern-Griff
