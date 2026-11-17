@@ -112,7 +112,7 @@ class CsrfFormInvariantTest {
         List<Path> startpunkte = new ArrayList<>();
         try {
             startpunkte.add(Path.of(getClass().getProtectionDomain().getCodeSource().getLocation().toURI()));
-        } catch (URISyntaxException | RuntimeException _) {
+        } catch (URISyntaxException | RuntimeException ignoriert) {
             // e.g. an exotic class loader — then the user.dir fallback applies
         }
         startpunkte.add(Path.of(System.getProperty("user.dir")));

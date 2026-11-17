@@ -258,7 +258,7 @@ public class SidecarsMcpTools {
             return o.toPrettyString();
         } catch (NoSuchElementException | IOException | JacksonException e) {
             return fehler(e.getMessage());
-        } catch (InterruptedException _) {
+        } catch (InterruptedException ignoriert) {
             Thread.currentThread().interrupt();
             return fehler("Aufruf unterbrochen.");
         }

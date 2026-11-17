@@ -189,7 +189,7 @@ public class MenuSearchProvider implements SearchProvider {
     private boolean isOnSafe(MenuRegistry.MenuItem item) {
         try {
             return item.isOn();
-        } catch (Exception _) {
+        } catch (Exception ignoriert) {
             // When in doubt do not display (fail-closed) - visibility is meant to be strict.
             return false;
         }

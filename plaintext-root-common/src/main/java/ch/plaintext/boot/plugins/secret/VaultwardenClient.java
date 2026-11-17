@@ -392,7 +392,7 @@ class VaultwardenClient {
         JsonElement e = get(o, names);
         try {
             return (e != null && e.isJsonPrimitive()) ? e.getAsBoolean() : def;
-        } catch (Exception _) {
+        } catch (Exception ignoriert) {
             return def;
         }
     }
@@ -760,7 +760,7 @@ class VaultwardenClient {
         JsonElement e = get(o, names);
         try {
             return (e != null && e.isJsonPrimitive()) ? e.getAsInt() : def;
-        } catch (Exception _) {
+        } catch (Exception ignoriert) {
             return def;
         }
     }
@@ -769,7 +769,7 @@ class VaultwardenClient {
         JsonElement e = get(o, names);
         try {
             return (e != null && e.isJsonPrimitive()) ? e.getAsLong() : def;
-        } catch (Exception _) {
+        } catch (Exception ignoriert) {
             return def;
         }
     }

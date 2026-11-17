@@ -146,7 +146,7 @@ public abstract class AbstractHoehenService {
             if (!h.isMissingNode() && !h.isNull()) {
                 out[idx] = Double.parseDouble(h.asString());
             }
-        } catch (Exception _) {
+        } catch (Exception ignoriert) {
             // einzelner Punkt fehlgeschlagen -> bleibt null -> Fallback
         }
     }

@@ -166,7 +166,7 @@ class QualityGateTest {
             LocalDateTime wann;
             try {
                 wann = LocalDateTime.parse(geprueft);
-            } catch (DateTimeParseException _) {
+            } catch (DateTimeParseException ignoriert) {
                 return "Der Zeitstempel `checked=" + geprueft + "` ist nicht lesbar — dann sagt das "
                         + "Gate nicht, wie alt seine Aussage ist, und ein OK darin ist wertlos.";
             }
@@ -208,7 +208,7 @@ class QualityGateTest {
     private static int parseInt(String s) {
         try {
             return Integer.parseInt(s.trim());
-        } catch (NumberFormatException _) {
+        } catch (NumberFormatException ignoriert) {
             return 0;
         }
     }

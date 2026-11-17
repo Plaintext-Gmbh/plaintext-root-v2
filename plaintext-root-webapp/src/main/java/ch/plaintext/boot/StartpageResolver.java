@@ -176,7 +176,7 @@ public final class StartpageResolver {
             String view = "/" + path.replaceFirst("\\.html$", ".xhtml");
             try {
                 return servletContext.getResource(view) != null;
-            } catch (MalformedURLException _) {
+            } catch (MalformedURLException ignoriert) {
                 return false;
             }
         };
