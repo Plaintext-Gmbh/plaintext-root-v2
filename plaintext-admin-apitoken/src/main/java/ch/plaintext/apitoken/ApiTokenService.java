@@ -56,7 +56,7 @@ public class ApiTokenService implements IApiTokenService {
      */
     private final ApiTokenRevocationLookup revocationLookup;
 
-    private static final int MAX_TOKENS_PER_USER = 10;
+    private static final int MAX_TOKENS_PER_USER = 20;
 
     /**
      * {@inheritDoc}
@@ -169,7 +169,7 @@ public class ApiTokenService implements IApiTokenService {
      * <ul>
      *   <li><b>Duplicate name check</b> — the Juriwagen mints a token on <em>every</em> opening of the
      *       SPA; on the second opening "Ein Token mit diesem Namen existiert bereits" would be thrown.</li>
-     *   <li><b>{@code MAX_TOKENS_PER_USER}</b> — after ten openings the flow would be blocked for good,
+     *   <li><b>{@code MAX_TOKENS_PER_USER}</b> — after twenty openings the flow would be blocked for good,
      *       in the middle of the tournament day.</li>
      * </ul>
      *
