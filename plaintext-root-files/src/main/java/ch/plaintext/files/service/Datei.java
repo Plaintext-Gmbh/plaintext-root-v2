@@ -8,10 +8,11 @@ import java.time.Instant;
 /**
  * Eine Datei der persönlichen Ablage (Karte 1559, aus dem Inventar).
  *
+ * @param besitzer  Ordner des Benutzers, dem die Datei gehört (Karte 2354: Admin/Root sehen fremde Ablagen)
  * @param name      Dateiname ohne Pfad
  * @param groesse   Bytes
  * @param geaendert letzte Änderung (= Hochladen)
  * @param ablauf    ab dann ist die Datei weg
  */
-public record Datei(String name, long groesse, Instant geaendert, Instant ablauf) {
+public record Datei(String besitzer, String name, long groesse, Instant geaendert, Instant ablauf) {
 }

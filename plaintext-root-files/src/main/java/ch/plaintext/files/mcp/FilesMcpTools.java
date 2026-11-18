@@ -6,6 +6,7 @@ package ch.plaintext.files.mcp;
 import ch.plaintext.files.config.FilesProperties;
 import ch.plaintext.files.service.Datei;
 import ch.plaintext.files.service.FilesService;
+import ch.plaintext.files.web.FilesZugriff;
 import ch.plaintext.linktoken.LinkToken;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,8 +14,6 @@ import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import java.nio.ByteBuffer;
@@ -34,6 +33,11 @@ import java.util.Locale;
  * leistet das Token am {@code /mcp}), es hält die KI davon ab, die Ablage für jemand anderen zu öffnen, der zufällig
  * am selben Client sitzt. Im Inventar war der Name fest verdrahtet.</p>
  *
+ * <p><b>Rolle (Karte 2354).</b> Die Werkzeuge öffnen dieselbe Ablage wie die Seite, also gilt dasselbe Recht
+ * ({@link FilesZugriff}): Rolle {@code files}, Admin oder Root. Der MCP-Filter lädt die echten Rollen des
+ * Token-Inhabers in den Kontext; ohne die Rolle ist hier Schluss, sonst wäre das Token der Weg um das Menü herum.
+ * Fremde Ablagen gibt es über MCP nicht, auch nicht für Admin und Root.</p>
+ *
  * <p>Abweichung vom Inventar: dort REST unter {@code /nosec/api/mcp/files} hinter dem Inventar-MCP; in root gibt es
  * die MCP-Werkzeuge direkt (wie {@code FreigabeLinkMcpTools}), {@code /nosec} wäre hier ohne Anmeldung.</p>
  */
@@ -49,6 +53,7 @@ public class FilesMcpTools {
 
     private final FilesService filesService;
     private final FilesProperties properties;
+    private final FilesZugriff zugriff;
 
     @PreAuthorize("hasAuthority('SCOPE_READ')")
     @McpTool(name = "list_files", description = "Listet die eigenen Dateien der persönlichen Ablage (Files) mit Grösse, "
@@ -102,18 +107,25 @@ public class FilesMcpTools {
 
     @PreAuthorize("hasAuthority('SCOPE_WRITE')")
     @McpTool(name = "create_file_link", description = "Lese-Link ohne Anmeldung auf eine eigene Datei, gültig solange "
-            + "die Datei lebt. Ein bestehender Link wird wiederverwendet, wenn der Speicher sein Token kennt.")
+            + "die Datei lebt. Ein bestehender Link wird wiederverwendet, wenn der Speicher sein Token kennt. Mit "
+            + "imBrowser=true zeigt der Link Bilder, PDF und Textdateien direkt im Browser, statt sie herunterzuladen.")
     public String createFileLink(@McpToolParam(required = false, description = "Antwort auf 'Wer bist du?'") String wer,
-                                 @McpToolParam(description = "Dateiname aus list_files") String name) {
+                                 @McpToolParam(description = "Dateiname aus list_files") String name,
+                                 @McpToolParam(required = false, description = "true = im Browser anzeigen statt "
+                                         + "herunterladen (Bilder, PDF, Text)") Boolean imBrowser) {
         return mitIdentitaet(wer, benutzer -> {
             if (filesService.liste(benutzer).stream().noneMatch(d -> d.name().equals(name))) {
                 return FEHLER + "Datei '" + name + "' gibt es nicht - list_files nennt die vorhandenen.";
             }
+            boolean anzeigen = Boolean.TRUE.equals(imBrowser);
+            // Wiederverwendet wird nur ein Link derselben Sorte: wer «anzeigen» verlangt, bekommt keinen Download-Link.
             LinkToken link = filesService.links(benutzer, name).stream()
-                    .filter(l -> l.token() != null && l.gueltigBis() == null).findFirst()
-                    .orElseGet(() -> filesService.linkErstellen(benutzer, name));
-            return "OK: " + filesService.url(link.token())
-                    + "\nLädt ohne Anmeldung herunter; gilt bis die Datei abläuft.";
+                    .filter(l -> l.token() != null && l.gueltigBis() == null && FilesService.imBrowser(l) == anzeigen)
+                    .findFirst()
+                    .orElseGet(() -> filesService.linkErstellen(benutzer, name, 0, null, anzeigen));
+            return "OK: " + filesService.url(link.token()) + "\n"
+                    + (anzeigen ? "Zeigt Bilder, PDF und Text ohne Anmeldung im Browser (alles andere lädt herunter)"
+                    : "Lädt ohne Anmeldung herunter") + "; gilt bis die Datei abläuft.";
         });
     }
 
@@ -126,9 +138,13 @@ public class FilesMcpTools {
             log.warn("[FilesMcp] Zugriff verweigert | wer={}", wer);
             return FEHLER + "Zugriff verweigert. Frage den Benutzer 'Wer bist du?' und übergib seine Antwort in 'wer'.";
         }
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String benutzer = zugriff.benutzer();
+        if (benutzer == null) {
+            log.warn("[FilesMcp] Zugriff verweigert | Rolle files fehlt");
+            return FEHLER + "Zugriff verweigert: die Dateiablage braucht die Rolle 'files' (oder Admin/Root).";
+        }
         try {
-            return aktion.ausfuehren(auth == null ? "" : auth.getName());
+            return aktion.ausfuehren(benutzer);
         } catch (RuntimeException e) {
             return FEHLER + e.getMessage();
         }

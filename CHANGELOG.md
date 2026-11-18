@@ -33,6 +33,28 @@ exhaustive.
   meldet Module aus `module.yaml`, die die Auswahl nicht nennt (`[modul-lader] ACHTUNG: … NICHT in der Auswahl`).
 
 ### Changed
+- **`plaintext-root-files`: unter «Misc», mit Rolle `files`, Admin/Root sehen alle, Links zum Anzeigen**
+  (Karte 2354). **Verhaltensaenderung fuer Konsumenten:** die Ablage hatte bisher jeder Angemeldete (`USER`);
+  jetzt braucht sie die Rolle `files` - auf der Seite, an `/files/api/*` und an den MCP-Werkzeugen (dort wird die
+  Rolle neu geprueft, vorher genuegte das Token). `admin` und `root` kommen weiter hinein. Beim Bump die Rolle
+  vergeben (`FilesRoleProvider` meldet sie der Benutzerverwaltung), sonst ist die Ablage fuer alle anderen zu;
+  die Dateien bleiben liegen und laufen nach `plaintext.files.frist` ab wie immer. Ohne Seitenschutz
+  (`page-guard.enabled=false`) galt «angemeldet genuegt», jetzt gelten dort dieselben drei Rollen.
+  Der Menueeintrag haengt neu unter «Misc»; das Modul bringt dieses Elternmenue mit (`order` 60). Eine Anwendung
+  mit eigenem «Misc» setzt `plaintext.files.misc-menue=false` (sonst doppelter Titel, WARN bei jedem Menueaufbau)
+  und oeffnet ihr «Misc» fuer die Rolle. `menuId = files` ist fest, `ROLE_MENU_FILES` bleibt also gueltig.
+  Admin und Root sehen auf der Seite die Dateien aller Benutzer mit Besitzer (Schalter «Nur meine Dateien»),
+  laden sie herunter und loeschen sie; teilen kann nur der Besitzer. REST: `dateien?alle=true` (Eintraege mit
+  `besitzer`), `datei?benutzer=…`, `loeschen {benutzer}`; wer nicht Admin/Root ist und einen fremden Ordner
+  nennt, bekommt 403. Fremdzugriffe stehen im Log (`[FilesApi] … fremde Datei`). `Datei` hat neu die Komponente
+  `besitzer` an erster Stelle - wer den Record selbst baut, muss nachziehen.
+  Freigabe-Links: Haken «Direkt im Browser anzeigen statt Download» (Vorgabe aus). Ein solcher Link liefert
+  Bilder, PDF und Textdateien mit `Content-Disposition: inline` und ihrem Typ (Text immer `text/plain`, SVG mit
+  `Content-Security-Policy: sandbox`); alles andere - HTML zuerst - laedt er weiter herunter, weil es unter der
+  Adresse der Anwendung mit der Sitzung des Oeffnenden liefe. Gespeichert ist die Wahl als zweite Link-Art
+  `files-inline` im `LinkTokenStore`, ohne neue Spalte und ohne Aenderung am Vertrag; eine Token-Uebersicht, die
+  nach Art `files` filtert, zeigt diese Links erst, wenn sie auch `files-inline` liest. MCP `create_file_link`
+  hat den optionalen Parameter `imBrowser`. Bestehende Links bleiben Download-Links.
 - **`system` an zwei weiteren Schreibwegen nie vergebbar, `Systemlauf` ist `@StabileApi`** (Karte 2352, Nits aus
   dem Review zu 1863). Der MCP-Import (`BenutzerMcpTools`) verwirft `system` ausdruecklich, nicht nur ueber
   `isPrivileged`; das per OIDC automatisch angelegte Konto uebernimmt `system` nicht aus den Default-Rollen der
@@ -64,6 +86,20 @@ exhaustive.
   (`TableState.listenHoehe`). Scheitert das Speichern des Stands, werden die Profile des Altbestands verworfen
   und der laufende Stand neu gespeichert; ein unlesbarer Stand beim Laden ergibt einen frischen.
   Apps müssen nichts ändern. Playwright-validiert auf `useradmin.xhtml`.
+
+### Fixed
+- **`plaintext-root-files`: `FilesAufraeumen` ist `@Scope("prototype")`** (Karte 2354). Die Angabe fehlte; mit
+  `plaintext-admin-cron` am Klassenpfad brach der `CronBeanPostProcessor` den Start der Anwendung ab
+  («PlaintextCron bean 'filesAufraeumen' must be @Scope("prototype")»). Aufgefallen bei der Pruefung der Seite in
+  der root-Anwendung; ein Test haelt die Angabe fest.
+- **`plaintext-root-freigabe`: `JpaLinkTokenStore.anlegen` schreibt das Recht als `r`/`rw`** (Karte 2354). Die
+  Spalte `freigabe_link.recht` ist `VARCHAR(2)`; der Store schrieb `lesen`/`schreiben`, und jedes Anlegen eines
+  Token-Links (Files, Draw.io, Diashows) scheiterte auf PostgreSQL mit «value too long for type character
+  varying(2)». Der Test lief gegen einen Repository-Mock und sah es nie. Gelesen wird wie bisher ueber
+  `LinkRecht.von()`, das `rw` schon als Schreibrecht kennt; keine Migration, bestehende Zeilen gibt es keine.
+- **`plaintext-root-files`: der Dialog «Link teilen» bleibt nach «Link erzeugen» offen** (Karte 2354). Erzeugen
+  und Zurueckziehen renderten den ganzen `p:dialog` neu, der damit wieder zu war - die Adresse, die nur in diesem
+  Moment angezeigt wird, sah niemand. Erneuert wird jetzt nur der Inhalt.
 
 ### Removed
 - **pt:tableSettings: fester Stand** (Karte 2333). «Aktuellen Stand festhalten» und der Doppelklick auf den

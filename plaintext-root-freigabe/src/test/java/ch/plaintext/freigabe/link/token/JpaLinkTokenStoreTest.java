@@ -93,6 +93,18 @@ class JpaLinkTokenStoreTest {
     }
 
     @Test
+    void rechtPasstInDieSpalte() {
+        // freigabe_link.recht ist VARCHAR(2). Der Mock kennt keine Spaltenlängen - darum hier ausdrücklich:
+        // mit «lesen»/«schreiben» scheiterte jedes anlegen() auf PostgreSQL (Karte 2354).
+        LinkToken lesen = neu("a.drawio", null, null);
+        LinkToken schreiben = neu("b.drawio", LinkRecht.SCHREIBEN, null);
+
+        assertThat(zeilen).extracting(FreigabeLink::getRecht).containsExactly("r", "rw");
+        assertThat(store.finde("drawio", lesen.token())).get().satisfies(f -> assertThat(f.recht()).isEqualTo(LinkRecht.LESEN));
+        assertThat(store.finde("drawio", schreiben.token())).get().satisfies(f -> assertThat(f.recht()).isEqualTo(LinkRecht.SCHREIBEN));
+    }
+
+    @Test
     void schreibRechtWirdGespeichertAlteWerteSindLesen() {
         LinkToken s = neu("pfs.drawio", LinkRecht.SCHREIBEN, null);
         assertThat(store.finde("drawio", s.token())).get().satisfies(f -> assertThat(f.schreiben()).isTrue());

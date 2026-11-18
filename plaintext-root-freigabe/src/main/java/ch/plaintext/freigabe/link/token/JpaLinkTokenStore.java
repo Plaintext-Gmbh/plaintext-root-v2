@@ -50,6 +50,9 @@ public class JpaLinkTokenStore implements LinkTokenStore {
     /** Base64url ohne Auffüllung, 24 Byte = 32 Zeichen; ältere Stores hatten bis 128. */
     private static final Pattern TOKEN = Pattern.compile("[A-Za-z0-9_-]{16,128}");
     private static final Pattern ART = Pattern.compile("[a-z0-9-]{1,40}");
+    /** Schreibweise der Spalte {@code freigabe_link.recht} (VARCHAR(2)), dieselbe wie {@code FreigabeRecht.kurz()}. */
+    static final String RECHT_LESEN = "r";
+    static final String RECHT_SCHREIBEN = "rw";
     private static final SecureRandom ZUFALL = new SecureRandom();
     static final int MAX_OBJEKT = 1000;
 
@@ -76,7 +79,11 @@ public class JpaLinkTokenStore implements LinkTokenStore {
         l.setMandat(mandat());
         l.setTyp(antrag.art());
         l.setSchluessel(objekt);
-        l.setRecht((antrag.recht() == null ? LinkRecht.LESEN : antrag.recht()).wert());
+        // Die Spalte ist VARCHAR(2) und trägt wie bei den Freigabe-Links `r` oder `rw` - nicht LinkRecht.wert()
+        // («lesen», «schreiben»): das passte nicht hinein, und jedes anlegen() scheiterte auf PostgreSQL mit
+        // «value too long for type character varying(2)» (Karte 2354; der Test mit dem Repository-Mock sah es nie).
+        // Gelesen wird über LinkRecht.von(), das `rw` schon immer als SCHREIBEN versteht.
+        l.setRecht(antrag.recht() == LinkRecht.SCHREIBEN ? RECHT_SCHREIBEN : RECHT_LESEN);
         l.setBesitzer(leerAlsNull(antrag.besitzer()));
         l.setZweck(leerAlsNull(antrag.zweck()));
         l.setGueltigBis(antrag.gueltigBis());

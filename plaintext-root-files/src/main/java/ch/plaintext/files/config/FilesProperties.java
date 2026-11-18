@@ -33,4 +33,11 @@ public class FilesProperties {
 
     /** Grösste Datei beim Hochladen. */
     private long maxBytes = 50L * 1024 * 1024;
+
+    /**
+     * Bringt das Modul das Elternmenü «Misc» mit (Karte 2354)? {@code false} für eine Anwendung mit eigenem «Misc» -
+     * sonst gäbe es den Titel doppelt. Ausgewertet an {@code MiscMenu}, nicht hier; das Feld macht die Einstellung
+     * nur bekannt.
+     */
+    private boolean miscMenue = true;
 }
