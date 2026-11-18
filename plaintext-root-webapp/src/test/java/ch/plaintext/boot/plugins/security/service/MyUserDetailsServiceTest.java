@@ -76,6 +76,20 @@ class MyUserDetailsServiceTest {
         assertEquals(3, authorities.size()); // ROLE_USER, ROLE_ADMIN, PROPERTY_MYUSERID_123
     }
 
+    /** Karte 1863: eine DB-Rolle "system" wird nie zur Maschinenrolle ROLE_SYSTEM. */
+    @Test
+    void loadUserByUsername_dbRolleSystemErgibtKeinRoleSystem() {
+        testUser.setRoles(new HashSet<>(Arrays.asList("user", "system", "ROLE_SYSTEM")));
+        when(userRepository.findByUsername("test@example.com")).thenReturn(testUser);
+
+        List<String> authorities = userDetailsService.loadUserByUsername("test@example.com").getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
+        assertTrue(authorities.contains("ROLE_USER"));
+        assertTrue(authorities.stream().noneMatch(a -> a.contains("SYSTEM")), "keine Systemrolle, war: " + authorities);
+    }
+
     @Test
     void loadUserByUsername_shouldAddMandatRoleWithoutRolePrefix() {
         // Given: User with mandat role

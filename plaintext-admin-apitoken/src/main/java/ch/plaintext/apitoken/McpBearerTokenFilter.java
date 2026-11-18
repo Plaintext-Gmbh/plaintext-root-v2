@@ -6,6 +6,7 @@
  */
 package ch.plaintext.apitoken;
 
+import ch.plaintext.security.Systemlauf;
 import ch.plaintext.McpUserRoles;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
@@ -110,8 +111,8 @@ public class McpBearerTokenFilter implements Filter {
      * shift the tenant boundary. It is therefore discarded here instead of being adopted.</p>
      */
     private static GrantedAuthority rollenAuthority(String role, Object userId) {
-        if (role == null || role.isBlank()) {
-            return null;
+        if (role == null || role.isBlank() || Systemlauf.istSystemrolle(role)) {
+            return null; // Karte 1863: die Maschinenrolle vergibt kein Anmeldeweg
         }
         String r = role.toUpperCase();
         if (r.startsWith(TOKEN_MANDAT_PREFIX)) {

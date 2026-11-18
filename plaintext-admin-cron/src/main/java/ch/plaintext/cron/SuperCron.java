@@ -6,6 +6,7 @@ package ch.plaintext.cron;
 import ch.plaintext.PlaintextCron;
 import ch.plaintext.PlaintextSecurity;
 import ch.plaintext.bus.ExecutionScope;
+import ch.plaintext.security.Systemlauf;
 import it.sauronsoftware.cron4j.Predictor;
 import lombok.Getter;
 import lombok.Setter;
@@ -17,17 +18,9 @@ import org.springframework.beans.factory.BeanNameAware;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Date;
-import java.util.LinkedHashSet;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -38,50 +31,10 @@ public abstract class SuperCron implements PlaintextCron, InitializingBean, Appl
      * {@code PlaintextSecurityImpl.getUser()} reports even without authentication — this keeps
      * auditing ({@code @CreatedBy}/{@code @LastModifiedBy}) and log output consistent.
      */
-    public static final String SYSTEM_USER = "SYSTEM";
+    public static final String SYSTEM_USER = Systemlauf.SYSTEM_USER;
 
     /** Marker role by which code can recognise a cron/system run. */
-    public static final String ROLE_SYSTEM = "ROLE_SYSTEM";
-
-    /**
-     * Builds a well-defined {@link SecurityContext} for a cron run:
-     * technical {@value #SYSTEM_USER} user with {@value #ROLE_SYSTEM} and the
-     * {@code PROPERTY_MANDAT_<mandant>} authority of the target tenant. This way
-     * {@code PlaintextSecurityHolder.getMandat()}/{@code getUser()} return meaningful values in
-     * background jobs (cron4j threads run WITHOUT a request/session context) instead of
-     * {@code NO_AUTH} defaults.
-     *
-     * <p>IMPORTANT: the existing context is NEVER mutated in place (same pattern as in
-     * {@code McpBearerTokenFilter}): a fresh context is set; the caller
-     * ({@link #run()}) restores or clears it in the {@code finally} block.</p>
-     *
-     * @param mandant target tenant of the run (e.g. {@code "global"} or a real tenant)
-     */
-    private void loginMandat(String mandant) {
-        loginMandatUser(mandant, SYSTEM_USER);
-    }
-
-    /**
-     * Like {@link #loginMandat(String)}, but with a concrete user as the principal instead of
-     * {@value #SYSTEM_USER} — used for {@link ExecutionScope#PERSOENLICH} runs
-     * ({@link #runProPersoenlich()}), so that {@code PlaintextSecurityHolder.getUser()} returns the
-     * right user inside the run.
-     *
-     * @param mandant target tenant of the run
-     * @param userId  target user; {@code null}/empty falls back to {@value #SYSTEM_USER}
-     */
-    private void loginMandatUser(String mandant, String userId) {
-        Set<GrantedAuthority> authorities = new LinkedHashSet<>();
-        authorities.add(new SimpleGrantedAuthority(ROLE_SYSTEM));
-        if (mandant != null && !mandant.isBlank()) {
-            authorities.add(new SimpleGrantedAuthority("PROPERTY_MANDAT_" + mandant.toLowerCase(Locale.ROOT)));
-        }
-        String principal = userId != null && !userId.isBlank() ? userId : SYSTEM_USER;
-        Authentication auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
-        SecurityContext cronContext = SecurityContextHolder.createEmptyContext();
-        cronContext.setAuthentication(auth);
-        SecurityContextHolder.setContext(cronContext);
-    }
+    public static final String ROLE_SYSTEM = Systemlauf.ROLE_SYSTEM;
 
     private Object state;
 
@@ -282,29 +235,19 @@ public abstract class SuperCron implements PlaintextCron, InitializingBean, Appl
         log.info(">>> Starting cron '{}' for mandant '{}' (scope: {})", getName(), getMandant(), getScope());
         start();
 
-        // Remember the previous context (on pooled threads there could theoretically be one),
-        // then set a fresh system context for this run. Restore/clear ALWAYS in the finally block —
-        // not even on the exception path may a system authentication be left behind on the thread.
-        SecurityContext previous = SecurityContextHolder.getContext();
-        boolean previousHadAuthentication = previous.getAuthentication() != null;
-
+        // Karte 1863: Systemlauf setzt fuer den Lauf einen frischen SYSTEM-Kontext (cron4j-Threads haben keinen
+        // Request) und stellt den vorherigen in jedem Fall wieder her, auch auf dem Fehlerpfad.
         try {
             if (getScope() == ExecutionScope.PERSOENLICH) {
                 runProPersoenlich();
             } else {
-                loginMandat(getMandant());
-                run(getMandant());
+                Systemlauf.als(getMandant(), () -> run(getMandant()));
             }
             log.info(">>> Cron '{}' for mandant '{}' completed successfully", getName(), getMandant());
         } catch (Exception e) {
             log.error(">>> ERROR in cron '{}' for mandant '{}'", getName(), getMandant(), e);
             throw e;
         } finally {
-            if (previousHadAuthentication) {
-                SecurityContextHolder.setContext(previous);
-            } else {
-                SecurityContextHolder.clearContext();
-            }
             ende();
             log.info(">>> Cron '{}' ended. Counter: {}, Last run: {}, Duration: {}s",
                     getName(), getCounter(), getLastRun(), getLastSeconds());
@@ -322,9 +265,8 @@ public abstract class SuperCron implements PlaintextCron, InitializingBean, Appl
     private void runProPersoenlich() {
         PlaintextSecurity security = context.getBean(PlaintextSecurity.class);
         for (String userId : security.getUsersForMandat(getMandant())) {
-            loginMandatUser(getMandant(), userId);
             try {
-                run(getMandant(), userId);
+                Systemlauf.alsBenutzer(getMandant(), userId, () -> run(getMandant(), userId));
             } catch (Exception e) {
                 log.warn(">>> ERROR in cron '{}' for mandant '{}' user '{}': {}",
                         getName(), getMandant(), userId, e.toString());

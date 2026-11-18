@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.boot.plugins.security.oidc;
 
+import ch.plaintext.security.Systemlauf;
 import ch.plaintext.boot.plugins.log.Log;
 import ch.plaintext.boot.plugins.security.model.MyUserEntity;
 import ch.plaintext.boot.plugins.security.persistence.MyUserRepository;
@@ -173,6 +174,9 @@ public class PlaintextOidcUserService implements OAuth2UserService<OidcUserReque
         // Add roles (same logic as MyUserDetailsService)
         if (user.getRoles() != null) {
             for (String role : user.getRoles()) {
+                if (Systemlauf.istSystemrolle(role)) {
+                    continue; // Karte 1863: die Maschinenrolle vergibt kein Anmeldeweg
+                }
                 if (role.toLowerCase().contains("mandat")) {
                     authorities.add(new SimpleGrantedAuthority(role.toUpperCase()));
                 } else {

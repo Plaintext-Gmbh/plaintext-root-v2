@@ -37,7 +37,8 @@ import java.util.Set;
 public final class PrivilegedRoleRules {
 
     /** Roles only root may assign (normalized: lowercase, without the {@code ROLE_} prefix). */
-    private static final Set<String> NUR_ROOT = Set.of("root", "admin");
+    // "system" (Karte 1863): wirkt ohnehin nie (Anmeldewege filtern sie), ADMIN soll sie auch nicht eintragen koennen
+    private static final Set<String> NUR_ROOT = Set.of("root", "admin", "system");
 
     /** Prefix of the roles that take effect beyond the own tenant. */
     private static final String QUERZUGRIFF_PREFIX = "property_";

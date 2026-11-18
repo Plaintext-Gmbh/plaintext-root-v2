@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.boot.plugins.security;
 
+import ch.plaintext.security.Systemlauf;
 import ch.plaintext.modules.ModulApiUmsetzung;
 
 import ch.plaintext.PlaintextSecurity;
@@ -60,9 +61,9 @@ public class PlaintextSecurityImpl implements PlaintextSecurity {
 
     private static final String SESSION_ORIGINAL_USER_ID = "impersonation.originalUserId";
     private static final String SESSION_ORIGINAL_AUTH = "impersonation.originalAuth";
-    private static final String SYSTEM_USER = "SYSTEM";
+    private static final String SYSTEM_USER = Systemlauf.SYSTEM_USER;
     /** The one authority that names the session tenant (card 1451). */
-    private static final String MANDAT_PREFIX = "PROPERTY_MANDAT_";
+    private static final String MANDAT_PREFIX = Systemlauf.MANDAT_PREFIX;
 
     private static PlaintextSecurityImpl instance;
 
@@ -684,6 +685,9 @@ public class PlaintextSecurityImpl implements PlaintextSecurity {
             // Add roles (with same logic as MyUserDetailsService)
             if (targetUser.getRoles() != null) {
                 for (String role : targetUser.getRoles()) {
+                    if (Systemlauf.istSystemrolle(role)) {
+                        continue; // Karte 1863: die Maschinenrolle vergibt kein Anmeldeweg
+                    }
                     if (role.toLowerCase().contains("mandat")) {
                         newAuthorities.add(new SimpleGrantedAuthority(role.toUpperCase()));
                     } else {
