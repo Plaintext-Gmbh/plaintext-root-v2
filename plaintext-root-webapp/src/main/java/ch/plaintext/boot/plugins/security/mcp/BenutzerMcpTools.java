@@ -322,7 +322,8 @@ public class BenutzerMcpTools {
             if (rolle == null || rolle.isBlank()) {
                 continue;
             }
-            if (PrivilegedRoleRules.isPrivileged(rolle)) {
+            // Karte 2352: system ausdruecklich, nicht nur ueber NUR_ROOT in isPrivileged
+            if (PrivilegedRoleRules.isNieVergebbar(rolle) || PrivilegedRoleRules.isPrivileged(rolle)) {
                 b.verworfeneRollen++;
                 continue;
             }
