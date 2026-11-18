@@ -65,6 +65,16 @@ class PrivilegedRoleRulesTest {
     }
 
     @Test
+    @DisplayName("Karte 1863: die Maschinenrolle system ist nie vergebbar, andere Rollen schon")
+    void systemNieVergebbar() {
+        assertTrue(PrivilegedRoleRules.isNieVergebbar("system"));
+        assertTrue(PrivilegedRoleRules.isNieVergebbar(" System "));
+        assertTrue(PrivilegedRoleRules.isNieVergebbar("ROLE_SYSTEM"));
+        assertFalse(PrivilegedRoleRules.isNieVergebbar("admin"));
+        assertFalse(PrivilegedRoleRules.isNieVergebbar(null));
+    }
+
+    @Test
     @DisplayName("Die Ablehnung nennt die Rolle und den Grund")
     void ablehnungsMeldung() {
         String meldung = PrivilegedRoleRules.rejectionMessage("ROLE_ADMIN");

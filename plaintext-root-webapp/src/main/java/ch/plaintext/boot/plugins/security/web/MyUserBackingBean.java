@@ -484,6 +484,11 @@ public class MyUserBackingBean implements Serializable {
         // Module roles are explicitly NOT privileged — granting them is the admin's job.
         // Roles already present on the persisted record stay permitted (existing data editable). The
         // server-side check is the actual fix; the free-text chips in the UI are only convenience.
+        if (selected.getRoles().stream().anyMatch(PrivilegedRoleRules::isNieVergebbar)) {
+            FacesMessages.error(FacesMessages.TITEL_FEHLER, "Die Rolle 'system' ist die Maschinenrolle und nie vergebbar (Karte 1863).");
+            context.validationFailed();
+            return;
+        }
         if (!isRoot() && !pruefeRollenAllowlist(context, persistedRoles)) {
             return;
         }

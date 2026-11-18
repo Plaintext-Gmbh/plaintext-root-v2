@@ -217,6 +217,9 @@ public class RollenzuteilungBackingBean implements Serializable {
      * @return {@code true} if saving is allowed
      */
     private boolean darfVergeben(String roleName) {
+        if (PrivilegedRoleRules.isNieVergebbar(roleName)) {
+            return false; // Karte 1863: Maschinenrolle, auch fuer ROOT
+        }
         if (security.ifGranted("ROLE_ROOT") || !PrivilegedRoleRules.isPrivileged(roleName)) {
             return true;
         }

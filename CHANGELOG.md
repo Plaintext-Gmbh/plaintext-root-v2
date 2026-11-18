@@ -19,7 +19,11 @@ exhaustive.
   (verhaltensgleich). Neu: `TaskDecorator` (AutoConfiguration in root-common) -> `@Scheduled`/`@Async` ohne
   Kontext laufen als Systemlauf im Mandat `global`, ein vorhandener Kontext bleibt. Die Benutzerrolle `system`
   wird in keinem Anmeldeweg (Formular, OIDC, Mandatswechsel, MCP-Token, Watch-Link) zur Authority, ADMIN kann sie
-  nicht vergeben. Auditing ohne Benutzer schreibt `SYSTEM` statt `system`. Keine neuen Gates (Etappe 2).
+  nicht vergeben, ROOT auch nicht (UI, Rollenzuteilung). Auditing ohne Benutzer schreibt `SYSTEM` statt `system`.
+  Keine neuen Gates (Etappe 2). **Verhaltensaenderung fuer Konsumenten:** rohe `@Scheduled`-/`@Async`-Threads hatten
+  bisher keinen Kontext (`getMandat()` = `NO_AUTH`); jetzt `ROLE_SYSTEM` + `PROPERTY_MANDAT_global`, neue Entitaeten
+  ohne gesetztes Mandat bekommen also `global` statt `NO_AUTH` (`SuperModel` @PrePersist). Pruefpunkt beim
+  schuetu-Bump: KorrekturWrapper, RevokedTokenService, ResultateVerarbeiter persistieren ohne eigenen Kontext.
 - **Flyway-Vorpruefung mit Modul-Hinweis** (Karte 2343, Folge des app-Vorfalls 17.11.). Neue
   `FlywayMigrationStrategy` in plaintext-root-webapp (`ch.plaintext.boot.flyway`): bei `validate-on-migrate: true`
   validiert sie vor dem Migrate genau wie `Flyway.migrate()` (konfigurierte Muster plus `*:pending`) und bricht bei

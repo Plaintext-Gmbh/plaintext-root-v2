@@ -70,6 +70,11 @@ public final class PrivilegedRoleRules {
      * @param roleName the rejected role
      * @return plain text for the UI
      */
+    /** Karte 1863 (Review fable2): die Maschinenrolle {@code system} vergibt niemand, auch ROOT nicht. */
+    public static boolean isNieVergebbar(String roleName) {
+        return ch.plaintext.security.Systemlauf.istSystemrolle(roleName);
+    }
+
     public static String rejectionMessage(String roleName) {
         return "Nur ROOT darf die Rolle '" + roleName + "' vergeben. "
                 + "Modul-Rollen (Zugang zu einem Fachmodul) darf ADMIN vergeben.";
