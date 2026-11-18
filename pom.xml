@@ -59,7 +59,7 @@
 
         <!-- JSF & Primefaces -->
         <primefaces-spring-boot-starter.version>6.1.2</primefaces-spring-boot-starter.version>
-        <primefaces.version>16.0.1</primefaces.version>
+        <primefaces.version>16.0.2</primefaces.version>
         <!-- Mindestens 4.1.13: dort schliesst Mojarra CVE-2026-46581 (Pfad-Traversal/RCE ueber
              ui:include, CVSS 7.5). Nicht zurueckdrehen. Die Kehrseite derselben Haertung —
              Facelet-Verweise brauchen seither einen fuehrenden "/" — haelt der Test
@@ -178,7 +178,7 @@
           28.08.2026: 11.0.24 -> 11.0.25. Geeicht per NVD-CPE-Abfrage: 11.0.24 traegt 11 CVEs
           (4x CRITICAL bis 9.8, u.a. CVE-2026-65637/65905/65182/68525), 11.0.25 null.
         -->
-        <tomcat.version>11.0.27</tomcat.version>
+        <tomcat.version>11.0.29</tomcat.version>
         <!--
           log4j-api: Boot 4.1.0 pinnt 2.25.4 — darin CVE-2026-49844 (CVSS 5.9, MapMessage-
           JSON-Serialisierung erzeugt ungueltiges JSON bei non-finite Floats), behoben ab 2.25.5.

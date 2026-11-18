@@ -22,6 +22,15 @@ exhaustive.
   meldet Module aus `module.yaml`, die die Auswahl nicht nennt (`[modul-lader] ACHTUNG: … NICHT in der Auswahl`).
 
 ### Changed
+- **Java-21-Ziel seit 3.46.0** (afb1525 + #57, Karte 2302/2347): der Parent setzt `release 21` fest
+  (Class-Version 65 fuer die BIT-Laufzeit); ein eigenes `java.version` in der App greift nicht. Konsumenten
+  kompilieren damit ebenfalls fuer 21: unbenannte Variablen (`catch (X _)`, `_ ->`) und Java-22+-APIs
+  brechen den Build — vor dem Bump `grep -rnE 'catch \([A-Za-z.| ]+ _\)|\b_ ->' --include=*.java`
+  und umbenennen (app 1acf4da6 als Muster).
+- **Tomcat 11.0.27 → 11.0.29** und **PrimeFaces 16.0.1 → 16.0.2** (Renovate #51/#53 gebuendelt, Karte 2029):
+  Bugfix-Releases ohne CVE-Druck. PrimeFaces setzt die Defaults von `p:commandButton` `escape` und
+  `renderDisabledClick` wieder auf true; bekannte HTML-Werte in Buttons pruefen (app zeiterfassung.xhtml
+  ist korrekt).
 - **MY_OBJECT auf TEXT** (Karte 2347, Folge 2333): Migration in plaintext-root-webapp hebt
   `simple_storable_entity.my_object` von VARCHAR(30000) auf TEXT (`SET DATA TYPE`, laeuft auch auf dem
   demo-H2-Pfad). Kommt in jeder App mit dem naechsten root-Bump an; die Entity bleibt unveraendert
