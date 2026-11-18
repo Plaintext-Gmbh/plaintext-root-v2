@@ -36,12 +36,26 @@ import java.util.regex.Pattern;
  *
  * <p><b>Freigabe-Links.</b> Über den {@link LinkTokenStore}, Art {@value #ART}, Objekt {@code <benutzer>/<name>}.
  * Ein Link gilt höchstens, solange die Datei existiert; mit der Datei verschwindet er.</p>
+ *
+ * <p><b>Download oder Anzeige (Karte 2354).</b> Ob ein Link die Datei herunterlädt oder im Browser zeigt, steht in
+ * seiner Art: {@value #ART} lädt herunter (wie bisher), {@value #ART_IM_BROWSER} zeigt an. Die Art und nicht ein
+ * Parameter an der Adresse, weil die Wahl zum Link gehört: wer ihn weitergibt, legt sie fest, wer ihn bekommt,
+ * kann sie nicht umstellen. Und die Art statt einer neuen Spalte, weil der {@link LinkTokenStore} ein geteilter
+ * Vertrag ist (Draw.io, Diashows, eigene Stores der Anwendungen) - ein Feld mehr hätte jeden davon gebrochen.</p>
+ *
+ * <p><b>Fremde Ablagen (Karte 2354).</b> Jede Methode nimmt den Benutzer, in dessen Ordner sie arbeitet; wer das
+ * sein darf, entscheidet der Aufrufer ({@code FilesZugriff}): der eigene, für Admin/Root auch ein fremder.
+ * {@link #alle()} ist die Liste über alle Ordner.</p>
  */
 @Slf4j
 @Service
 public class FilesService {
 
     public static final String ART = "files";
+    /** Art eines Links, der die Datei im Browser zeigt statt sie herunterzuladen (Karte 2354). */
+    public static final String ART_IM_BROWSER = "files-inline";
+    /** Beide Arten; alles, was Links sucht oder widerruft, geht über beide. */
+    private static final List<String> ARTEN = List.of(ART, ART_IM_BROWSER);
     /** Wurzel im Speicher; zufaellig gleich benannt wie {@link #ART}, aber ein Pfad, keine Link-Art. */
     private static final String WURZEL = "files";
     private static final String PRAEFIX = WURZEL + "/";
@@ -72,20 +86,42 @@ public class FilesService {
 
     /** Die Dateien des Benutzers, neueste zuerst. */
     public List<Datei> liste(String benutzer) {
-        String ordner = ordner(benutzer);
+        List<Datei> ergebnis = imOrdner(ordnerName(benutzer));
+        ergebnis.sort(Comparator.comparing(Datei::geaendert).reversed());
+        return ergebnis;
+    }
+
+    /**
+     * Die Dateien aller Benutzer, neueste zuerst - für Admin/Root (Karte 2354). Ob der Aufrufer das darf, prüft
+     * {@code FilesZugriff.siehtAlle()}, nicht diese Methode.
+     *
+     * <p>Ein Ordner, dessen Name keine Kennung ist (von Hand angelegt, Grossbuchstaben), fehlt hier: jede andere
+     * Methode käme über {@link #ordnerName} in einen anderen Ordner als den gezeigten.</p>
+     */
+    public List<Datei> alle() {
         List<Datei> ergebnis = new ArrayList<>();
-        for (DateiEintrag e : speicher.list(ordner)) {
+        for (DateiEintrag o : speicher.list(WURZEL)) {
+            if (o.ordner() && istOrdnerName(o.name())) {
+                ergebnis.addAll(imOrdner(o.name()));
+            }
+        }
+        ergebnis.sort(Comparator.comparing(Datei::geaendert).reversed());
+        return ergebnis;
+    }
+
+    private List<Datei> imOrdner(String ordnerName) {
+        List<Datei> ergebnis = new ArrayList<>();
+        for (DateiEintrag e : speicher.list(PRAEFIX + ordnerName)) {
             if (e.ordner()) {
                 continue;
             }
-            Datei d = new Datei(e.name(), e.groesse(), e.geaendert(), e.geaendert().plus(frist()));
+            Datei d = new Datei(ordnerName, e.name(), e.groesse(), e.geaendert(), e.geaendert().plus(frist()));
             if (abgelaufen(d)) {
-                entferne(ordnerName(benutzer), e.name());
+                entferne(ordnerName, e.name());
             } else {
                 ergebnis.add(d);
             }
         }
-        ergebnis.sort(Comparator.comparing(Datei::geaendert).reversed());
         return ergebnis;
     }
 
@@ -112,14 +148,24 @@ public class FilesService {
         log.info("[FilesService] gelöscht | benutzer={} | datei={}", benutzer, dateiname);
     }
 
-    /** Die Freigabe-Links des Benutzers. */
+    /** Die Freigabe-Links des Benutzers, beide Arten, neueste zuerst. */
     public List<LinkToken> links(String benutzer) {
-        return links.liste(ART, null, ordnerName(benutzer));
+        return beiderArten(null, ordnerName(benutzer));
     }
 
-    /** Die Freigabe-Links einer Datei des Benutzers. */
+    /** Die Freigabe-Links einer Datei des Benutzers, beide Arten, neueste zuerst. */
     public List<LinkToken> links(String benutzer, String dateiname) {
-        return links.liste(ART, objekt(ordnerName(benutzer), name(dateiname)), ordnerName(benutzer));
+        return beiderArten(objekt(ordnerName(benutzer), name(dateiname)), ordnerName(benutzer));
+    }
+
+    private List<LinkToken> beiderArten(String objekt, String besitzer) {
+        List<LinkToken> ergebnis = new ArrayList<>();
+        for (String art : ARTEN) {
+            ergebnis.addAll(links.liste(art, objekt, besitzer));
+        }
+        // Ein Store ohne Zeitstempel (erstellt = null) behält seine eigene Reihenfolge je Art.
+        ergebnis.sort(Comparator.comparing(LinkToken::erstellt, Comparator.nullsLast(Comparator.reverseOrder())));
+        return ergebnis;
     }
 
     /** Lese-Link, solange die Datei lebt, ohne Zweck - so legt ihn das MCP-Werkzeug an. */
@@ -127,12 +173,19 @@ public class FilesService {
         return linkErstellen(benutzer, dateiname, 0, null);
     }
 
+    /** Download-Link wie vor Karte 2354. */
+    public LinkToken linkErstellen(String benutzer, String dateiname, int tage, String zweck) {
+        return linkErstellen(benutzer, dateiname, tage, zweck, false);
+    }
+
     /**
      * Wie das Draw.io-Formular: {@code tage} Gültigkeit (0 = bis die Datei abläuft), {@code zweck} für die Übersicht.
      *
+     * @param imBrowser {@code true} = der Link zeigt die Datei im Browser, statt sie herunterzuladen (Karte 2354);
+     *                  was sich nicht gefahrlos zeigen lässt, lädt der Link trotzdem herunter
      * @throws IllegalArgumentException wenn es die Datei nicht gibt oder die Gültigkeit ausserhalb 0..3650 liegt
      */
-    public LinkToken linkErstellen(String benutzer, String dateiname, int tage, String zweck) {
+    public LinkToken linkErstellen(String benutzer, String dateiname, int tage, String zweck, boolean imBrowser) {
         String b = ordnerName(benutzer);
         String name = name(dateiname);
         if (tage < 0 || tage > MAX_TAGE) {
@@ -144,22 +197,29 @@ public class FilesService {
         // Same day as the LinkTokenStore checks against (JVM default zone), not ZONE: with ZONE a
         // link set to yesterday stayed open until midnight UTC (release 1.786.0, Karte 1559).
         LocalDate bis = tage == 0 ? null : LocalDate.now().plusDays(tage);
-        LinkToken l = links.anlegen(new LinkTokenAntrag(ART, objekt(b, name), LinkRecht.LESEN, b, zweck, bis));
-        log.info("[FilesService] Link erstellt | benutzer={} | datei={} | bis={}", b, name, bis);
+        String art = imBrowser ? ART_IM_BROWSER : ART;
+        LinkToken l = links.anlegen(new LinkTokenAntrag(art, objekt(b, name), LinkRecht.LESEN, b, zweck, bis));
+        log.info("[FilesService] Link erstellt | benutzer={} | datei={} | bis={} | imBrowser={}", b, name, bis, imBrowser);
         return l;
     }
 
     /** Zieht einen Link zurück - nur einen eigenen. */
     public boolean linkWiderrufen(String benutzer, String id) {
         String b = ordnerName(benutzer);
-        boolean eigener = links.liste(ART, null, b).stream().anyMatch(l -> l.id().equals(id));
-        return eigener && links.widerrufe(ART, id);
+        // Die Art kommt vom gefundenen Link: eine id ist nur innerhalb ihrer Art eindeutig zugesichert.
+        return beiderArten(null, b).stream().filter(l -> l.id().equals(id)).findFirst()
+                .map(l -> links.widerrufe(l.art(), id)).orElse(false);
+    }
+
+    /** Zeigt der Link die Datei im Browser, statt sie herunterzuladen? */
+    public static boolean imBrowser(LinkToken link) {
+        return ART_IM_BROWSER.equals(link.art());
     }
 
     /** Für den öffentlichen Download: der gültige Link zum Token, falls es ihn und seine Datei gibt. Wirft nie. */
     public Optional<LinkToken> finde(String token) {
         try {
-            return links.finde(ART, token).filter(l -> {
+            return ARTEN.stream().flatMap(art -> links.finde(art, token).stream()).findFirst().filter(l -> {
                 String[] teile = teile(l.objekt());
                 return teile != null && gibtEs(teile[0], teile[1]);
             });
@@ -175,7 +235,7 @@ public class FilesService {
         if (teile == null || !gibtEs(teile[0], teile[1])) {
             return null;
         }
-        links.aufgerufen(ART, token);
+        links.aufgerufen(link.art(), token);
         return speicher.download(PRAEFIX + link.objekt());
     }
 
@@ -240,7 +300,9 @@ public class FilesService {
 
     private void entferne(String ordnerName, String name) {
         speicher.delete(PRAEFIX + ordnerName + "/" + name);
-        links.widerrufeFuer(ART, objekt(ordnerName, name));
+        for (String art : ARTEN) {
+            links.widerrufeFuer(art, objekt(ordnerName, name));
+        }
     }
 
     static String ordner(String benutzer) {
@@ -261,8 +323,20 @@ public class FilesService {
         return i <= 0 || i == objekt.length() - 1 ? null : new String[]{objekt.substring(0, i), objekt.substring(i + 1)};
     }
 
-    /** Kennung → Ordnername: klein, nur harmlose Zeichen. Leer gibt es nicht. */
-    static String ordnerName(String benutzer) {
+    /** Ist das schon ein Ordnername, so wie {@link #ordnerName} ihn bildet? */
+    private static boolean istOrdnerName(String name) {
+        try {
+            return ordnerName(name).equals(name);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Kennung → Ordnername: klein, nur harmlose Zeichen. Leer gibt es nicht. Auf einen Ordnernamen angewendet
+     * ändert sie nichts - darum darf, wer eine fremde Ablage öffnet, deren Ordnernamen als Benutzer übergeben.
+     */
+    public static String ordnerName(String benutzer) {
         String b = benutzer == null ? "" : NICHT_ERLAUBT_BENUTZER.matcher(benutzer.strip().toLowerCase(Locale.ROOT)).replaceAll("_");
         if (b.isEmpty() || b.chars().allMatch(c -> c == '.')) {
             throw new IllegalArgumentException("Kein Benutzer angemeldet");

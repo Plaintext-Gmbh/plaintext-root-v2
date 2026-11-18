@@ -4,7 +4,9 @@
 package ch.plaintext.files;
 
 import ch.plaintext.files.config.FilesProperties;
+import ch.plaintext.bus.ExecutionScope;
 import ch.plaintext.files.service.Datei;
+import ch.plaintext.files.service.FilesAufraeumen;
 import ch.plaintext.files.service.FilesService;
 import ch.plaintext.files.speicher.DateisystemDateiSpeicher;
 import ch.plaintext.framework.EigeneAdresse;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.annotation.Scope;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -121,6 +124,82 @@ class FilesServiceTest {
         assertThat(service.aufraeumen()).isEqualTo(1);
         assertThat(wurzel.resolve("files/bert/auch-alt.txt")).doesNotExist();
         assertThat(wurzel.resolve("files/bert/neu.txt")).exists();
+    }
+
+    @Test
+    void alleZeigtJedeAblageMitBesitzer() throws Exception {
+        service.hochladen("Anna.Muster@example.ch", "a.txt", "x".getBytes());
+        service.hochladen("bert", "b.txt", "y".getBytes());
+        service.hochladen("bert", "alt.txt", "z".getBytes());
+        Files.setLastModifiedTime(wurzel.resolve("files/bert/alt.txt"), FileTime.from(Instant.now().minus(Duration.ofDays(22))));
+        // Von Hand angelegt, kein Ordnername: jede andere Methode käme mit diesem Namen in den Ordner "fremd".
+        Files.createDirectories(wurzel.resolve("files/Fremd"));
+        Files.writeString(wurzel.resolve("files/Fremd/x.txt"), "x");
+        Files.writeString(wurzel.resolve("files/lose.txt"), "keinem Benutzer zugeordnet");
+
+        assertThat(service.alle()).extracting(d -> d.besitzer() + "/" + d.name())
+                .containsExactlyInAnyOrder("anna.muster@example.ch/a.txt", "bert/b.txt");
+        assertThat(wurzel.resolve("files/bert/alt.txt")).as("abgelaufen: weg wie in liste()").doesNotExist();
+        assertThat(service.liste("bert")).extracting(Datei::besitzer).containsExactly("bert");
+        // Mit dem Besitzer aus der Liste kommt ein Admin an die Datei.
+        assertThat(service.herunterladen("anna.muster@example.ch", "a.txt")).isEqualTo("x".getBytes());
+    }
+
+    @Test
+    void anzeigeLinkIstEineEigeneArtUndVerhaeltSichSonstGleich() {
+        service.hochladen("anna", "bild.png", "x".getBytes());
+        LinkToken download = service.linkErstellen("anna", "bild.png", 7, "zum Laden");
+        LinkToken anzeige = service.linkErstellen("anna", "bild.png", 0, "zum Zeigen", true);
+
+        assertThat(download.art()).isEqualTo("files");
+        assertThat(anzeige.art()).isEqualTo("files-inline");
+        assertThat(FilesService.imBrowser(download)).isFalse();
+        assertThat(FilesService.imBrowser(anzeige)).isTrue();
+        assertThat(service.finde(anzeige.token()).map(LinkToken::art)).contains("files-inline");
+        assertThat(service.finde(download.token()).map(LinkToken::art)).contains("files");
+        assertThat(service.url(anzeige.token())).as("dieselbe Adresse, die Wahl steckt im Link")
+                .isEqualTo("https://app.example.ch/nosec/files/" + anzeige.token());
+        assertThat(service.links("anna")).hasSize(2);
+        assertThat(service.links("anna", "bild.png")).extracting(LinkToken::zweck)
+                .containsExactlyInAnyOrder("zum Laden", "zum Zeigen");
+        assertThat(service.links("bert")).isEmpty();
+
+        assertThat(service.linkWiderrufen("bert", anzeige.id())).as("fremder Link").isFalse();
+        assertThat(service.linkWiderrufen("anna", anzeige.id())).isTrue();
+        assertThat(service.finde(anzeige.token())).isEmpty();
+        assertThat(service.finde(download.token())).as("der andere Link lebt weiter").isPresent();
+    }
+
+    @Test
+    void loeschenNimmtLinksBeiderArtenMit() {
+        service.hochladen("anna", "bild.png", "x".getBytes());
+        LinkToken download = service.linkErstellen("anna", "bild.png");
+        LinkToken anzeige = service.linkErstellen("anna", "bild.png", 0, null, true);
+
+        service.loeschen("anna", "bild.png");
+
+        assertThat(links.zeilen).isEmpty();
+        // Sonst öffnete ein alter Link später eine neue Datei, die zufällig gleich heisst.
+        service.hochladen("anna", "bild.png", "neu".getBytes());
+        assertThat(service.finde(download.token())).isEmpty();
+        assertThat(service.finde(anzeige.token())).isEmpty();
+    }
+
+    @Test
+    void aufraeumCronIstPrototypeUndLoeschtAbgelaufene() throws Exception {
+        // Ohne prototype bricht plaintext-admin-cron den Start der Anwendung ab (CronBeanPostProcessor).
+        assertThat(FilesAufraeumen.class.getAnnotation(Scope.class)).as("jeder PlaintextCron ist prototype").isNotNull();
+        assertThat(FilesAufraeumen.class.getAnnotation(Scope.class).value()).isEqualTo("prototype");
+
+        service.hochladen("anna", "alt.txt", "x".getBytes());
+        Files.setLastModifiedTime(wurzel.resolve("files/anna/alt.txt"), FileTime.from(Instant.now().minus(Duration.ofDays(22))));
+        FilesAufraeumen cron = new FilesAufraeumen(service);
+        cron.run("global");
+
+        assertThat(wurzel.resolve("files/anna/alt.txt")).doesNotExist();
+        assertThat(cron.getScope()).isEqualTo(ExecutionScope.APPLICATION);
+        assertThat(cron.getDisplayName()).isNotBlank();
+        assertThat(cron.getDefaultCronExpression()).isEqualTo("30 3 * * *");
     }
 
     @Test

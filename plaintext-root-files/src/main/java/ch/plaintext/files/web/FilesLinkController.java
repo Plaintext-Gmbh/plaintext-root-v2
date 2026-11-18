@@ -21,6 +21,10 @@ import java.util.Optional;
 /**
  * Download per Freigabe-Link - {@code /nosec/files/{token}}, ohne Anmeldung (Karte 1559, Adresse wie im Inventar,
  * damit bestehende Links weiter gehen). Geschützt allein durch das Token.
+ *
+ * <p><b>Anzeige statt Download (Karte 2354).</b> Ein Link, der mit «Direkt im Browser anzeigen» angelegt wurde,
+ * liefert {@code Content-Disposition: inline} und den Typ der Datei - für das, was {@link Anzeige} kennt (Bilder,
+ * PDF, Text). Alles andere lädt auch ein solcher Link herunter; warum, steht dort.</p>
  */
 @RestController
 @RequiredArgsConstructor
@@ -38,12 +42,24 @@ public class FilesLinkController {
                     .body("Datei nicht gefunden - der Link ist widerrufen oder die Datei abgelaufen."
                             .getBytes(StandardCharsets.UTF_8));
         }
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+        String name = FilesService.datei(link.get());
+        Optional<Anzeige> anzeige = FilesService.imBrowser(link.get()) ? Anzeige.fuer(name) : Optional.empty();
+        ResponseEntity.BodyBuilder antwort = ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .header("X-Robots-Tag", "noindex")
                 .header("Referrer-Policy", "no-referrer")
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
-                        .filename(FilesService.datei(link.get()), StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff");
+        if (anzeige.isEmpty()) {
+            return antwort.contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                            .filename(name, StandardCharsets.UTF_8).build().toString())
+                    .body(inhalt);
+        }
+        if (anzeige.get().sandbox()) {
+            antwort.header("Content-Security-Policy", "sandbox");
+        }
+        return antwort.contentType(anzeige.get().typ())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(name, StandardCharsets.UTF_8).build().toString())
                 .body(inhalt);
     }
 }
