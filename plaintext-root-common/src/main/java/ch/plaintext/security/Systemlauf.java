@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.security;
 
+import ch.plaintext.arch.StabileApi;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -24,6 +25,7 @@ import java.util.Set;
  * in-place; danach kommt der Vorgaenger zurueck, oder der Kontext wird geleert. {@code MODE_THREADLOCAL} bleibt
  * (InheritableThreadLocal vererbte in Pool-Threads falsch).</p>
  */
+@StabileApi("Maschinen-Identitaet fuer guild, schuetu und iot (Karte 1863 Etappe 3, Karte 2352)")
 public final class Systemlauf {
 
     /** Principal eines Maschinenlaufs; auch der Auditing-Name ohne Benutzer. */

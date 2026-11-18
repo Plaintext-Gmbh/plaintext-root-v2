@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.boot.plugins.security.oidc;
 
+import ch.plaintext.framework.PrivilegedRoleRules;
 import ch.plaintext.security.Systemlauf;
 import ch.plaintext.boot.plugins.log.Log;
 import ch.plaintext.boot.plugins.security.model.MyUserEntity;
@@ -154,6 +155,7 @@ public class PlaintextOidcUserService implements OAuth2UserService<OidcUserReque
             Arrays.stream(config.getDefaultRoles().split(","))
                     .map(String::trim)
                     .filter(r -> !r.isEmpty())
+                    .filter(r -> !PrivilegedRoleRules.isNieVergebbar(r)) // Karte 2352: auch nicht aus der Konfiguration
                     .forEach(roles::add);
         }
 
