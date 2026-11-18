@@ -37,7 +37,8 @@ import java.util.Set;
 public final class PrivilegedRoleRules {
 
     /** Roles only root may assign (normalized: lowercase, without the {@code ROLE_} prefix). */
-    private static final Set<String> NUR_ROOT = Set.of("root", "admin");
+    // "system" (Karte 1863): wirkt ohnehin nie (Anmeldewege filtern sie), ADMIN soll sie auch nicht eintragen koennen
+    private static final Set<String> NUR_ROOT = Set.of("root", "admin", "system");
 
     /** Prefix of the roles that take effect beyond the own tenant. */
     private static final String QUERZUGRIFF_PREFIX = "property_";
@@ -69,6 +70,11 @@ public final class PrivilegedRoleRules {
      * @param roleName the rejected role
      * @return plain text for the UI
      */
+    /** Karte 1863 (Review fable2): die Maschinenrolle {@code system} vergibt niemand, auch ROOT nicht. */
+    public static boolean isNieVergebbar(String roleName) {
+        return ch.plaintext.security.Systemlauf.istSystemrolle(roleName);
+    }
+
     public static String rejectionMessage(String roleName) {
         return "Nur ROOT darf die Rolle '" + roleName + "' vergeben. "
                 + "Modul-Rollen (Zugang zu einem Fachmodul) darf ADMIN vergeben.";

@@ -3,6 +3,7 @@
  */
 package ch.plaintext.watch.web;
 
+import ch.plaintext.security.Systemlauf;
 import ch.plaintext.McpUserRoles;
 import ch.plaintext.PlaintextSecurity;
 import ch.plaintext.apitoken.IApiTokenService;
@@ -210,6 +211,9 @@ public class WatchTokenAnmeldeController {
         for (String rolle : rollen.rolesForUser(r.userId())) {
             if (rolle == null || rolle.isBlank()) {
                 continue;
+            }
+            if (Systemlauf.istSystemrolle(rolle)) {
+                continue; // Karte 1863: die Maschinenrolle vergibt kein Anmeldeweg
             }
             String gross = rolle.trim().toUpperCase(java.util.Locale.ROOT);
             // SECURITY (card 1460, N-4): a phone link never carries ROOT or ADMIN. No watch page

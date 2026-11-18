@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.boot.plugins.jpa;
 
+import ch.plaintext.security.Systemlauf;
 import ch.plaintext.boot.plugins.security.PlaintextSecurityHolder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,8 +32,8 @@ public class JpaAuditingConfig {
             // Get current user from PlaintextSecurityHolder
             String username = PlaintextSecurityHolder.getUser();
 
-            // Return username or "system" if no user is logged in
-            return Optional.ofNullable(username != null && !username.isEmpty() ? username : "system");
+            // Karte 1863: ohne Benutzer derselbe Name wie im Systemlauf (vorher "system" neben "SYSTEM")
+            return Optional.ofNullable(username != null && !username.isEmpty() ? username : Systemlauf.SYSTEM_USER);
         };
     }
 }

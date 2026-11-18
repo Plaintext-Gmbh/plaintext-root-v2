@@ -3,23 +3,16 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.bus;
 
+import ch.plaintext.security.Systemlauf;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
 
 /**
  * Central delivery point of the internal event bus. Collects all {@link PlaintextBusSubscriber}
@@ -43,9 +36,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Slf4j
 public class PlaintextBusDispatcher {
-
-    private static final String ROLE_SYSTEM = "ROLE_SYSTEM";
-    private static final String SYSTEM_USER = "SYSTEM";
 
     private final List<PlaintextBusSubscriber<?>> subscribers;
 
@@ -78,37 +68,17 @@ public class PlaintextBusDispatcher {
 
     @SuppressWarnings("unchecked")
     private void zustellen(PlaintextBusSubscriber<?> subscriber, PlaintextBusEvent<?> envelope) {
-        SecurityContext vorheriger = SecurityContextHolder.getContext();
-        boolean vorherigerHatteAuthentication = vorheriger.getAuthentication() != null;
-        loginContext(envelope);
-        try {
-            PlaintextBusSubscriber<Object> typed = (PlaintextBusSubscriber<Object>) subscriber;
-            PlaintextBusEvent<Object> typedEnvelope = (PlaintextBusEvent<Object>) envelope;
-            typed.onEvent(envelope.payload(), typedEnvelope);
-        } catch (Exception e) {
-            log.warn("Bus-Subscriber {} fehlgeschlagen fuer Event {}: {}",
-                    subscriber.getClass().getName(), envelope.payload().getClass().getSimpleName(), e.toString());
-        } finally {
-            if (vorherigerHatteAuthentication) {
-                SecurityContextHolder.setContext(vorheriger);
-            } else {
-                SecurityContextHolder.clearContext();
+        // Karte 1863: Maschinenkontext des Events (Mandat, Benutzer oder SYSTEM), danach der vorherige zurueck.
+        Systemlauf.alsBenutzer(envelope.mandant(), envelope.userId(), () -> {
+            try {
+                PlaintextBusSubscriber<Object> typed = (PlaintextBusSubscriber<Object>) subscriber;
+                PlaintextBusEvent<Object> typedEnvelope = (PlaintextBusEvent<Object>) envelope;
+                typed.onEvent(envelope.payload(), typedEnvelope);
+            } catch (Exception e) {
+                log.warn("Bus-Subscriber {} fehlgeschlagen fuer Event {}: {}",
+                        subscriber.getClass().getName(), envelope.payload().getClass().getSimpleName(), e.toString());
             }
-        }
+        });
     }
 
-    /** Sets a minimal SecurityContext from the event context, analogous to {@code SuperCron.loginMandat}. */
-    private void loginContext(PlaintextBusEvent<?> envelope) {
-        Set<GrantedAuthority> authorities = new LinkedHashSet<>();
-        authorities.add(new SimpleGrantedAuthority(ROLE_SYSTEM));
-        String mandant = envelope.mandant();
-        if (mandant != null && !mandant.isBlank()) {
-            authorities.add(new SimpleGrantedAuthority("PROPERTY_MANDAT_" + mandant.toLowerCase(Locale.ROOT)));
-        }
-        String principal = envelope.userId() != null && !envelope.userId().isBlank() ? envelope.userId() : SYSTEM_USER;
-        Authentication auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
-        SecurityContext context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(auth);
-        SecurityContextHolder.setContext(context);
-    }
 }

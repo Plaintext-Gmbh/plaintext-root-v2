@@ -4,6 +4,7 @@
 package ch.plaintext.boot.plugins.security.service;
 
 
+import ch.plaintext.security.Systemlauf;
 import ch.plaintext.boot.plugins.security.lockout.AccountLockoutService;
 import ch.plaintext.boot.plugins.security.model.MyUserEntity;
 import ch.plaintext.boot.plugins.security.persistence.MyUserRepository;
@@ -47,6 +48,9 @@ public class MyUserDetailsService implements org.springframework.security.core.u
 
         List<SimpleGrantedAuthority> auth = new ArrayList<>();
         for (String role : user.getRoles()) {
+            if (Systemlauf.istSystemrolle(role)) {
+                continue; // Karte 1863: die Maschinenrolle vergibt kein Anmeldeweg
+            }
             if(role.toLowerCase().contains("mandat")){
                 auth.add(new SimpleGrantedAuthority( role.toUpperCase()));
             } else {
