@@ -55,6 +55,12 @@ exhaustive.
   `files-inline` im `LinkTokenStore`, ohne neue Spalte und ohne Aenderung am Vertrag; eine Token-Uebersicht, die
   nach Art `files` filtert, zeigt diese Links erst, wenn sie auch `files-inline` liest. MCP `create_file_link`
   hat den optionalen Parameter `imBrowser`. Bestehende Links bleiben Download-Links.
+- **`system` an zwei weiteren Schreibwegen nie vergebbar, `Systemlauf` ist `@StabileApi`** (Karte 2352, Nits aus
+  dem Review zu 1863). Der MCP-Import (`BenutzerMcpTools`) verwirft `system` ausdruecklich, nicht nur ueber
+  `isPrivileged`; das per OIDC automatisch angelegte Konto uebernimmt `system` nicht aus den Default-Rollen der
+  OIDC-Konfiguration (bisher gespeichert, beim Anmelden gefiltert). `ch.plaintext.security.Systemlauf` ist als
+  stabile API deklariert. **Fuer Konsumenten:** ein `root-common-api`-Eintrag `-> ch.plaintext.security.Systemlauf`
+  in `plaintext-arch-allowlist.txt` ist beim Bump auf diese Version verwaist und muss raus (guild PR 561).
 - **Java-21-Ziel seit 3.46.0** (afb1525 + #57, Karte 2302/2347): der Parent setzt `release 21` fest
   (Class-Version 65 fuer die BIT-Laufzeit); ein eigenes `java.version` in der App greift nicht. Konsumenten
   kompilieren damit ebenfalls fuer 21: unbenannte Variablen (`catch (X _)`, `_ ->`) und Java-22+-APIs

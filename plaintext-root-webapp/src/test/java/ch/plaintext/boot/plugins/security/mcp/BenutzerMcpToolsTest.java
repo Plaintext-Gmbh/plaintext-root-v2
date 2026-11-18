@@ -7,6 +7,7 @@
 package ch.plaintext.boot.plugins.security.mcp;
 
 import ch.plaintext.PlaintextSecurity;
+import ch.plaintext.framework.PrivilegedRoleRules;
 import ch.plaintext.boot.plugins.security.PlaintextSecurityHolder;
 import ch.plaintext.boot.plugins.security.model.MyUserEntity;
 import ch.plaintext.boot.plugins.security.model.UserMandate;
@@ -154,6 +155,21 @@ class BenutzerMcpToolsTest {
         assertFalse(gespeichert.getRoles().contains("admin"), "admin darf nie aus einer Datei kommen.");
         assertFalse(gespeichert.getRoles().contains("root"), "root darf nie aus einer Datei kommen.");
         assertTrue(bericht.contains("verworfen"), "Das Verworfene gehoert in den Bericht.");
+    }
+
+    /** Karte 2352: die Maschinenrolle system kommt in keiner Schreibweise aus einer Datei. */
+    @Test
+    void importVerwirftMaschinenrolleSystem() {
+        authAdmin();
+        when(userRepository.findByUsername(anyString())).thenReturn(null);
+
+        String bericht = tools.importBenutzer(datei("""
+                {"username":"neu@x.ch","rollen":["buchhaltung","system","ROLE_SYSTEM"," System "]}"""));
+
+        Set<String> rollen = einzigerGespeicherter().getRoles();
+        assertTrue(rollen.contains("buchhaltung"), rollen.toString());
+        assertTrue(rollen.stream().noneMatch(PrivilegedRoleRules::isNieVergebbar), rollen.toString());
+        assertTrue(bericht.contains("3 privilegierte Rolle(n)"), bericht);
     }
 
     @Test
