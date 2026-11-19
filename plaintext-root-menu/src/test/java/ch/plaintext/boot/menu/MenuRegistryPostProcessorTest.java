@@ -42,6 +42,10 @@ class MenuRegistryPostProcessorTest {
         // scans.
         lenient().when(environment.resolveRequiredPlaceholders(anyString()))
                 .thenAnswer(inv -> inv.getArgument(0));
+        // Karte 2377 ROOT-2: the post processor looks for an application MenuPlatzierungProvider;
+        // a mock would return null instead of an empty array.
+        lenient().when(beanFactory.getBeanNamesForType(MenuPlatzierungProvider.class, true, false))
+                .thenReturn(new String[0]);
     }
 
     @Test

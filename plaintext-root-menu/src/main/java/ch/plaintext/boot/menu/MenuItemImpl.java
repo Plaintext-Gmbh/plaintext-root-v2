@@ -67,6 +67,31 @@ public class MenuItemImpl extends AbstractMenuItem implements MenuRegistry.MenuI
      */
     private List<String> moduleKeys = new ArrayList<>();
 
+    /**
+     * {@code false} keeps the item out of the rendered menu ({@code plaintext.menu.platzierung.<menuId>.sichtbar});
+     * {@link #isOn()} and therefore the page access guard are unaffected, the page stays reachable by link.
+     *
+     * @since 3.59.0
+     */
+    private boolean sichtbar = true;
+
+    /**
+     * {@code true} for a pure group the framework created from {@code plaintext.menu.gruppen} because a
+     * placement named a parent that did not exist. A group has no link and no roles of its own; the
+     * menu builder drops it when none of its children is visible.
+     *
+     * @since 3.59.0
+     */
+    private boolean gruppe;
+
+    /**
+     * The module's own placement ("Parent | Title, order n") before {@code plaintext.menu.platzierung}
+     * moved the item; empty if the item keeps it. For diagnostics only.
+     *
+     * @since 3.59.0
+     */
+    private String platzierungVorgabe = "";
+
     @Override
     public String getIc() {
         return icon;
@@ -201,6 +226,11 @@ public class MenuItemImpl extends AbstractMenuItem implements MenuRegistry.MenuI
      * @since 1.608.0 public
      */
     public boolean isRoleVisible() {
+        if (gruppe) {
+            // A created group is no page; its children carry their own checks (and the page guard
+            // inherits from this group, so a role check here would lock them out under STRICT).
+            return true;
+        }
         if (accessPolicy == MenuAccessPolicy.STRICT) {
             return isStrictRoleVisible();
         }

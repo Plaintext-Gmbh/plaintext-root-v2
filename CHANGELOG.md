@@ -19,6 +19,18 @@ exhaustive.
   (`plaintext.menu.platzierung.<menuId>`, `plaintext.menu.gruppen.<Titel>`). plaintext-root-menu registriert den
   Standard-Provider aus den Properties (`@ConditionalOnMissingBean`, eine eigene Bean gewinnt). Noch keine
   Verhaltensaenderung: angewendet wird die Platzierung erst mit ROOT-2.
+- **Menueplatzierung von aussen: anwenden** (Karte 2377, Backport ROOT-2). `MenuRegistryPostProcessor` wendet
+  `plaintext.menu.platzierung` (oder eine eigene `MenuPlatzierungProvider`-Bean) vor der Registrierung an:
+  parent/order/title/icon werden gesetzt, die wirksame `menuId` wird vorher eingefroren (Auto-Rolle
+  `ROLE_MENU_<menuId>` und `moduleId` bleiben). Fehlende Eltern aus `plaintext.menu.gruppen` entstehen als Gruppe ohne
+  Link (`MenuItemImpl.gruppe`, keine eigene Rollenpruefung, faellt ohne sichtbares Kind aus dem Menue).
+  `sichtbar: false` nimmt den Eintrag aus dem Menue, PageGuard und Suche sehen ihn weiter. Unbekannte menuId, Elter
+  weder vorhanden noch Gruppe und Zyklus ueber parent: WARN, Eintrag bleibt auf der Vorgabe, kein Startabbruch.
+  Startlog `MenuPlatzierung : n Eintraege umgehaengt, m Gruppen angelegt - erkannte menuIds: [...]`.
+  `/debug/menu-scan` und die Menue-Diagnose zeigen die Vorgabe neben dem wirksamen Platz (`MenuDiagnoseZeile.platzVorgabe`
+  neu). Ohne Konfiguration unveraendert. **Achtung beim Umhaengen:** der volle Titel (`Elter | Titel`) aendert sich;
+  Mandanten-Menuelisten und Kachel-`menuTitle`, die den alten Titel nennen, greifen dann nicht mehr. Umhaengen unter
+  «Root» unterstellt den Eintrag der Root-Zweig-Regel (nur ROOT).
 
 ## [3.58.0] - 2026-11-19
 

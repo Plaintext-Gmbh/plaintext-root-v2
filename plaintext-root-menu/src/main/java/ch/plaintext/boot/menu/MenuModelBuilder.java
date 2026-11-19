@@ -86,8 +86,14 @@ public class MenuModelBuilder {
         }
 
         // Filter only visible items
-        List<MenuItemImpl> visibleItems = allMenuItems.stream()
+        // sichtbar=false (plaintext.menu.platzierung): not in the menu, the page stays reachable.
+        List<MenuItemImpl> onItems = allMenuItems.stream()
             .filter(MenuItemImpl::isOn)
+            .filter(MenuItemImpl::isSichtbar)
+            .toList();
+        // A created group without a visible child would render as a dead leaf.
+        List<MenuItemImpl> visibleItems = onItems.stream()
+            .filter(item -> !item.isGruppe() || hasChildren(item.getTitle(), onItems))
             .toList();
 
         if (visibleItems.isEmpty()) {

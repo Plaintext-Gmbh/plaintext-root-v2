@@ -78,6 +78,9 @@
                         <h:outputText value="#{z.titel}"/>
                         <br/>
                         <h:outputText value="#{z.link}" styleClass="diag-grund"/>
+                        <h:panelGroup rendered="#{not empty z.platzVorgabe}">
+                            <br/><h:outputText value="#{z.platzVorgabe}" styleClass="diag-grund"/>
+                        </h:panelGroup>
                     </p:column>
 
                     <p:column headerText="#{i18n.t('Modul-Keys')}">

@@ -6,11 +6,16 @@ package ch.plaintext.boot.menu;
 import ch.plaintext.MenuVisibilityProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor;
+import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.Environment;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -70,22 +75,60 @@ public class MenuRegistryPostProcessor implements BeanDefinitionRegistryPostProc
                 new MenuAnnotationScanner(securityProvider, menuVisibilityProvider, beanFactory, accessPolicy)
                         .mitUmgebung(environment);
 
-        int count = 0;
+        List<MenuItemImpl> gescannt = new ArrayList<>();
         for (String scanPackage : scanPackages) {
             String pkg = scanPackage.trim();
             log.debug("Scanning package: {}", pkg);
             List<MenuItemImpl> menuItems = scanner.findAnnotatedClasses(pkg);
             log.debug("Found {} menu items in package {}", menuItems.size(), pkg);
+            gescannt.addAll(menuItems);
+        }
 
-            for (MenuItemImpl menuItem : menuItems) {
-                count++;
-                String beanName = "menuItem" + count;
-                beanFactory.registerSingleton(beanName, menuItem);
-                log.debug("Registered menu item bean: {} for '{}' (order: {}, parent: '{}')",
-                    beanName, menuItem.getTitle(), menuItem.getOrder(), menuItem.getParent());
-            }
+        // Karte 2377 ROOT-2: placement from outside the module, before the items become beans.
+        MenuPlatzierungProperties platzierung = environment instanceof ConfigurableEnvironment konfigurierbar
+                ? Binder.get(konfigurierbar).bind("plaintext.menu", MenuPlatzierungProperties.class)
+                        .orElseGet(MenuPlatzierungProperties::new)
+                : new MenuPlatzierungProperties();
+        MenuPlatzierungAnwender.Ergebnis ergebnis = MenuPlatzierungAnwender.anwenden(gescannt,
+                platzierungProvider(beanFactory, platzierung), platzierung.getGruppen(),
+                platzierung.getPlatzierung().keySet());
+        gescannt.addAll(ergebnis.gruppen());
+
+        int count = 0;
+        for (MenuItemImpl menuItem : gescannt) {
+            count++;
+            String beanName = "menuItem" + count;
+            beanFactory.registerSingleton(beanName, menuItem);
+            log.debug("Registered menu item bean: {} for '{}' (order: {}, parent: '{}')",
+                beanName, menuItem.getTitle(), menuItem.getOrder(), menuItem.getParent());
         }
 
         log.info("Successfully registered {} menu items from {} packages", count, scanPackages.length);
+    }
+
+    /**
+     * The placement source. The standard provider of {@link MenuAutoConfiguration} is NOT
+     * instantiated here: in a bean factory post processor its {@code @ConfigurationProperties} would
+     * still be unbound, so the properties are bound directly from the environment. An application's
+     * own {@link MenuPlatzierungProvider} bean is created early and used instead; it must not depend
+     * on beans that need post processing.
+     */
+    private static MenuPlatzierungProvider platzierungProvider(ConfigurableListableBeanFactory beanFactory,
+                                                               MenuPlatzierungProperties properties) {
+        for (String name : beanFactory.getBeanNamesForType(MenuPlatzierungProvider.class, true, false)) {
+            BeanDefinition definition = beanFactory.containsBeanDefinition(name) ? beanFactory.getBeanDefinition(name) : null;
+            // Recognised by the declaring class of the @Bean method, not by the factory bean name: an application
+            // that component-scans ch.plaintext registers MenuAutoConfiguration as "menuAutoConfiguration"
+            // (review fable2, Karte 2377).
+            boolean standard = definition instanceof AnnotatedBeanDefinition annotated
+                    && annotated.getFactoryMethodMetadata() != null
+                    && MenuAutoConfiguration.class.getName()
+                            .equals(annotated.getFactoryMethodMetadata().getDeclaringClassName());
+            if (!standard) {
+                log.info("MenuPlatzierung: eigener MenuPlatzierungProvider '{}'", name);
+                return beanFactory.getBean(name, MenuPlatzierungProvider.class);
+            }
+        }
+        return new PropertiesMenuPlatzierungProvider(properties);
     }
 }

@@ -91,7 +91,8 @@ public class MenuDiagnoseService {
                 modulRolleOk, modulRolleOk ? "" : modulRolleGrund(item),
                 modulOk, modulOk ? "" : modulGrund(item),
                 mandantOk, mandantGrund(item, mandant, mandantOk),
-                rolleOk && modulRolleOk && modulOk && mandantOk);
+                rolleOk && modulRolleOk && modulOk && mandantOk,
+                platzVorgabe(item));
     }
 
     /**
@@ -100,6 +101,19 @@ public class MenuDiagnoseService {
      * @param item the menu item
      * @return plain text, e.g. {@code "Rolle ADMIN oder ROOT fehlt"}
      */
+    /** Karte 2377 ROOT-2: the module's own placement next to the effective one; empty if unchanged. */
+    private static String platzVorgabe(MenuItemImpl item) {
+        String text = item.getPlatzierungVorgabe() == null || item.getPlatzierungVorgabe().isEmpty()
+                ? "" : "Vorgabe: " + item.getPlatzierungVorgabe();
+        if (!item.isSichtbar()) {
+            text = (text.isEmpty() ? "" : text + "; ") + "nicht im Menue (sichtbar: false)";
+        }
+        if (item.isGruppe()) {
+            text = "Gruppe aus plaintext.menu.gruppen";
+        }
+        return text;
+    }
+
     private static String rolleGrund(MenuItemImpl item) {
         List<String> verlangt = new ArrayList<>();
         if (item.getRoles() != null) {

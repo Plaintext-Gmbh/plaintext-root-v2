@@ -37,7 +37,8 @@ public record MenuDiagnoseZeile(
         String modulGrund,
         boolean mandantOk,
         String mandantGrund,
-        boolean sichtbar) {
+        boolean sichtbar,
+        String platzVorgabe) {
 
     // Order from Daniel, 29.08.2026: the two derived values are deliberately NOT named getXxx().
     // This class is a record, and the RecordELResolver (Jakarta EL 6) resolves #{z.modulKeysText}

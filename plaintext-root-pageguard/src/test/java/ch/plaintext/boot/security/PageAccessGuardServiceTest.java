@@ -237,6 +237,31 @@ class PageAccessGuardServiceTest {
         }
     }
 
+    // ============================================================ Karte 2377 ROOT-2: platzierung
+
+    @Test
+    @DisplayName("Karte 2377: sichtbar=false unter einer angelegten Gruppe bleibt per Link erreichbar (STRICT)")
+    void unsichtbarerEintragUnterGruppeBleibtErreichbar() {
+        MenuItemImpl gruppe = menu("Werkzeuge", "", "", NUR_USER);
+        gruppe.setGruppe(true);
+        // menu policy STRICT: without the group flag the group (no auto-role) would lock the child out
+        gruppe.setAccessPolicy(ch.plaintext.boot.menu.MenuAccessPolicy.STRICT);
+        MenuItemImpl bilder = menu("Bilder", "Werkzeuge", "drawio-bilder.html", NUR_USER);
+        bilder.setSichtbar(false);
+
+        assertTrue(guard(PageGuardMode.STRICT, true, gruppe, bilder).hasAccessToView("/drawio-bilder.xhtml"));
+    }
+
+    @Test
+    @DisplayName("Karte 2377: eigene Rollen des Eintrags gelten auch unter einer Gruppe")
+    void eintragUnterGruppeBehaeltEigeneRollen() {
+        MenuItemImpl gruppe = menu("Werkzeuge", "", "", NUR_USER);
+        gruppe.setGruppe(true);
+        MenuItemImpl terminal = menu("Terminal", "Werkzeuge", "terminal.html", NUR_USER, "TERMINAL");
+
+        assertFalse(guard(PageGuardMode.STRICT, true, gruppe, terminal).hasAccessToView("/terminal.xhtml"));
+    }
+
     // ============================================================ H4: parent roles
 
     @Nested
