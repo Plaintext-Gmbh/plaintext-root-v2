@@ -85,8 +85,8 @@ fi
 # dann PUTs ohne MKCOL — so bleibt der Upload ~1 Request pro Datei.
 sag "Upload nach $DAV/$GRUPPE_PFAD ..."
 rm -rf "$STAGE/quelle"
-FREMD="$(find "$STAGE" -mindepth 1 -maxdepth 1 ! -name "${GRUPPE_PFAD%%/*}")"
-[ -z "$FREMD" ] || fehler "nur $GRUPPE_PFAD darf im Staging liegen, gefunden: $FREMD"
+FREMD="$(find "$STAGE" -type f ! -path "$STAGE/$GRUPPE_PFAD/*")"
+[ -z "$FREMD" ] || fehler "nur Dateien unter $GRUPPE_PFAD duerfen im Staging liegen, gefunden: $FREMD"
 while IFS= read -r d; do
     dav -o /dev/null -X MKCOL "$DAV/${d#"$STAGE"/}" 2>/dev/null || true
 done < <(find "$STAGE" -type d | sort)
