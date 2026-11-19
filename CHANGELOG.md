@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.59.0] - 2026-11-19
+
 ### Added
 - **Menueplatzierung von aussen: Modell und Konfiguration** (Karte 2377, Backport ROOT-1). Neu in plaintext-root-interfaces
   `MenuPlatzierung` (parent, order, title, icon, sichtbar; alle optional), `MenuGruppe` (order, icon),
