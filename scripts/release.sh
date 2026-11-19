@@ -22,7 +22,8 @@
 #    Schnitt: ist die Major der POM groesser als die Major des hoechsten Tags (z. B. POM
 #              3.0.0-SNAPSHOT, Tags bis 2.821.1), wird die POM-Version GENAU so released —
 #              das ist der Versionsschnitt. Sonst: NEU = BASIS + 1 Minor.
-#    Danach: "Prepare next development iteration <NEU>-SNAPSHOT" — die SNAPSHOT-Version traegt
+#    Danach: "Prepare next development iteration <NEU>-SNAPSHOT" (mit der CHANGELOG-Umbenennung
+#    [Unreleased] -> [<NEU>], Karte 2366) — die SNAPSHOT-Version traegt
 #    bewusst die GERADE veroeffentlichte Nummer (Hauskonvention, siehe compute_release_versions
 #    in tui-build-logic.sh); hochgezaehlt wird erst beim naechsten Release.
 #
@@ -57,6 +58,20 @@ TAG_PRAEFIX=""
 
 sag() { echo "release: $*"; }
 fehler() { echo "release: FEHLER: $*" >&2; exit 1; }
+
+# Karte 2366: CHANGELOG.md — der Block "[Unreleased]" wird zur Sektion des Releases (Nummer und
+# Datum), davor entsteht ein neues leeres "[Unreleased]". Nur die Kopfzeile; Eintraege schreibt
+# weiterhin ein Mensch. Fehlt der Block, bleibt die Datei stehen (Warnung, kein Abbruch).
+changelog_umbenennen() {   # <datei> <version> <datum>
+    local datei="$1" version="$2" datum="$3"
+    if ! grep -q '^## \[Unreleased\]' "$datei"; then
+        sag "WARNUNG: kein '## [Unreleased]' in $datei — CHANGELOG bleibt unveraendert."
+        return 0
+    fi
+    awk -v v="$version" -v d="$datum" '
+        !getan && /^## \[Unreleased\]/ { print "## [Unreleased]"; print ""; print "## [" v "] - " d; getan=1; next }
+        { print }' "$datei" > "$datei.neu" && mv "$datei.neu" "$datei"
+}
 
 # ── 0. Sperren und Stand ────────────────────────────────────────────────────
 [ -z "$(git status --porcelain)" ] || fehler "Arbeitsbaum nicht sauber"
@@ -121,7 +136,11 @@ esac
 sag "Tests: $MVN_TEST_FLAG"
 
 if [ "$TROCKEN" = "1" ]; then
-    sag "TROCKEN: wuerde taggen ($TAG), 'mvn clean deploy' mit Version $NEU ausfuehren und danach $NEXT_SNAPSHOT committen. Nichts getan."
+    PROBE="$(mktemp)"; cp CHANGELOG.md "$PROBE"
+    changelog_umbenennen "$PROBE" "$NEU" "$(date +%F)"
+    sag "TROCKEN: CHANGELOG-Sektionen danach: $(grep '^## \[' "$PROBE" | head -3 | tr '\n' ' ')"
+    rm -f "$PROBE"
+    sag "TROCKEN: wuerde taggen ($TAG), 'mvn clean deploy' mit Version $NEU ausfuehren und danach CHANGELOG plus $NEXT_SNAPSHOT committen. Nichts getan."
     exit 0
 fi
 
@@ -205,13 +224,15 @@ fi
 # Fehler — der naechste Lauf rechnet ab dem gerade gesetzten Tag weiter (Massnahme 11).
 trap - EXIT
 mvn -q -B versions:set -DnewVersion="$NEXT_SNAPSHOT" -DgenerateBackupPoms=false
+changelog_umbenennen CHANGELOG.md "$NEU" "$(date +%F)"
 git add -u
 if git diff --cached --quiet; then
     # Schnitt-Release (POM-Major vor Tag-Major): die POM-Version nach dem Release ist die der
     # HEAD-Revision (3.0.0-SNAPSHOT -> 3.0.0 -> 3.0.0-SNAPSHOT) — es gibt nichts zu committen.
     sag "SNAPSHOT-Commit entfaellt: POMs nach dem Release identisch mit $ZWEIG (Schnitt-Release $NEU)."
 else
-    git commit -q -m "Prepare next development iteration $NEXT_SNAPSHOT [skip ci]"
+    git commit -q -m "Prepare next development iteration $NEXT_SNAPSHOT [skip ci]" \
+        -m "CHANGELOG: [Unreleased] -> [$NEU] (Karte 2366)"
     if git push origin "HEAD:$ZWEIG"; then
         sag "SNAPSHOT-Commit $NEXT_SNAPSHOT nach $ZWEIG gepusht."
     else

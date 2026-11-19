@@ -33,6 +33,10 @@ exhaustive.
   meldet Module aus `module.yaml`, die die Auswahl nicht nennt (`[modul-lader] ACHTUNG: … NICHT in der Auswahl`).
 
 ### Changed
+- **Release benennt den CHANGELOG-Block selbst um** (Karte 2366): `scripts/release.sh` macht aus
+  `[Unreleased]` die Sektion `[<version>] - <datum>` und legt ein neues leeres `[Unreleased]` an, im
+  selben `[skip ci]`-Commit wie der SNAPSHOT-Schritt. Die Sektionen 3.1.0 bis 3.57.0 werden nicht
+  nachgetragen.
 - **`plaintext-root-files`: unter «Misc», mit Rolle `files`, Admin/Root sehen alle, Links zum Anzeigen**
   (Karte 2354). **Verhaltensaenderung fuer Konsumenten:** die Ablage hatte bisher jeder Angemeldete (`USER`);
   jetzt braucht sie die Rolle `files` - auf der Seite, an `/files/api/*` und an den MCP-Werkzeugen (dort wird die
