@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Configuration;
  * Auto-configuration for the menu module
  */
 @Configuration
-@EnableConfigurationProperties(ModuleRoleProperties.class)
+@EnableConfigurationProperties({ModuleRoleProperties.class, MenuPlatzierungProperties.class})
 @Slf4j
 public class MenuAutoConfiguration {
 
@@ -82,6 +82,19 @@ public class MenuAutoConfiguration {
                                                ModuleRoleProperties properties) {
         log.info("Registering ModuleRoleService (plaintext.menu.module-roles)");
         return new ModuleRoleService(applicationContext, properties);
+    }
+
+    /**
+     * Menu placement from outside the module ({@code plaintext.menu.platzierung}); an application
+     * bean of type {@link MenuPlatzierungProvider} replaces this one.
+     *
+     * @param properties the configured placements
+     * @return the standard placement provider
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public MenuPlatzierungProvider menuPlatzierungProvider(MenuPlatzierungProperties properties) {
+        return new PropertiesMenuPlatzierungProvider(properties);
     }
 
     /**
