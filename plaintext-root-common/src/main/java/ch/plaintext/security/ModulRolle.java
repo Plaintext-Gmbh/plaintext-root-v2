@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * Modulrolle auch auf REST und MCP (Karte 1500, Review 1450 M2): {@code @PreAuthorize("… and @modulRolle.darf('fotos')")}.
  *
  * <p>Gleiche Regel wie der Page-Guard ({@code ModuleRoleService.holdsAny}): ist dem Modul in
- * {@code plaintext.menu.module-roles} keine Rolle zugeordnet, ist es frei; ADMIN und ROOT dürfen immer;
+ * {@code plaintext.menu.module-roles} keine Rolle zugeordnet, ist es frei; ADMIN und ROOT dürfen immer, ausser bei strengen Modulen ({@code plaintext.menu.strenge-module-roles});
  * sonst braucht es die konfigurierte Rolle. Die Rolle steht bewusst in der Konfiguration und nicht im
  * Modul: wiki und auszahlungen laufen auch in guild, dort mit anderer Zuordnung ({@code auszahlung}).
  * Darum liegt das Bean in der Hülle (root-common, Karte 1525; vorher app-interfaces) und ist in jeder Instanz da.</p>
@@ -42,6 +42,10 @@ public class ModulRolle {
             return true;
         }
         PlaintextSecurity s = security.getIfAvailable();
+        // Karte 2377 ROOT-3: strict modules (plaintext.menu.strenge-module-roles) without the admin/root bypass.
+        if (p.canonicalStrengeModuleRoles().contains(ModuleRoleProperties.canonicalKey(modulKey))) {
+            return PlaintextRoles.hasAny(s, rolle);
+        }
         return PlaintextRoles.isAdmin(s) || PlaintextRoles.hasAny(s, rolle);
     }
 }

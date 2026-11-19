@@ -70,6 +70,10 @@ public class ModuleRoleService implements SmartInitializingSingleton {
     /** All module keys detected on the classpath (for the startup report and doc hint). */
     private final AtomicReference<Set<String>> knownModuleKeys = new AtomicReference<>(Set.of());
 
+    /** Links and menu titles of strict modules (Karte 2377 ROOT-3), for the tile check. */
+    private final AtomicReference<Set<String>> strengeLinks = new AtomicReference<>(Set.of());
+    private final AtomicReference<Set<String>> strengeMenuTitel = new AtomicReference<>(Set.of());
+
     private volatile boolean resolved;
 
     public ModuleRoleService(ApplicationContext applicationContext, ModuleRoleProperties properties) {
@@ -101,6 +105,10 @@ public class ModuleRoleService implements SmartInitializingSingleton {
             return;
         }
         log.info("Modul-Rollen aktiv: {} — erkannte Modul-Keys: {}", configured, bekannteKeys);
+        Set<String> streng = properties.canonicalStrengeModuleRoles();
+        if (!streng.isEmpty()) {
+            log.info("Strenge Modul-Rollen (ohne ADMIN/ROOT-Umgehung, plaintext.menu.strenge-module-roles): {}", streng);
+        }
         for (Map.Entry<String, String> eintrag : configured.entrySet()) {
             String key = eintrag.getKey();
             if (!bekannteKeys.contains(key)) {
@@ -127,11 +135,14 @@ public class ModuleRoleService implements SmartInitializingSingleton {
             return true;
         }
         ensureResolved();
-        List<String> required = rolesByLink.get().get(canonicalLink(link));
+        String key = canonicalLink(link);
+        List<String> required = rolesByLink.get().get(key);
+        boolean streng = strengeLinks.get().contains(key);
         if (required == null && menuTitle != null && !menuTitle.trim().isEmpty()) {
             required = rolesByMenuTitle.get().get(menuTitle.trim());
+            streng = strengeMenuTitel.get().contains(menuTitle.trim());
         }
-        return holdsAny(required, securityProvider);
+        return holdsAny(required, securityProvider, streng);
     }
 
     /**
@@ -154,14 +165,28 @@ public class ModuleRoleService implements SmartInitializingSingleton {
      * @return {@code true} if access is allowed
      */
     public static boolean holdsAny(List<String> required, SecurityProvider securityProvider) {
+        return holdsAny(required, securityProvider, false);
+    }
+
+    /**
+     * Like {@link #holdsAny(List, SecurityProvider)}; with {@code streng} admin and root need the role
+     * themselves ({@code plaintext.menu.strenge-module-roles}, Karte 2377 ROOT-3).
+     *
+     * @param required         required roles (UPPERCASE, without prefix), may be empty/{@code null}
+     * @param securityProvider role lookup, may be {@code null}
+     * @param streng           {@code true} for a strict module: no admin/root bypass
+     * @return {@code true} if access is allowed
+     * @since 3.59.0
+     */
+    public static boolean holdsAny(List<String> required, SecurityProvider securityProvider, boolean streng) {
         if (required == null || required.isEmpty()) {
             return true;
         }
         if (securityProvider == null) {
             return true;
         }
-        // admin and root ALWAYS keep access - unchanged behaviour.
-        if (hasRole(securityProvider, "ROOT") || hasRole(securityProvider, "ADMIN")) {
+        // admin and root keep access, except for strict modules.
+        if (!streng && (hasRole(securityProvider, "ROOT") || hasRole(securityProvider, "ADMIN"))) {
             return true;
         }
         for (String role : required) {
@@ -257,7 +282,10 @@ public class ModuleRoleService implements SmartInitializingSingleton {
      */
     public void resolve(Collection<MenuItemImpl> items) {
         Map<String, String> configured = properties.canonicalModuleRoles();
+        Set<String> strengeKeys = properties.canonicalStrengeModuleRoles();
         Map<String, List<MenuItemImpl>> byTitle = indexByTitle(items);
+        Set<String> strengLinks = new HashSet<>();
+        Set<String> strengTitel = new HashSet<>();
 
         Set<String> keys = new TreeSet<>();
         Map<String, List<String>> byLink = new HashMap<>();
@@ -275,7 +303,21 @@ public class ModuleRoleService implements SmartInitializingSingleton {
             List<String> required = requiredRolesOf(candidates, configured);
             item.setModuleRoles(required);
             indexRequiredRoles(item, required, byLink, byMenuTitle);
+
+            boolean streng = candidates.stream().anyMatch(strengeKeys::contains);
+            item.setModuleRoleStreng(streng);
+            if (streng) {
+                String link = canonicalLink(item.getCommand());
+                if (!link.isEmpty()) {
+                    strengLinks.add(link);
+                }
+                if (item.getTitle() != null && !item.getTitle().isBlank()) {
+                    strengTitel.add(item.getTitle().trim());
+                }
+            }
         }
+        this.strengeLinks.set(Set.copyOf(strengLinks));
+        this.strengeMenuTitel.set(Set.copyOf(strengTitel));
 
         this.knownModuleKeys.set(Collections.unmodifiableSet(new TreeSet<>(keys)));
         this.rolesByLink.set(Map.copyOf(byLink));

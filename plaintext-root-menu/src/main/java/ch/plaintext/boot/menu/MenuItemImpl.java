@@ -68,6 +68,14 @@ public class MenuItemImpl extends AbstractMenuItem implements MenuRegistry.MenuI
     private List<String> moduleKeys = new ArrayList<>();
 
     /**
+     * {@code true} if one of the {@link #moduleKeys} is listed in {@code plaintext.menu.strenge-module-roles}:
+     * the module role then applies to admin and root as well. Set once by the {@link ModuleRoleService}.
+     *
+     * @since 3.59.0
+     */
+    private boolean moduleRoleStreng;
+
+    /**
      * {@code false} keeps the item out of the rendered menu ({@code plaintext.menu.platzierung.<menuId>.sichtbar});
      * {@link #isOn()} and therefore the page access guard are unaffected, the page stays reachable by link.
      *
@@ -183,7 +191,9 @@ public class MenuItemImpl extends AbstractMenuItem implements MenuRegistry.MenuI
      * Configurable module role ({@code plaintext.menu.module-roles.<key>=<rolle>}): switches a
      * whole module on or off per application. Applies under both access policies and — because the
      * {@code PageAccessGuard} goes through {@link #isOn()} — to direct page access as well.
-     * {@code admin}/{@code root} bypass the check (in the {@link ModuleRoleService}).
+     * {@code admin}/{@code root} bypass the check (in the {@link ModuleRoleService}), except for strict modules
+     * ({@code plaintext.menu.strenge-module-roles}): there {@link #isOn()} is {@code false} without the role even
+     * for root, because it requires this check AND the role check.
      *
      * <p>Public so that the diagnostics view can query the four filters <i>individually</i>
      * without rebuilding the logic — a second copy would drift away from {@link #isOn()}.</p>
@@ -193,7 +203,7 @@ public class MenuItemImpl extends AbstractMenuItem implements MenuRegistry.MenuI
      */
     public boolean isModuleRoleVisible() {
         ensureModuleMetadataResolved();
-        boolean visible = ModuleRoleService.holdsAny(moduleRoles, securityProvider);
+        boolean visible = ModuleRoleService.holdsAny(moduleRoles, securityProvider, moduleRoleStreng);
         if (!visible) {
             log.debug("Modul-Rolle {} fehlt - Menuepunkt '{}' ausgeblendet", moduleRoles, title);
         }
