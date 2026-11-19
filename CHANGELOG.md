@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.58.0] - 2026-11-19
+
 ### Added
 - **Systemlauf: eine Maschinen-Identitaet** (Karte 1863, Etappe 1). `ch.plaintext.security.Systemlauf` (root-common)
   baut den Kontext fuer Laeufe ohne Benutzer an EINER Stelle: Principal `SYSTEM`, `ROLE_SYSTEM`,
