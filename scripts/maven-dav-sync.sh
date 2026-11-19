@@ -29,8 +29,9 @@ fehler() { echo "maven-dav-sync: FEHLER: $*" >&2; exit 1; }
 ls -d "$QUELLE"/*/"$V" >/dev/null 2>&1 || fehler "$GRUPPE_MAVEN:$V liegt nicht in $QUELLE"
 
 STAGE="$(mktemp -d /tmp/maven-dav.XXXXXX)"; chmod 700 "$STAGE"
-trap 'rm -rf "$STAGE"' EXIT
-NETRC="$STAGE/netrc"; : > "$NETRC"
+# Die netrc liegt AUSSERHALB von $STAGE: alles im Staging wird hochgeladen (Karte 2378, netrc lag in der Freigabe).
+NETRC="$(mktemp /tmp/maven-dav-netrc.XXXXXX)"
+trap 'rm -rf "$STAGE"; rm -f "$NETRC"' EXIT
 
 dav() { curl -sS --fail --max-time 300 --netrc-file "$NETRC" "$@"; }
 if [ -n "$DAV" ] && [ -n "$AUTH" ]; then
@@ -84,6 +85,8 @@ fi
 # dann PUTs ohne MKCOL — so bleibt der Upload ~1 Request pro Datei.
 sag "Upload nach $DAV/$GRUPPE_PFAD ..."
 rm -rf "$STAGE/quelle"
+FREMD="$(find "$STAGE" -mindepth 1 -maxdepth 1 ! -name "${GRUPPE_PFAD%%/*}")"
+[ -z "$FREMD" ] || fehler "nur $GRUPPE_PFAD darf im Staging liegen, gefunden: $FREMD"
 while IFS= read -r d; do
     dav -o /dev/null -X MKCOL "$DAV/${d#"$STAGE"/}" 2>/dev/null || true
 done < <(find "$STAGE" -type d | sort)
