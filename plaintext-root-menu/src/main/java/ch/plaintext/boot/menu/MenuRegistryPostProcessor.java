@@ -6,6 +6,7 @@ package ch.plaintext.boot.menu;
 import ch.plaintext.MenuVisibilityProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -116,8 +117,13 @@ public class MenuRegistryPostProcessor implements BeanDefinitionRegistryPostProc
                                                                MenuPlatzierungProperties properties) {
         for (String name : beanFactory.getBeanNamesForType(MenuPlatzierungProvider.class, true, false)) {
             BeanDefinition definition = beanFactory.containsBeanDefinition(name) ? beanFactory.getBeanDefinition(name) : null;
-            boolean standard = definition != null
-                    && MenuAutoConfiguration.class.getName().equals(definition.getFactoryBeanName());
+            // Recognised by the declaring class of the @Bean method, not by the factory bean name: an application
+            // that component-scans ch.plaintext registers MenuAutoConfiguration as "menuAutoConfiguration"
+            // (review fable2, Karte 2377).
+            boolean standard = definition instanceof AnnotatedBeanDefinition annotated
+                    && annotated.getFactoryMethodMetadata() != null
+                    && MenuAutoConfiguration.class.getName()
+                            .equals(annotated.getFactoryMethodMetadata().getDeclaringClassName());
             if (!standard) {
                 log.info("MenuPlatzierung: eigener MenuPlatzierungProvider '{}'", name);
                 return beanFactory.getBean(name, MenuPlatzierungProvider.class);
