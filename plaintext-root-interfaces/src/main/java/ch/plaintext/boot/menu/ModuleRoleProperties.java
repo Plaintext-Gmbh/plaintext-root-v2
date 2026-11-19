@@ -5,10 +5,14 @@ package ch.plaintext.boot.menu;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * Configurable module roles: per application, maps a module key to a role that switches the entire
@@ -25,7 +29,7 @@ import java.util.TreeMap;
  *
  * <p>Without the configured role neither a menu item nor a dashboard tile of the module is
  * visible, and the {@code PageAccessGuard} refuses direct calls to the pages. {@code admin} and
- * {@code root} always bypass the check. Modules without an entry behave unchanged.</p>
+ * {@code root} bypass the check, except for the modules listed in {@code strenge-module-roles}. Modules without an entry behave unchanged.</p>
  *
  * <p><b>Why here and not in the module code:</b> the same module artifact is bundled by several
  * applications (e.g. {@code plaintext-z-mailbox} runs in app.plaintext.ch AND in app.guild42.ch).
@@ -48,12 +52,44 @@ public class ModuleRoleProperties {
     /** Module key -&gt; role name (without the {@code ROLE_} prefix, case-insensitive). */
     private Map<String, String> moduleRoles = new LinkedHashMap<>();
 
+    /**
+     * Module keys whose role is checked WITHOUT the admin/root bypass ({@code plaintext.menu.strenge-module-roles},
+     * Karte 2377 ROOT-3), e.g. a terminal that opens a shell on a VM. A strict key without an entry in
+     * {@link #moduleRoles} requires the role of the same name, so it is closed by default rather than open.
+     *
+     * @since 3.59.0
+     */
+    private List<String> strengeModuleRoles = new ArrayList<>();
+
     public Map<String, String> getModuleRoles() {
         return moduleRoles;
     }
 
     public void setModuleRoles(Map<String, String> moduleRoles) {
         this.moduleRoles = moduleRoles == null ? new LinkedHashMap<>() : moduleRoles;
+    }
+
+    public List<String> getStrengeModuleRoles() {
+        return strengeModuleRoles;
+    }
+
+    public void setStrengeModuleRoles(List<String> strengeModuleRoles) {
+        this.strengeModuleRoles = strengeModuleRoles == null ? new ArrayList<>() : strengeModuleRoles;
+    }
+
+    /**
+     * @return the strict module keys in canonical form, sorted (never {@code null})
+     * @since 3.59.0
+     */
+    public Set<String> canonicalStrengeModuleRoles() {
+        Set<String> ret = new TreeSet<>();
+        for (String key : strengeModuleRoles) {
+            String k = canonicalKey(key);
+            if (!k.isEmpty()) {
+                ret.add(k);
+            }
+        }
+        return ret;
     }
 
     /**
@@ -71,6 +107,10 @@ public class ModuleRoleProperties {
             if (!key.isEmpty() && !role.isEmpty()) {
                 ret.put(key, role);
             }
+        }
+        // A strict module without its own mapping requires the role of the same name (closed by default).
+        for (String key : canonicalStrengeModuleRoles()) {
+            ret.putIfAbsent(key, canonicalRole(key));
         }
         return ret;
     }

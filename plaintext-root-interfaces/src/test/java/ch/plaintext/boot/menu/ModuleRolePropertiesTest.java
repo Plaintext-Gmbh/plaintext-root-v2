@@ -60,4 +60,15 @@ class ModuleRolePropertiesTest {
 
         assertEquals(Map.of("rechnungen", "FINANZEN", "buchhaltung", "FINANZEN"), kanonisch);
     }
+
+    @Test
+    void strengeModuleWerdenKanonischUndBekommenOhneZuordnungDieGleichnamigeRolle() {
+        ModuleRoleProperties properties = mit(Map.of("drawio", "zeichnen"));
+        properties.setStrengeModuleRoles(java.util.List.of(" Terminal ", "drawio", " "));
+
+        assertEquals(java.util.Set.of("terminal", "drawio"), properties.canonicalStrengeModuleRoles());
+        assertEquals(Map.of("drawio", "ZEICHNEN", "terminal", "TERMINAL"), properties.canonicalModuleRoles());
+        properties.setStrengeModuleRoles(null);
+        assertTrue(properties.canonicalStrengeModuleRoles().isEmpty());
+    }
 }

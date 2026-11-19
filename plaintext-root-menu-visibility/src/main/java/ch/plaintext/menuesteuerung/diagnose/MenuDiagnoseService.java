@@ -150,7 +150,8 @@ public class MenuDiagnoseService {
         if (rollen == null || rollen.isEmpty()) {
             return "Modul-Rolle fehlt";
         }
-        return "Modul-Rolle " + String.join(" oder ", rollen) + " fehlt (plaintext.menu.module-roles)";
+        String text = "Modul-Rolle " + String.join(" oder ", rollen) + " fehlt (plaintext.menu.module-roles)";
+        return item.isModuleRoleStreng() ? text + ", streng: auch ADMIN/ROOT brauchen sie" : text;
     }
 
     /**

@@ -45,9 +45,15 @@ class PageAccessGuardModuleRoleTest {
     }
 
     private static PageAccessGuardService guard(Map<String, String> konfiguration, Set<String> benutzerRollen) {
+        return guard(konfiguration, List.of(), benutzerRollen);
+    }
+
+    private static PageAccessGuardService guard(Map<String, String> konfiguration, List<String> streng,
+                                                Set<String> benutzerRollen) {
         List<MenuItemImpl> menues = wikiMenue(benutzerRollen);
         ModuleRoleProperties properties = new ModuleRoleProperties();
         properties.setModuleRoles(new LinkedHashMap<>(konfiguration));
+        properties.setStrengeModuleRoles(streng);
         new ModuleRoleService(null, properties).resolve(menues);
         return PageAccessGuardTestFactory.strictMitMenues(menues.toArray(new MenuItemImpl[0]));
     }
@@ -86,5 +92,15 @@ class PageAccessGuardModuleRoleTest {
 
         assertTrue(guard.hasAccessToView(WIKI_SEITE));
         assertTrue(guard.hasAccessToView("/kontakte.xhtml"));
+    }
+
+    @Test
+    void strengesModulVerweigertAuchRootUndAdminOhneRolle() {
+        // Karte 2377 ROOT-3 (Akzeptanz): ROOT ohne Modulrolle bekommt auf der Seite 403
+        assertFalse(guard(Map.of("wiki", "wiki"), List.of("wiki"), Set.of("ROOT")).hasAccessToView(WIKI_SEITE));
+        assertFalse(guard(Map.of("wiki", "wiki"), List.of("wiki"), Set.of("ADMIN")).hasAccessToView(WIKI_SEITE));
+        assertTrue(guard(Map.of("wiki", "wiki"), List.of("wiki"), Set.of("ROOT", "WIKI")).hasAccessToView(WIKI_SEITE));
+        assertTrue(guard(Map.of("wiki", "wiki"), List.of("wiki"), Set.of("ROOT")).hasAccessToView("/kontakte.xhtml"),
+                "nicht gelistetes Modul unveraendert");
     }
 }

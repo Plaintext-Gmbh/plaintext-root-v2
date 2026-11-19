@@ -202,6 +202,52 @@ class ModuleRoleServiceTest {
         assertTrue(finde(menues, "Wiki").isOn());
     }
 
+    // ---------------------------------------------------------------- Karte 2377 ROOT-3: strenge Modulrollen
+
+    private static ModuleRoleService strengService(Map<String, String> konfiguration, List<String> streng, List<MenuItemImpl> menues) {
+        ModuleRoleProperties properties = new ModuleRoleProperties();
+        properties.setModuleRoles(new LinkedHashMap<>(konfiguration));
+        properties.setStrengeModuleRoles(streng);
+        ModuleRoleService service = new ModuleRoleService(null, properties);
+        service.resolve(menues);
+        return service;
+    }
+
+    @Test
+    void strengesModulSperrtAuchAdminUndRootOhneRolle() {
+        for (Set<String> rollen : List.of(ADMIN, ROOT)) {
+            List<MenuItemImpl> menues = menueBaum(rollen);
+            ModuleRoleService service = strengService(Map.of("wiki", "wiki"), List.of("wiki"), menues);
+            assertFalse(finde(menues, "Wiki").isOn(), "streng: keine Umgehung fuer " + rollen);
+            assertFalse(finde(menues, "Projekte").isOn(), "Kind erbt das strenge Modul: " + rollen);
+            assertTrue(finde(menues, "Wiki").isModuleRoleStreng());
+            assertFalse(service.isAllowedForLink("wiki.html", "Wiki", security(rollen)), "Kachel streng: " + rollen);
+            assertTrue(finde(menues, "Kontakte").isOn(), "nicht gelistetes Modul unveraendert: " + rollen);
+            assertFalse(finde(menues, "Kontakte").isModuleRoleStreng());
+        }
+    }
+
+    @Test
+    void strengesModulMitRolleIstSichtbarAuchFuerRoot() {
+        Set<String> rootMitWiki = Set.of("ROOT", "WIKI");
+        List<MenuItemImpl> menues = menueBaum(rootMitWiki);
+        ModuleRoleService service = strengService(Map.of("wiki", "wiki"), List.of("wiki"), menues);
+        assertTrue(finde(menues, "Wiki").isOn());
+        assertTrue(service.isAllowedForLink("wiki.html", "Wiki", security(rootMitWiki)));
+    }
+
+    @Test
+    void strengesModulOhneZuordnungVerlangtDieGleichnamigeRolle() {
+        List<MenuItemImpl> ohne = menueBaum(ROOT);
+        strengService(Map.of(), List.of("wiki"), ohne);
+        assertEquals(List.of("WIKI"), finde(ohne, "Wiki").getModuleRoles(), "geschlossen statt offen");
+        assertFalse(finde(ohne, "Wiki").isOn());
+
+        List<MenuItemImpl> mit = menueBaum(USER_MIT_WIKI);
+        strengService(Map.of(), List.of("wiki"), mit);
+        assertTrue(finde(mit, "Wiki").isOn());
+    }
+
     // ---------------------------------------------------------------- Tiles
 
     @Test

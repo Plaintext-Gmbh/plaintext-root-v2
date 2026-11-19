@@ -21,8 +21,13 @@ import static org.mockito.Mockito.when;
 class ModulRolleTest {
 
     private static ModulRolle modulRolle(Map<String, String> zuordnung, String... rollen) {
+        return modulRolle(zuordnung, java.util.List.of(), rollen);
+    }
+
+    private static ModulRolle modulRolle(Map<String, String> zuordnung, java.util.List<String> streng, String... rollen) {
         ModuleRoleProperties p = new ModuleRoleProperties();
         p.setModuleRoles(zuordnung);
+        p.setStrengeModuleRoles(streng);
         StaticListableBeanFactory bf = new StaticListableBeanFactory();
         bf.addBean("props", p);
         if (rollen != null) {
@@ -55,6 +60,21 @@ class ModulRolleTest {
     void admin() {
         assertThat(modulRolle(Map.of("fotos", "fotos"), "ROLE_ADMIN").darf("fotos")).isTrue();
         assertThat(modulRolle(Map.of("fotos", "fotos"), "ROLE_ROOT").darf("fotos")).isTrue();
+    }
+
+    @Test
+    @DisplayName("Karte 2377 ROOT-3: strenges Modul ohne ADMIN/ROOT-Umgehung")
+    void strengesModul() {
+        assertThat(strengeModulRolle(Map.of("terminal", "terminal"), "ROLE_ROOT").darf("terminal")).isFalse();
+        assertThat(strengeModulRolle(Map.of("terminal", "terminal"), "ROLE_ADMIN").darf("terminal")).isFalse();
+        assertThat(strengeModulRolle(Map.of("terminal", "terminal"), "ROLE_ROOT", "ROLE_TERMINAL").darf("terminal")).isTrue();
+        assertThat(strengeModulRolle(Map.of(), "ROLE_ROOT").darf("terminal")).as("ohne Zuordnung: gleichnamige Rolle").isFalse();
+        assertThat(strengeModulRolle(Map.of(), "ROLE_USER", "ROLE_TERMINAL").darf("terminal")).isTrue();
+        assertThat(strengeModulRolle(Map.of("fotos", "fotos"), "ROLE_ADMIN").darf("fotos")).as("nicht gelistet: Umgehung bleibt").isTrue();
+    }
+
+    private static ModulRolle strengeModulRolle(Map<String, String> zuordnung, String... rollen) {
+        return modulRolle(zuordnung, java.util.List.of("terminal"), rollen);
     }
 
     @Test

@@ -31,6 +31,12 @@ exhaustive.
   neu). Ohne Konfiguration unveraendert. **Achtung beim Umhaengen:** der volle Titel (`Elter | Titel`) aendert sich;
   Mandanten-Menuelisten und Kachel-`menuTitle`, die den alten Titel nennen, greifen dann nicht mehr. Umhaengen unter
   «Root» unterstellt den Eintrag der Root-Zweig-Regel (nur ROOT).
+- **Strenge Modulrollen ohne ADMIN/ROOT-Umgehung** (Karte 2377, Backport ROOT-3). Neu
+  `plaintext.menu.strenge-module-roles` (Liste von Modul-Keys): fuer diese Module brauchen auch ADMIN und ROOT die
+  Modulrolle, in Menue, Kacheln, PageGuard (`isOn`) und `@modulRolle.darf(...)`. Ein strenges Modul ohne Eintrag in
+  `module-roles` verlangt die gleichnamige Rolle (geschlossen statt offen). `ModuleRoleService.holdsAny(..., streng)`
+  neu, `MenuItemImpl.moduleRoleStreng` neu; Startlog nennt die strengen Module, die Menue-Diagnose sagt «streng».
+  Nicht gelistete Module unveraendert.
 
 ## [3.58.0] - 2026-11-19
 
