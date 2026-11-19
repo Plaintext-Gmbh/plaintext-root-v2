@@ -12,6 +12,14 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+- **Menueplatzierung von aussen: Modell und Konfiguration** (Karte 2377, Backport ROOT-1). Neu in plaintext-root-interfaces
+  `MenuPlatzierung` (parent, order, title, icon, sichtbar; alle optional), `MenuGruppe` (order, icon),
+  `MenuPlatzierungProvider` (`@ModulApi` SCHNITTSTELLE, NEU) und `MenuPlatzierungProperties`
+  (`plaintext.menu.platzierung.<menuId>`, `plaintext.menu.gruppen.<Titel>`). plaintext-root-menu registriert den
+  Standard-Provider aus den Properties (`@ConditionalOnMissingBean`, eine eigene Bean gewinnt). Noch keine
+  Verhaltensaenderung: angewendet wird die Platzierung erst mit ROOT-2.
+
 ## [3.58.0] - 2026-11-19
 
 ### Added

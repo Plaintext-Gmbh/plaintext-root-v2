@@ -1,0 +1,25 @@
+# Abschnitt 3 aus KONZEPT-ROOT-MENUE-EXTERN (Karte 2377, ROOT-1)
+plaintext:
+  menu:
+    platzierung:
+      terminal:
+        parent: Werkzeuge
+        order: 10
+        title: Terminal
+        icon: pi pi-desktop
+      drawio:
+        parent: Werkzeuge
+        order: 20
+      files:
+        parent: Werkzeuge
+        order: 30
+      drawio-bilder:
+        sichtbar: false
+    gruppen:
+      Werkzeuge:
+        order: 70
+        icon: pi pi-wrench
+    module-roles:
+      terminal: terminal
+      drawio: drawio
+      files: files
