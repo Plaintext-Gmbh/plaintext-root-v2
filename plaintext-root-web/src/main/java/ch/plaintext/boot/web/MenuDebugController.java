@@ -4,6 +4,7 @@
 package ch.plaintext.boot.web;
 
 import ch.plaintext.MenuRegistry;
+import ch.plaintext.boot.menu.MenuItemImpl;
 import ch.plaintext.boot.menu.MenuAnnotation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,7 +91,11 @@ public class MenuDebugController {
         html.append("<div class='summary'>");
         html.append("<strong>Total Scanned:</strong> ").append(totalScanned).append(" | ");
         html.append("<strong>Total Registered Beans:</strong> ").append(menuItems.size());
-        if (totalScanned != menuItems.size()) {
+        long gruppen = menuItems.stream().filter(i -> i instanceof MenuItemImpl impl && impl.isGruppe()).count();
+        if (gruppen > 0) {
+            html.append(" | <strong>Gruppen (plaintext.menu.gruppen):</strong> ").append(gruppen);
+        }
+        if (totalScanned != menuItems.size() - gruppen) {
             html.append(" <span style='color: red;'>⚠️ MISMATCH!</span>");
         } else {
             html.append(" <span style='color: green;'>✅ OK</span>");
@@ -105,6 +110,18 @@ public class MenuDebugController {
             html.append("<div class='bean-detail'><span class='label'>Parent:</span> ").append(item.getParent() == null || item.getParent().isEmpty() ? "<em>(root)</em>" : item.getParent()).append("</div>");
             html.append("<div class='bean-detail'><span class='label'>Order:</span> ").append(item.getOrder()).append("</div>");
             html.append("<div class='bean-detail'><span class='label'>Icon:</span> ").append(item.getIcon()).append("</div>");
+            if (item instanceof MenuItemImpl impl) {
+                // Karte 2377 ROOT-2: own placement of the module next to the effective one
+                if (!impl.getPlatzierungVorgabe().isEmpty()) {
+                    html.append("<div class='bean-detail'><span class='label'>Vorgabe:</span> ").append(impl.getPlatzierungVorgabe()).append("</div>");
+                }
+                if (!impl.isSichtbar()) {
+                    html.append("<div class='bean-detail'><span class='label'>Im Menue:</span> nein (sichtbar: false)</div>");
+                }
+                if (impl.isGruppe()) {
+                    html.append("<div class='bean-detail'><span class='label'>Gruppe:</span> aus plaintext.menu.gruppen</div>");
+                }
+            }
             html.append("<div class='bean-detail'><span class='label'>Roles:</span> ").append(item.getRoles().isEmpty() ? "<em>(all users)</em>" : String.join(", ", item.getRoles())).append("</div>");
             html.append("</div>");
         }
