@@ -119,8 +119,11 @@ proof that anything ran.
    the consumer is the deployment and stays a deliberate act.
 4. `publish-root-pin.yaml` reports each consumer's pinned root version to `plaintext-mvn`
    (branch `pins`), so that housekeeping there never deletes a version still in use.
-5. `CHANGELOG.md`: rename the `[Unreleased]` block to the release number on release. The minor
-   number counts releases; it is **not** a SemVer promise.
+5. `CHANGELOG.md`: `scripts/release.sh` renames the `[Unreleased]` block to the release number
+   and date and opens a new empty `[Unreleased]` above it, in the same `[skip ci]` commit as the
+   SNAPSHOT bump (Karte 2366). Humans only write entries under `[Unreleased]`, before the merge.
+   The sections 3.1.0 to 3.57.0 are not backfilled. The minor number counts releases; it is
+   **not** a SemVer promise.
 
 Steps 3 and 4 are the exception to the engine switch: `root-autobump.yaml` and
 `publish-root-pin.yaml` are GitHub Actions workflows and stay in the consumer repositories'
