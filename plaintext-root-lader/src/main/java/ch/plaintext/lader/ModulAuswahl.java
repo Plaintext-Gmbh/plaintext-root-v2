@@ -31,8 +31,9 @@ import java.util.regex.Pattern;
  * Karte 1608: Module per Auswahl aus signierten Registries (Ed25519).
  *
  * <ul>
- *   <li>{@code module/auswahl.yaml} (geschrieben von der Seite, nur ROOT): Name und Version oder {@code latest}.
- *       Was nicht drinsteht, ist deaktiviert.</li>
+ *   <li>{@code module/auswahl.yaml} (geschrieben von der Seite, nur ROOT): Name und Version oder {@code latest},
+ *       optional {@code registry: <name>} (Karte 2377, ROOT-9: nur aus dieser Registry; ohne Angabe die erste mit
+ *       passender Version). Was nicht drinsteht, ist deaktiviert.</li>
  *   <li>{@code config/module-quellen.txt} (Instanz-Konfig): {@code schluessel ed25519 <base64 X.509>},
  *       {@code registry <name> <url>}, optional {@code eingebettet ueberschreibbar}.</li>
  *   <li>Registry = Textdatei {@value #INDEX_KOPF} mit einer Zeile je Jar:
@@ -78,9 +79,18 @@ public final class ModulAuswahl {
     private static final Pattern BIBLIOTHEK = Pattern.compile("([a-z][a-z0-9_-]*(?:\\.[a-z0-9_-]+)*):([A-Za-z0-9][A-Za-z0-9_.-]*):([0-9][A-Za-z0-9_.-]*)@([0-9a-f]{64})");
     private static final Pattern BASE64 = Pattern.compile("[A-Za-z0-9+/=]+");
 
-    /** Ein Eintrag der Auswahl; {@code version} ist eine feste Version oder {@link #LATEST}. */
-    public record Wahl(String name, String version) {
+    /**
+     * Ein Eintrag der Auswahl; {@code version} ist eine feste Version oder {@link #LATEST}; {@code registry} ist
+     * {@code null} (erste Registry mit passender Version) oder der Name einer Registry aus {@code module-quellen.txt}.
+     */
+    public record Wahl(String name, String version, String registry) {
+        public Wahl(String name, String version) {
+            this(name, version, null);
+        }
     }
+
+    /** Erlaubte Registry-Namen in der Auswahl: wie in {@code module-quellen.txt}, ohne Leerraum. */
+    private static final Pattern REGISTRY_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_.-]*");
 
     /**
      * Eine Zeile eines Registry-Index. {@code registry}/{@code index} sagen, woher sie kam.
@@ -276,8 +286,10 @@ public final class ModulAuswahl {
         }
         int dp = rest.indexOf(':');
         String k = dp > 0 ? rest.substring(0, dp).strip() : "";
-        if (!(k.equals("name") || k.equals("version")) || aktuell.put(k, rest.substring(dp + 1).strip()) != null) {
-            throw new IllegalArgumentException(quelle + ":" + nr + ": erwartet je Eintrag genau 'name' und 'version'");
+        if (!(k.equals("name") || k.equals("version") || k.equals("registry"))
+                || aktuell.put(k, rest.substring(dp + 1).strip()) != null) {
+            throw new IllegalArgumentException(quelle + ":" + nr
+                    + ": erwartet je Eintrag genau 'name' und 'version', optional 'registry'");
         }
     }
 
@@ -293,7 +305,11 @@ public final class ModulAuswahl {
         if (!namen.add(n)) {
             throw new IllegalArgumentException(quelle + ": Modul '" + n + "' doppelt");
         }
-        return new Wahl(n, v);
+        String r = m.get("registry");
+        if (r != null && !REGISTRY_NAME.matcher(r).matches()) {
+            throw new IllegalArgumentException(quelle + ": Modul '" + n + "', ungueltiger Registry-Name '" + r + "'");
+        }
+        return new Wahl(n, v, r);
     }
 
     /** Text fuer {@code auswahl.yaml}; wird vor dem Schreiben mit {@link #auswahlParsen} geprueft. */
@@ -303,7 +319,12 @@ public final class ModulAuswahl {
             return sb.append("auswahl: []\n").toString();
         }
         sb.append("auswahl:\n");
-        wahl.forEach(w -> sb.append("  - name: ").append(w.name()).append("\n    version: ").append(w.version()).append('\n'));
+        wahl.forEach(w -> {
+            sb.append("  - name: ").append(w.name()).append("\n    version: ").append(w.version()).append('\n');
+            if (w.registry() != null) {
+                sb.append("    registry: ").append(w.registry()).append('\n');
+            }
+        });
         String text = sb.toString();
         auswahlParsen(text, AUSWAHL);
         return text;
@@ -537,8 +558,11 @@ public final class ModulAuswahl {
                                  ModulLader.Huelle huelle, boolean latestErlaubt) {
         Map<String, Zeile> ergebnis = new LinkedHashMap<>();
         for (Wahl w : wahl) {
+            // ROOT-9: mit registry nur aus dieser; ohne die erste mit passender Version (bisheriges Verhalten)
             List<Zeile> kandidaten = angebot.zeilen().stream()
-                    .filter(z -> z.istModul() && z.name().equals(w.name())).toList();
+                    .filter(z -> z.istModul() && z.name().equals(w.name()))
+                    .filter(z -> w.registry() == null || w.registry().equals(z.registry())).toList();
+            String wo = w.registry() == null ? "in keiner Registry" : "nicht in Registry '" + w.registry() + "'";
             Zeile z;
             if (LATEST.equals(w.version())) {
                 if (!latestErlaubt) {
@@ -547,11 +571,13 @@ public final class ModulAuswahl {
                 z = kandidaten.stream().filter(k -> rootMinPasst(k.rootMin(), huelle) == null)
                         .max(Comparator.comparing(Zeile::version, ModulAuswahl::versionVergleich))
                         .orElseThrow(() -> new IllegalStateException("'" + w.name() + "' latest: keine zur Huelle "
-                                + huelle.version() + " passende Version in den Registries" + fehlerText(angebot)));
+                                + huelle.version() + " passende Version "
+                                + (w.registry() == null ? "in den Registries" : "in Registry '" + w.registry() + "'")
+                                + fehlerText(angebot)));
             } else {
                 z = kandidaten.stream().filter(k -> k.version().equals(w.version())).findFirst()
                         .orElseThrow(() -> new IllegalStateException("'" + w.name() + "' " + w.version()
-                                + " steht in keiner Registry" + fehlerText(angebot)));
+                                + " steht " + wo + fehlerText(angebot)));
                 String grund = rootMinPasst(z.rootMin(), huelle);
                 if (grund != null) {
                     throw new IllegalStateException("'" + w.name() + "' " + w.version() + ": " + grund);

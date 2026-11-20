@@ -530,6 +530,19 @@ class ModulAuswahlTest {
                 new ModulAuswahl.Wahl("plaintext-z-b", "2.0.0")), "Seite");
         assertThat(ModulAuswahl.auswahlParsen(t, "t")).containsExactly(new ModulAuswahl.Wahl("plaintext-z-a", "latest"),
                 new ModulAuswahl.Wahl("plaintext-z-b", "2.0.0"));
+        // ROOT-9: registry optional, wird nur geschrieben, wenn gewaehlt
+        String r = ModulAuswahl.auswahlText(List.of(new ModulAuswahl.Wahl("plaintext-z-a", "1.0.0", "zweit"),
+                new ModulAuswahl.Wahl("plaintext-z-b", "latest")), "Seite");
+        assertThat(r).contains("    registry: zweit\n").doesNotContain("registry: null");
+        assertThat(ModulAuswahl.auswahlParsen(r, "t")).containsExactly(new ModulAuswahl.Wahl("plaintext-z-a", "1.0.0", "zweit"),
+                new ModulAuswahl.Wahl("plaintext-z-b", "latest", null));
+        assertThatThrownBy(() -> ModulAuswahl.auswahlParsen("auswahl:\n  - name: plaintext-z-a\n    version: 1.0.0\n    registry: a b\n", "t"))
+                .hasMessageContaining("ungueltiger Registry-Name");
+        assertThatThrownBy(() -> ModulAuswahl.auswahlParsen("auswahl:\n  - name: plaintext-z-a\n    version: 1.0.0\n    ort: x\n", "t"))
+                .hasMessageContaining("optional 'registry'");
+        // Plan ROOT-9: ein unbekannter Schluessel bleibt ein Fehler (nur registry ist neu erlaubt)
+        assertThatThrownBy(() -> ModulAuswahl.auswahlParsen("auswahl:\n  - name: plaintext-z-a\n    version: 1.0.0\n    quelle: x\n", "t"))
+                .hasMessageContaining("optional 'registry'");
         assertThatThrownBy(() -> ModulAuswahl.auswahlParsen("auswahl:\n  - name: ../x\n    version: 1\n", "t"))
                 .hasMessageContaining("ungueltiger Name");
         assertThatThrownBy(() -> ModulAuswahl.auswahlParsen("auswahl:\n  - name: a\n    url: http://x\n", "t"))
@@ -603,5 +616,39 @@ class ModulAuswahlTest {
 
         assertThat(starten()).isEmpty(); // Testlauf ohne PLAINTEXT_MODULE_UNSIGNIERT: abgelehnt, kein Modul
         assertThat(status().get("grund")).contains("unsigniertes Modul plaintext-z-a 1.0.0").contains("Entwicklungsmodus aus");
+    }
+
+    /** Karte 2377 (ROOT-9): dasselbe Modul in zwei Registries; mit {@code registry} laedt der Lader aus genau dieser. */
+    @Test
+    void zweiRegistriesMitGleichemModulWahlNenntDieRegistry() throws Exception {
+        modul("plaintext-z-a", "1.0.0", "1.770.0", A1);
+        byte[] b = TestJars.zip("ch/plaintext/a/A.class", "anders");
+        Path reg = Files.createDirectories(huellenDir.resolve("zweit"));
+        Files.write(reg.resolve("a.jar"), b);
+        ModulAuswahl.Zeile z = new ModulAuswahl.Zeile("modul", "plaintext-z-a", "1.0.0", "1.770.0", sha(b), List.of(), List.of(),
+                "a.jar", "x", "zweit", null);
+        Signature sig = Signature.getInstance("Ed25519");
+        sig.initSign(schluessel.getPrivate());
+        sig.update(z.nachricht().getBytes(StandardCharsets.UTF_8));
+        Files.writeString(reg.resolve("index.txt"), ModulAuswahl.INDEX_KOPF + "\n"
+                + z.alsIndexZeile().replace("signatur=x", "signatur=" + Base64.getEncoder().encodeToString(sig.sign())) + "\n");
+        quellen(schluessel, "registry zweit " + reg.resolve("index.txt").toUri() + "\n");
+
+        auswahl("plaintext-z-a", "1.0.0"); // ohne registry: die erste (test), wie bisher
+        List<Path> jars = starten();
+        assertThat(jars).hasSize(1);
+        assertThat(sha(Files.readAllBytes(jars.get(0)))).isEqualTo(sha(A1));
+
+        Files.writeString(dir.resolve(ModulAuswahl.AUSWAHL),
+                ModulAuswahl.auswahlText(List.of(new ModulAuswahl.Wahl("plaintext-z-a", "1.0.0", "zweit")), "Test"));
+        jars = starten();
+        assertThat(jars).hasSize(1);
+        assertThat(sha(Files.readAllBytes(jars.get(0)))).isEqualTo(sha(b));
+        assertThat(status()).containsEntry("ergebnis", "OK");
+
+        Files.writeString(dir.resolve(ModulAuswahl.AUSWAHL),
+                ModulAuswahl.auswahlText(List.of(new ModulAuswahl.Wahl("plaintext-z-a", "1.0.0", "dritt")), "Test"));
+        starten();
+        assertThat(status().get("grund")).contains("nicht in Registry 'dritt'");
     }
 }

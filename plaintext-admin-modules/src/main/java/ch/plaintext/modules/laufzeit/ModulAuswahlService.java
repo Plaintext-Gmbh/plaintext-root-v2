@@ -50,13 +50,19 @@ public class ModulAuswahlService {
     }
 
     /** Ein waehlbares Modul mit allen Versionen aus allen Registries (neueste zuerst). */
-    public record Modul(String name, List<Version> versionen, String gewaehlt, String geladen) implements Serializable {
+    /** {@code gewaehltRegistry}: Registry aus der Auswahl oder {@code null} (erste mit passender Version). */
+    public record Modul(String name, List<Version> versionen, String gewaehlt, String gewaehltRegistry, String geladen)
+            implements Serializable {
+    }
+
+    /** Karte 2377 (ROOT-9): eine Registry der Quellen mit Status fuer die Seite. */
+    public record Registry(String name, String status) implements Serializable {
     }
 
     /** Was die Seite zeigt. */
     public record Ansicht(Map<String, String> status, List<Modul> module, Map<String, String> registryFehler,
                           String quellenFehler, List<String> geladen, String huelle, boolean darfSchalten,
-                          String auswahlFehler) implements Serializable {
+                          String auswahlFehler, List<Registry> registries) implements Serializable {
     }
 
     private final PlaintextSecurity security;
@@ -94,11 +100,13 @@ public class ModulAuswahlService {
         }
         ModulLader.Huelle huelle = huelle();
         String quellenFehler = null;
+        List<String> registryNamen = new ArrayList<>();
         ModulAuswahl.Angebot angebot = new ModulAuswahl.Angebot(List.of(), Map.of());
         List<java.security.PublicKey> schluessel = List.of();
         try {
             ModulAuswahl.Quellen q = ModulAuswahl.quellenLesen(konfigVerzeichnis.resolve(ModulAuswahl.QUELLEN));
             schluessel = q.schluessel();
+            q.registries().forEach(r -> registryNamen.add(r.name()));
             if (q.registries().isEmpty()) {
                 quellenFehler = "keine Registry in " + konfigVerzeichnis.resolve(ModulAuswahl.QUELLEN);
             }
@@ -107,9 +115,9 @@ public class ModulAuswahlService {
             quellenFehler = ex.getMessage();
         }
         String auswahlFehler = null;
-        Map<String, String> gewaehlt = new LinkedHashMap<>();
+        Map<String, ModulAuswahl.Wahl> gewaehlt = new LinkedHashMap<>();
         try {
-            auswahl().forEach(w -> gewaehlt.put(w.name(), w.version()));
+            auswahl().forEach(w -> gewaehlt.put(w.name(), w));
         } catch (RuntimeException ex) {
             auswahlFehler = ex.getMessage();
         }
@@ -128,11 +136,30 @@ public class ModulAuswahlService {
             v.sort(Comparator.comparing(Version::version, ModulAuswahl::versionVergleich).reversed());
             String im = geladen.stream().filter(g -> g.startsWith(n + "-")).map(g -> g.substring(n.length() + 1, g.length() - 4))
                     .findFirst().orElse(null);
-            module.add(new Modul(n, List.copyOf(v), gewaehlt.get(n), im));
+            ModulAuswahl.Wahl w = gewaehlt.get(n);
+            module.add(new Modul(n, List.copyOf(v), w == null ? null : w.version(), w == null ? null : w.registry(), im));
         });
         module.sort(Comparator.comparing(Modul::name));
         return new Ansicht(ModulAuswahl.statusLesen(modulVerzeichnis), List.copyOf(module), angebot.fehler(),
-                quellenFehler, geladen, huelle == null ? null : huelle.version(), darfSchalten(), auswahlFehler);
+                quellenFehler, geladen, huelle == null ? null : huelle.version(), darfSchalten(), auswahlFehler,
+                registries(registryNamen, angebot, schluessel));
+    }
+
+    /** Status je Registry der Quellen: Fehler aus dem Angebot, sonst Anzahl Module und ungueltige Signaturen, sonst leer. */
+    static List<Registry> registries(List<String> namen, ModulAuswahl.Angebot angebot, List<java.security.PublicKey> schluessel) {
+        List<Registry> aus = new ArrayList<>();
+        for (String n : namen) {
+            String fehler = angebot.fehler().get(n);
+            if (fehler != null) {
+                aus.add(new Registry(n, "Fehler: " + fehler));
+                continue;
+            }
+            List<ModulAuswahl.Zeile> z = angebot.zeilen().stream().filter(x -> x.istModul() && n.equals(x.registry())).toList();
+            long ungueltig = z.stream().filter(x -> !ModulAuswahl.signaturGueltig(x, schluessel)).count();
+            aus.add(new Registry(n, z.isEmpty() ? "leer" : z.size() + " Modul(e)"
+                    + (ungueltig == 0 ? "" : ", " + ungueltig + " mit ungueltiger Signatur")));
+        }
+        return List.copyOf(aus);
     }
 
     List<ModulAuswahl.Wahl> auswahl() throws IOException {
@@ -146,16 +173,23 @@ public class ModulAuswahlService {
     /** Schreibt die Auswahl; jedes Modul muss im Angebot stehen, die Version dort oder {@code latest}. */
     public synchronized List<ModulAuswahl.Wahl> speichern(List<ModulAuswahl.Wahl> neu) throws IOException {
         nurRoot();
-        Map<String, List<String>> angebot = new LinkedHashMap<>();
+        Map<String, List<ModulAuswahl.Zeile>> angebot = new LinkedHashMap<>();
         ModulAuswahl.angebot(konfigVerzeichnis).zeilen().stream().filter(ModulAuswahl.Zeile::istModul)
-                .forEach(z -> angebot.computeIfAbsent(z.name(), n -> new ArrayList<>()).add(z.version()));
+                .forEach(z -> angebot.computeIfAbsent(z.name(), n -> new ArrayList<>()).add(z));
         for (ModulAuswahl.Wahl w : neu) {
-            List<String> v = angebot.get(w.name());
+            List<ModulAuswahl.Zeile> v = angebot.get(w.name());
             if (v == null) {
                 throw new IllegalArgumentException("'" + w.name() + "' steht in keiner erreichbaren Registry");
             }
-            if (!ModulAuswahl.LATEST.equals(w.version()) && !v.contains(w.version())) {
-                throw new IllegalArgumentException("'" + w.name() + "' " + w.version() + " steht in keiner Registry");
+            // ROOT-9: mit registry muss das Modul (in dieser Version) genau dort liegen
+            List<ModulAuswahl.Zeile> dort = w.registry() == null ? v
+                    : v.stream().filter(z -> w.registry().equals(z.registry())).toList();
+            String wo = w.registry() == null ? "in keiner Registry" : "nicht in Registry '" + w.registry() + "'";
+            if (dort.isEmpty()) {
+                throw new IllegalArgumentException("'" + w.name() + "' steht " + wo);
+            }
+            if (!ModulAuswahl.LATEST.equals(w.version()) && dort.stream().noneMatch(z -> z.version().equals(w.version()))) {
+                throw new IllegalArgumentException("'" + w.name() + "' " + w.version() + " steht " + wo);
             }
         }
         List<ModulAuswahl.Wahl> alt = nachsichtig();

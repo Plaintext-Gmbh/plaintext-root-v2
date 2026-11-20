@@ -213,7 +213,26 @@ class ModulAuswahlServiceTest {
 
         assertThat(bean.getZeilen()).extracting(ModulAuswahlBackingBean.Zeile::getName).containsExactly("plaintext-z-a", "plaintext-z-b");
         assertThat(bean.getZeilen().get(0).isAktiv()).isTrue();
-        assertThat(bean.getZeilen().get(0).getOptionen()).containsExactly("latest", "1.10.0", "1.0.0");
+        assertThat(bean.getZeilen().get(0).getOptionen()).extracting(jakarta.faces.model.SelectItem::getValue)
+                .containsExactly("latest", "1.10.0", "1.0.0");
         assertThat(bean.getZeilen().get(1).getHinweis()).contains("Signatur ungültig");
+    }
+
+    /** Karte 2377 (ROOT-9): registry in der Wahl muss das Modul dort anbieten; die Ansicht nennt je Registry den Status. */
+    @Test
+    void registryInDerWahlUndRegistryStatus() throws Exception {
+        als("ROOT");
+        assertThatThrownBy(() -> service.speichern(List.of(new ModulAuswahl.Wahl("plaintext-z-a", "1.0.0", "fremd"))))
+                .hasMessageContaining("nicht in Registry 'fremd'");
+        assertThatThrownBy(() -> service.speichern(List.of(new ModulAuswahl.Wahl("plaintext-z-a", "9.9.9", "test"))))
+                .hasMessageContaining("9.9.9 steht nicht in Registry 'test'");
+        service.speichern(List.of(new ModulAuswahl.Wahl("plaintext-z-a", "1.0.0", "test")));
+        assertThat(Files.readString(module.resolve(ModulAuswahl.AUSWAHL))).contains("registry: test");
+
+        ModulAuswahlService.Ansicht a = service.ansicht();
+        assertThat(a.module().get(0).gewaehlt()).isEqualTo("1.0.0");
+        assertThat(a.module().get(0).gewaehltRegistry()).isEqualTo("test");
+        assertThat(a.registries()).extracting(ModulAuswahlService.Registry::name).containsExactly("test");
+        assertThat(a.registries().get(0).status()).contains("Modul(e)").contains("ungueltiger Signatur");
     }
 }

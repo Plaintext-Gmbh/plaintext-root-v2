@@ -41,6 +41,18 @@
                     <p class="ui-messages-error">Auswahl: #{modulAuswahlBackingBean.ansicht.auswahlFehler}</p>
                 </h:panelGroup>
 
+                <h2>Registries</h2>
+                <h:dataTable id="registries" value="#{modulAuswahlBackingBean.ansicht.registries}" var="r" styleClass="mobile-safe">
+                    <h:column>
+                        <f:facet name="header">Registry</f:facet>
+                        <h:outputText value="#{r.name}"/>
+                    </h:column>
+                    <h:column>
+                        <f:facet name="header">Status</f:facet>
+                        <h:outputText value="#{r.status}"/>
+                    </h:column>
+                </h:dataTable>
+
                 <h2>Module aus allen Registries</h2>
                 <h:dataTable id="tbl" value="#{modulAuswahlBackingBean.zeilen}" var="z" styleClass="mobile-safe">
                     <h:column>
@@ -76,6 +88,8 @@
                 </p>
                 <p>«Neu starten» beendet die Instanz sofort, sie ist danach etwa eine Minute weg.
                     «latest» wird bei jedem Start auf die neueste zur Hülle passende, gültig signierte Version aufgelöst.
+                    Liegt eine Version in mehreren Registries, nennt die Auswahl die Registry (Version (Registry)); der Lader lädt
+                    dann genau aus dieser.
                     Scheitert ein Download oder eine Signaturprüfung, startet die Instanz mit dem letzten guten Stand.</p>
             </h:panelGroup>
         </h:form>

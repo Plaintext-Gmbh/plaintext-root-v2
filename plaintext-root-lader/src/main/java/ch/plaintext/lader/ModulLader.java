@@ -347,7 +347,7 @@ public final class ModulLader {
             String v = ausgerollt.get(w.name());
             if (ModulAuswahl.LATEST.equals(w.version()) && v != null) {
                 log("Auswahl " + w.name() + ": latest = ausgerollte Version " + v + " (" + KONFIG + ")");
-                out.add(new ModulAuswahl.Wahl(w.name(), v));
+                out.add(new ModulAuswahl.Wahl(w.name(), v, w.registry()));
             } else {
                 out.add(w);
             }
