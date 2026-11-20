@@ -22,6 +22,14 @@ exhaustive.
   Schalter `plaintext.arch.menu-id` wie `plaintext.arch.inline-js`: Vorgabe **melden** (Konsumenten-Repos werden beim
   root-Bump nicht rot, die Verstoesse stehen im Testlog), `enforce` = rot; root selbst laeuft mit `enforce`.
 
+- **Laufzeit-Module: Registry je Wahl, Registries mit Status** (Karte 2377, Backport ROOT-9). `auswahl.yaml` kennt je
+  Eintrag optional `registry: <name>` (Name aus `module-quellen.txt`); der Lader laedt dann genau aus dieser Registry,
+  ohne Angabe wie bisher aus der ersten mit passender Version. Die Seite «Laufzeit-Module» zeigt die Registries der
+  Quellen mit Status (Fehler, leer, Anzahl Module, ungueltige Signaturen) und bietet eine Version, die in mehreren
+  Registries liegt, je Registry an («Version (Registry)»); `auswahl.yaml` erhaelt `registry` nur, wenn so gewaehlt.
+  Hinweis: eine `auswahl.yaml` mit `registry` ist fuer aeltere Huellen ein Fehler («optional 'registry'» kennt erst
+  diese Version); root-min des Huellen-Release beachten.
+
 ### Changed
 - **menuIds der root-eigenen Menueeintraege** (Karte 2377, ROOT-4): `claude-api`, `i18n`, `mailtemplate`,
   `notifications`, `secrets`, `settings`, `setup`, `ablage-ausprobieren`, `sidecars`, `webhooks`, `misc`, `deeplinks`,
