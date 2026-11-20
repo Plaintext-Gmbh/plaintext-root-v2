@@ -12,6 +12,13 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+- **`DateiSpeicher`: Ordner und Verschieben** (Karte 2377, Backport ROOT-12). Neue `default`-Methoden
+  `istOrdner`, `legeOrdnerAn`, `verschiebe(von, nach)` und `loescheRekursiv` in plaintext-root-interfaces, umgesetzt
+  ueber die fuenf bestehenden Primitive (Kopieren und Loeschen), damit ein fremder Adapter weiter nur diese fuenf
+  braucht; `DateisystemDateiSpeicher` setzt sie nativ um (`Files.move` atomar, `Files.walk`). Keine Verhaltensaenderung
+  fuer bestehende Aufrufer; Stabilitaet NEU bleibt.
+
 ## [3.59.0] - 2026-11-19
 
 ### Added

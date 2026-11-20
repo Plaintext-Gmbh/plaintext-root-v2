@@ -38,6 +38,64 @@ public interface DateiSpeicher {
     /** @return {@code true} if a file was deleted */
     boolean delete(String pfad);
 
+    // ── Folders and moving (card 2377, backport ROOT-12). Defaults work on the five primitives above, so an
+    //    implementation may still provide only those; a native store overrides them (DateisystemDateiSpeicher).
+
+    /** @return {@code true} if a folder exists at the path (default: its parent lists it as a folder) */
+    default boolean istOrdner(String pfad) {
+        int i = pfad.lastIndexOf('/');
+        String eltern = i < 0 ? "" : pfad.substring(0, i);
+        String name = pfad.substring(i + 1);
+        return list(eltern).stream().anyMatch(e -> e.ordner() && e.name().equals(name));
+    }
+
+    /**
+     * Creates the folder (and missing parents). Default: nothing, because folders of a store without native
+     * folders appear with their first upload; a native store creates it.
+     */
+    default void legeOrdnerAn(String pfad) {
+    }
+
+    /**
+     * Moves a file or a whole folder; {@code nach} must not exist yet.
+     * Default: copy and delete over the primitives, folder by folder.
+     *
+     * @throws IllegalArgumentException if {@code von} does not exist or {@code nach} exists
+     */
+    default void verschiebe(String von, String nach) {
+        if (exists(nach) || istOrdner(nach)) {
+            throw new IllegalArgumentException("Ziel existiert schon: " + nach);
+        }
+        if (istOrdner(von)) {
+            for (DateiEintrag e : list(von)) {
+                verschiebe(von + "/" + e.name(), nach + "/" + e.name());
+            }
+            return;
+        }
+        byte[] inhalt = download(von);
+        if (inhalt == null) {
+            throw new IllegalArgumentException("Quelle fehlt: " + von);
+        }
+        upload(nach, inhalt);
+        delete(von);
+    }
+
+    /**
+     * Deletes a file, or a folder with everything in it. Default: over {@link #list} and {@link #delete}.
+     *
+     * @return {@code true} if something was deleted
+     */
+    default boolean loescheRekursiv(String pfad) {
+        if (!istOrdner(pfad)) {
+            return delete(pfad);
+        }
+        boolean etwas = false;
+        for (DateiEintrag e : list(pfad)) {
+            etwas |= loescheRekursiv(pfad + "/" + e.name());
+        }
+        return etwas;
+    }
+
     /**
      * Does the store delete expired files itself (retention rule outside the application)? Then the module does
      * not clean up; otherwise it deletes files {@code plaintext.files.frist} after their last change.

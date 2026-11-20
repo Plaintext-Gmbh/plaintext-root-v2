@@ -103,6 +103,57 @@ public class DateisystemDateiSpeicher implements DateiSpeicher {
         }
     }
 
+    // ── Ordner und Verschieben nativ (Karte 2377, ROOT-12) ──
+
+    @Override
+    public boolean istOrdner(String pfad) {
+        return Files.isDirectory(aufloesen(pfad));
+    }
+
+    @Override
+    public void legeOrdnerAn(String pfad) {
+        try {
+            Files.createDirectories(aufloesen(pfad));
+        } catch (IOException e) {
+            throw new UncheckedIOException("Ordner nicht angelegt: " + pfad, e);
+        }
+    }
+
+    /** Verschiebt Datei oder Ordner atomar (gleiches Dateisystem unter der Wurzel); das Ziel darf nicht existieren. */
+    @Override
+    public void verschiebe(String von, String nach) {
+        Path q = aufloesen(von);
+        Path z = aufloesen(nach);
+        if (!Files.exists(q)) {
+            throw new IllegalArgumentException("Quelle fehlt: " + von);
+        }
+        if (Files.exists(z)) {
+            throw new IllegalArgumentException("Ziel existiert schon: " + nach);
+        }
+        try {
+            Files.createDirectories(z.getParent());
+            Files.move(q, z, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Nicht verschoben: " + von + " -> " + nach, e);
+        }
+    }
+
+    @Override
+    public boolean loescheRekursiv(String pfad) {
+        Path p = aufloesen(pfad);
+        if (!Files.exists(p)) {
+            return false;
+        }
+        try (Stream<Path> s = Files.walk(p)) {
+            for (Path x : s.sorted(Comparator.reverseOrder()).toList()) {
+                Files.delete(x);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Nicht gelöscht: " + pfad, e);
+        }
+        return true;
+    }
+
     /** @throws IllegalArgumentException wenn der Pfad die Wurzel verlässt */
     Path aufloesen(String pfad) {
         if (pfad == null || pfad.isBlank()) {
