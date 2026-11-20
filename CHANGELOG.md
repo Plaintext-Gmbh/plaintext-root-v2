@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.60.0] - 2026-11-20
+
 ### Added
 - **ArchUnit-Regel `menuIdPflichtBeiModuleId`** (Karte 2377, Backport ROOT-4): eine Klasse mit
   `@MenuAnnotation(moduleId=…)` braucht eine nicht-leere `menuId`; sie ist der stabile Schluessel fuer die
