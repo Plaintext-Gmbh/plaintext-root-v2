@@ -12,7 +12,24 @@ exhaustive.
 
 ## [Unreleased]
 
+### Fixed
+- **pt:-Tags fehlten in root-v2-Apps** (Karte 2411): `plaintext-root-tablesettings` bringt eine eigene Taglib im
+  Namensraum `http://plaintext.ch/ui` mit (nur `tableSettings`). Mojarra fuehrt Taglibs mit gleichem Namensraum nicht
+  zusammen, sondern behaelt die erste; im Exec-Jar lag sie vor `plaintext.taglib.xml` des Templates und verdeckte alle
+  uebrigen pt:-Tags (`dateiAblage`, `freigabeLinks`, `table`, `chip`, `filter`, …), z. B. 500 auf «Ablage ausprobieren».
+  `plaintext-root-common` haengt jetzt am Jar mit Classifier `ohne-taglib`; Apps ohne Template (Inventar) nehmen weiter
+  das Haupt-Jar. Neuer Test `TaglibNamensraumEindeutigTest` (webapp): jeder Taglib-Namensraum genau einmal.
+
 ## [3.61.0] - 2026-11-20
+
+### Added
+- **Laufzeit-Module: Registry je Wahl, Registries mit Status** (Karte 2377, Backport ROOT-9). `auswahl.yaml` kennt je
+  Eintrag optional `registry: <name>` (Name aus `module-quellen.txt`); der Lader laedt dann genau aus dieser Registry,
+  ohne Angabe wie bisher aus der ersten mit passender Version. Die Seite «Laufzeit-Module» zeigt die Registries der
+  Quellen mit Status (Fehler, leer, Anzahl Module, ungueltige Signaturen) und bietet eine Version, die in mehreren
+  Registries liegt, je Registry an («Version (Registry)»); `auswahl.yaml` erhaelt `registry` nur, wenn so gewaehlt.
+  Hinweis: eine `auswahl.yaml` mit `registry` ist fuer aeltere Huellen ein Fehler («optional 'registry'» kennt erst
+  diese Version); root-min des Huellen-Release beachten.
 
 ## [3.60.0] - 2026-11-20
 
@@ -23,14 +40,6 @@ exhaustive.
   (`menu-id <Klasse>  # <Karte, Grund>`), Uebergang ein Release. Beschrieben in `docs/MENU_SYSTEM.md`.
   Schalter `plaintext.arch.menu-id` wie `plaintext.arch.inline-js`: Vorgabe **melden** (Konsumenten-Repos werden beim
   root-Bump nicht rot, die Verstoesse stehen im Testlog), `enforce` = rot; root selbst laeuft mit `enforce`.
-
-- **Laufzeit-Module: Registry je Wahl, Registries mit Status** (Karte 2377, Backport ROOT-9). `auswahl.yaml` kennt je
-  Eintrag optional `registry: <name>` (Name aus `module-quellen.txt`); der Lader laedt dann genau aus dieser Registry,
-  ohne Angabe wie bisher aus der ersten mit passender Version. Die Seite «Laufzeit-Module» zeigt die Registries der
-  Quellen mit Status (Fehler, leer, Anzahl Module, ungueltige Signaturen) und bietet eine Version, die in mehreren
-  Registries liegt, je Registry an («Version (Registry)»); `auswahl.yaml` erhaelt `registry` nur, wenn so gewaehlt.
-  Hinweis: eine `auswahl.yaml` mit `registry` ist fuer aeltere Huellen ein Fehler («optional 'registry'» kennt erst
-  diese Version); root-min des Huellen-Release beachten.
 
 ### Changed
 - **menuIds der root-eigenen Menueeintraege** (Karte 2377, ROOT-4): `claude-api`, `i18n`, `mailtemplate`,

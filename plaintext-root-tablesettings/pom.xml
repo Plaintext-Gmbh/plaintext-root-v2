@@ -15,9 +15,9 @@
         TableStateStore-Bean der App).
           - Tag + JS + CSS kommen unveraendert aus plaintext-root-template (einzige Quelle)
           - eigenes Taglib (META-INF/plaintext-tablesettings.taglib.xml) im Namensraum
-            http://plaintext.ch/ui - Mojarra fuehrt Taglibs mit gleichem Namensraum zusammen.
-            In root-v2-Apps liegt das Tag damit zweimal im Klassenpfad (Template und dieses JAR),
-            byte-gleich aus derselben Quelle; Mojarra nimmt das erste, beide sind dasselbe.
+            http://plaintext.ch/ui. Mojarra fuehrt Taglibs mit gleichem Namensraum NICHT zusammen, es
+            behaelt die erste (Karte 2411). root-v2-Apps bekommen darum ueber plaintext-root-common das
+            Jar mit Classifier ohne-taglib; das Taglib gilt nur fuer Apps ohne Template.
         Alle Abhaengigkeiten sind provided: die Anwendung bringt PrimeFaces (15 oder 16), Faces,
         Jackson und slf4j selbst mit. Keine Abhaengigkeit auf root (auch nicht auf StabileApi).
     -->
@@ -108,6 +108,29 @@
             </resource>
         </resources>
         <plugins>
+            <!-- Karte 2411: zweites Jar ohne Taglib fuer plaintext-root-common. Mojarra behaelt je Namensraum nur
+                 die ERSTE Taglib (Compiler.addTagLibrary, equals ueber den Namensraum), fuehrt also nicht zusammen.
+                 In root-v2-Apps lag dieses Taglib (nur tableSettings) vor plaintext.taglib.xml des Templates und
+                 verdeckte alle uebrigen pt:-Tags (500 auf ablage-ausprobieren). Apps ohne Template (Inventar)
+                 nehmen weiter das Haupt-Jar mit Taglib. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>ohne-taglib</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>ohne-taglib</classifier>
+                            <excludes>
+                                <exclude>META-INF/plaintext-tablesettings.taglib.xml</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

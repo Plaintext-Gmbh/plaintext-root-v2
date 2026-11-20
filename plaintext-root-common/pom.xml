@@ -26,6 +26,8 @@
         <dependency>
             <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-tablesettings</artifactId>
+            <!-- Karte 2411: ohne Taglib, sonst verdeckt es plaintext.taglib.xml des Templates -->
+            <classifier>ohne-taglib</classifier>
         </dependency>
 
         <!-- Spring Boot Starters -->

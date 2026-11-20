@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
     Karte 1904: nur pt:tableSettings, fuer Anwendungen ohne plaintext-root-template.
-    Gleicher Namensraum wie plaintext.taglib.xml im Template: Mojarra fuehrt Taglibs mit
-    gleichem Namensraum zusammen, die Seiten schreiben weiter <pt:tableSettings .../>.
+    Gleicher Namensraum wie plaintext.taglib.xml im Template, die Seiten schreiben weiter
+    <pt:tableSettings .../>. Nie zusammen mit dem Template laden: Mojarra behaelt je Namensraum nur
+    die erste Taglib (Karte 2411); root-v2 nimmt darum das Jar mit Classifier ohne-taglib.
     <source> ist relativ zu dieser Datei - das Tag-File liegt in diesem JAR unter META-INF/tags/.
 -->
 <facelet-taglib xmlns="https://jakarta.ee/xml/ns/jakartaee"
