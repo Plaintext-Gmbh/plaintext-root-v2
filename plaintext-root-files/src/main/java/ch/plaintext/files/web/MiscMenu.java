@@ -28,6 +28,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
         order = 60,
         icon = "pi pi-briefcase",
         moduleId = FilesMenu.MODUL,
+        menuId = "misc",
         roles = {FilesRollen.FILES, FilesRollen.ADMIN, FilesRollen.ROOT}
 )
 public class MiscMenu {

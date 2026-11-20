@@ -18,7 +18,8 @@ import ch.plaintext.boot.menu.MenuAnnotation;
     order = 12,
     icon = "pi pi-bell",
     roles = {"USER", "ADMIN", "ROOT"},
-    moduleId = "notifications"
+    moduleId = "notifications",
+    menuId = "notifications"
 )
 public class NotificationMenu {
 }

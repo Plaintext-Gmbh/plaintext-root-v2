@@ -171,6 +171,14 @@ public class MySecurityProvider implements SecurityProvider {
 - `order`: Sort order (lower numbers appear first, default: 0)
 - `icon`: PrimeFaces icon class (default: "")
 - `roles`: Array of roles that can see this menu item (default: empty = visible to all)
+- `moduleId`: The module this entry belongs to; the entry disappears when the module is disabled (default: empty)
+- `menuId`: Stable id of the entry, used as key for placement from outside (`plaintext.menu.platzierung.<menuId>`)
+  and for the auto-role `ROLE_MENU_<MENUID>` under `plaintext.menu.access-policy=STRICT`. Empty = derived from
+  `parent` + `title`. **Required whenever `moduleId` is set** (ArchUnit rule `menuIdPflichtBeiModuleId` in
+  plaintext-root-archtests, Karte 2377 ROOT-4): the derived id would change when the entry is moved or renamed.
+  Transition for consumer repos: `menu-id <Klasse>  # <Karte, Grund>` in `plaintext-arch-allowlist.txt`. During the
+  transition release the rule only reports in consumer repos; `-Dplaintext.arch.menu-id=enforce` (root does this in
+  Surefire) makes it fail.
 
 ## How It Works
 

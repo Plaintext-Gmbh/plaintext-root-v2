@@ -17,7 +17,8 @@ import ch.plaintext.boot.menu.MenuAnnotation;
     order = 12,
     icon = "pi pi-bolt",
     roles = {"ROOT"},
-    moduleId = "webhooks"
+    moduleId = "webhooks",
+    menuId = "webhooks"
 )
 public class WebhookMenu {
 }

@@ -525,6 +525,9 @@
                              solange dort noch Altbestand liegt. Wer bereinigt ist, setzt dieselben
                              Zeilen in seinem webapp-pom. -->
                         <plaintext.arch.inline-js>enforce</plaintext.arch.inline-js>
+                        <!-- Karte 2377 ROOT-4: menuId-Pflicht bei moduleId scharf in root; Konsumenten melden nur
+                             (Vorgabe), bis sie ihre menuIds vergeben haben. -->
+                        <plaintext.arch.menu-id>enforce</plaintext.arch.menu-id>
                         <!-- Karte 1548: PlaintextUiGrundlageLinterTest scharf — neue XHTML ohne style=,
                              ohne eigenes p:growl, mit _csrf; der Bestand steht in
                              plaintext-ui-bestand.txt. Ueber die Property, damit

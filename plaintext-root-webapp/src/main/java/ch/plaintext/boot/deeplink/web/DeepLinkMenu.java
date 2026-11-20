@@ -16,7 +16,8 @@ import ch.plaintext.boot.menu.MenuAnnotation;
         parent = "Root",
         icon = "pi pi-link",
         roles = {"ROOT"},
-        moduleId = "deeplinks"
+        moduleId = "deeplinks",
+        menuId = "deeplinks"
 )
 public class DeepLinkMenu {
 }

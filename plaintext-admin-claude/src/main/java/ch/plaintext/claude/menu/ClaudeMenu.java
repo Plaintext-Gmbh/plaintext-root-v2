@@ -16,7 +16,8 @@ import ch.plaintext.boot.menu.MenuAnnotation;
     order = 13,
     icon = "pi pi-comments",
     roles = {"ROOT"},
-    moduleId = "claude"
+    moduleId = "claude",
+    menuId = "claude-api"
 )
 public class ClaudeMenu {
 }
