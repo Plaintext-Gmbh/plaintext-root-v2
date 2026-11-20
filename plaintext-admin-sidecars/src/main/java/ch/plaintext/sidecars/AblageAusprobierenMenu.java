@@ -13,7 +13,8 @@ import ch.plaintext.boot.menu.MenuAnnotation;
     parent = "Root",
     icon = "pi pi-folder-open",
     roles = {"ROOT"},
-    moduleId = "sidecars"
+    moduleId = "sidecars",
+    menuId = "ablage-ausprobieren"
 )
 public class AblageAusprobierenMenu {
 }

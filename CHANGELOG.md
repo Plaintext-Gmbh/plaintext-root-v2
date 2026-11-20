@@ -12,6 +12,23 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+- **ArchUnit-Regel `menuIdPflichtBeiModuleId`** (Karte 2377, Backport ROOT-4): eine Klasse mit
+  `@MenuAnnotation(moduleId=…)` braucht eine nicht-leere `menuId`; sie ist der stabile Schluessel fuer die
+  Platzierung von aussen und die Auto-Rolle. Verstoesse in Konsumenten-Repos ueber `plaintext-arch-allowlist.txt`
+  (`menu-id <Klasse>  # <Karte, Grund>`), Uebergang ein Release. Beschrieben in `docs/MENU_SYSTEM.md`.
+  Schalter `plaintext.arch.menu-id` wie `plaintext.arch.inline-js`: Vorgabe **melden** (Konsumenten-Repos werden beim
+  root-Bump nicht rot, die Verstoesse stehen im Testlog), `enforce` = rot; root selbst laeuft mit `enforce`.
+
+### Changed
+- **menuIds der root-eigenen Menueeintraege** (Karte 2377, ROOT-4): `claude-api`, `i18n`, `mailtemplate`,
+  `notifications`, `secrets`, `settings`, `setup`, `ablage-ausprobieren`, `sidecars`, `webhooks`, `misc`, `deeplinks`,
+  `cron`.
+  Nur unter `plaintext.menu.access-policy=STRICT` sichtbar: die Auto-Rollen heissen jetzt `ROLE_MENU_<MENUID>`
+  (z. B. `ROLE_MENU_SECRETS` statt `ROLE_MENU_ROOT_SECRETS`, `ROLE_MENU_I18N` statt `ROLE_MENU_ROOT_UEBERSETZUNGEN`);
+  unter der Vorgabe PERMISSIVE aendert sich nichts. Platzierungen (`plaintext.menu.platzierung.<menuId>`) nutzen die
+  neuen Ids.
+
 ## [3.59.0] - 2026-11-19
 
 ### Added

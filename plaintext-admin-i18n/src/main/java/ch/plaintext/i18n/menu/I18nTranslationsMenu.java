@@ -17,7 +17,8 @@ import ch.plaintext.boot.menu.MenuAnnotation;
     order = 10,
     icon = "pi pi-language",
     roles = {"ADMIN", "ROOT"},
-    moduleId = "i18n"
+    moduleId = "i18n",
+    menuId = "i18n"
 )
 public class I18nTranslationsMenu {
 }

@@ -15,7 +15,8 @@ import ch.plaintext.boot.menu.MenuAnnotation;
     // the menu entry only ADMIN — a pure ROOT got through Spring and was rejected by the menu
     // guard. Both places now say the same thing.
     roles = {"ADMIN", "ROOT"},
-    moduleId = "cron"
+    moduleId = "cron",
+    menuId = "cron"
 )
 public class CronMenu {
 

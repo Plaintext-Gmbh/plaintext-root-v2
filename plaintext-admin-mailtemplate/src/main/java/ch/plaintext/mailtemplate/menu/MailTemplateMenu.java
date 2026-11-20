@@ -23,7 +23,8 @@ import ch.plaintext.boot.menu.MenuAnnotation;
     order = 60,
     icon = "pi pi-envelope",
     roles = {"ADMIN", "ROOT"},
-    moduleId = "mailtemplate"
+    moduleId = "mailtemplate",
+    menuId = "mailtemplate"
 )
 public class MailTemplateMenu {
 }

@@ -17,7 +17,8 @@ import ch.plaintext.boot.menu.MenuAnnotation;
     order = 2,
     icon = "pi pi-cog",
     roles = {"ROOT"},
-    moduleId = "settings"
+    moduleId = "settings",
+    menuId = "setup"
 )
 public class SetupSubmenu {
 }

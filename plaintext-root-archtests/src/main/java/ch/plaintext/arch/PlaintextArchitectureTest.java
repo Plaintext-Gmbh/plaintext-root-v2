@@ -5,6 +5,7 @@ package ch.plaintext.arch;
 
 import ch.plaintext.PlaintextCron;
 import ch.plaintext.boot.plugins.jsf.FacesMessages;
+import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.importer.ImportOption;
@@ -117,6 +118,35 @@ public class PlaintextArchitectureTest {
                     + "(root-common) — zentrale Stelle für Null-Sicherheit ausserhalb eines "
                     + "JSF-Requests statt N leicht unterschiedlicher Kopien");
 
+    /** Fully qualified name of {@code MenuAnnotation} (string: the rule works even if interfaces is not on the classpath). */
+    private static final String MENU_ANNOTATION = "ch.plaintext.boot.menu.MenuAnnotation";
+
+    /** Rule identifier in {@code plaintext-arch-allowlist.txt} for the menuId rule. */
+    static final String MENU_ID_REGEL = "menu-id";
+
+    /**
+     * Switch for the menuId rule, like {@code plaintext.arch.inline-js}: {@code enforce} = violations fail; anything else
+     * (default) = violations are only printed. Transition of one release for consumer repos (plan ROOT-4); root itself
+     * runs with {@code enforce} (Surefire in the root POM).
+     */
+    static final String MENU_ID_SCHALTER = "plaintext.arch.menu-id";
+
+    /**
+     * Karte 2377 (Backport ROOT-4): a menu entry that belongs to a module ({@code moduleId}) needs a stable
+     * {@code menuId}. Without one the id is derived from {@code parent} + {@code title}; moving or renaming the
+     * entry would silently change the placement key ({@code plaintext.menu.platzierung.<menuId>}) and the
+     * auto-role {@code ROLE_MENU_<menuId>}. Exceptions (one release of transition for consumer repos) go into
+     * {@code plaintext-arch-allowlist.txt}: {@code menu-id <Klasse>  # <Karte, Grund>}.
+     */
+    @ArchTest
+    static final ArchRule menuIdPflichtBeiModuleId = classes()
+            .that().areAnnotatedWith(MENU_ANNOTATION)
+            .should(mitModuleIdAuchMenuIdTragen())
+            .because("die menuId ist der stabile Schluessel fuer Platzierung und Auto-Rolle; aus parent+title "
+                    + "abgeleitet aendert sie sich beim Umhaengen oder Umbenennen")
+            // Ein Modul-Repo ohne Menueeintrag ist kein Defekt.
+            .allowEmptyShould(ReactorLayout.modulRepo());
+
     // ── Conditions ─────────────────────────────────────────────────────────
 
     private static ArchCondition<JavaMethod> nurInMitAllowRawScheduledAnnotierterKlasse() {
@@ -146,5 +176,36 @@ public class PlaintextArchitectureTest {
                 }
             }
         };
+    }
+    private static ArchCondition<JavaClass> mitModuleIdAuchMenuIdTragen() {
+        return new ArchCondition<>("bei gesetzter moduleId auch eine menuId tragen") {
+            private final ArchAllowlist allowlist = ArchAllowlist.fuer(MENU_ID_REGEL);
+
+            @Override
+            public void check(JavaClass klasse, ConditionEvents events) {
+                JavaAnnotation<JavaClass> a = klasse.getAnnotationOfType(MENU_ANNOTATION);
+                String moduleId = wert(a, "moduleId");
+                String menuId = wert(a, "menuId");
+                if (!moduleId.isBlank() && menuId.isBlank() && !allowlist.erlaubt(klasse.getFullName())) {
+                    String meldung = klasse.getFullName()
+                            + " hat @MenuAnnotation(moduleId=\"" + moduleId + "\") ohne menuId. Stabile, kleine menuId vergeben "
+                            + "(z. B. \"" + moduleId + "\"); Uebergang: '" + MENU_ID_REGEL + " " + klasse.getFullName()
+                            + "  # <Karte, Grund>' in " + ArchAllowlist.DATEINAME;
+                    if (menuIdScharf()) {
+                        events.add(SimpleConditionEvent.violated(klasse, meldung));
+                    } else {
+                        System.err.println("NUR GEMELDET (" + MENU_ID_SCHALTER + " != enforce): " + meldung);
+                    }
+                }
+            }
+        };
+    }
+
+    static boolean menuIdScharf() {
+        return "enforce".equalsIgnoreCase(System.getProperty(MENU_ID_SCHALTER, "").strip());
+    }
+
+    private static String wert(JavaAnnotation<?> annotation, String name) {
+        return annotation.get(name).map(Object::toString).orElse("");
     }
 }

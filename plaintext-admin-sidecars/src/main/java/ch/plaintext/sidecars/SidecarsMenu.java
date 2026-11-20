@@ -13,7 +13,8 @@ import ch.plaintext.boot.menu.MenuAnnotation;
     parent = "Root",
     icon = "pi pi-box",
     roles = {"ROOT"},
-    moduleId = "sidecars"
+    moduleId = "sidecars",
+    menuId = "sidecars"
 )
 public class SidecarsMenu {
 }

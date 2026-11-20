@@ -15,7 +15,8 @@ import ch.plaintext.boot.menu.MenuAnnotation;
     parent = "Root",
     icon = "pi pi-lock",
     roles = {"ROOT"},
-    moduleId = "secrets"
+    moduleId = "secrets",
+    menuId = "secrets"
 )
 public class SecretsMenu {
 }
