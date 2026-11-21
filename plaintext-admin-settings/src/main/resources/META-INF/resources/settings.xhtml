@@ -99,6 +99,21 @@
 
             </p:fieldset>
 
+            <!-- Karte 2425 PR C (Entscheid chef (299)): Geheimnis eines Speichers nur schreiben, nie lesen. Es liegt im
+                 Secret-Store unter speicher.<name>.<feld>; settings bekommt nur den Verweis <feld>-secret. -->
+            <p:fieldset id="speicherGeheimnis" legend="#{i18n.t('Geheimnis eines Speichers setzen (nur schreiben)')}">
+                <p:outputLabel for="sgName" value="#{i18n.t('Speicher')}"/>
+                <p:inputText id="sgName" value="#{settingsBackingBean.speicherName}" placeholder="files" style="margin: 0 10px;"/>
+                <p:outputLabel for="sgFeld" value="#{i18n.t('Feld')}"/>
+                <p:inputText id="sgFeld" value="#{settingsBackingBean.speicherFeld}" style="margin: 0 10px;"/>
+                <p:outputLabel for="sgWert" value="#{i18n.t('Wert')}"/>
+                <p:password id="sgWert" value="#{settingsBackingBean.speicherGeheimnis}" redisplay="false" feedback="false"
+                            autocomplete="new-password" style="margin: 0 10px;"/>
+                <p:commandButton id="sgSetzen" value="#{i18n.t('Geheimnis setzen')}" icon="pi pi-lock"
+                                 actionListener="#{settingsBackingBean.speicherGeheimnisSetzen()}"
+                                 process="speicherGeheimnis" update="fm"/>
+            </p:fieldset>
+
             <p:dialog header="#{i18n.t('Einstellung Details')}" widgetVar="dlg" modal="true"
                       showEffect="fade" hideEffect="fade" styleClass="mobile-safe" id="settingDialog">
 

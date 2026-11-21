@@ -5,6 +5,7 @@ package ch.plaintext.settings.web;
 
 import ch.plaintext.boot.plugins.jsf.FacesMessages;
 import ch.plaintext.PlaintextSecurity;
+import ch.plaintext.secrets.SecretWriter;
 import ch.plaintext.settings.SettingsKeys;
 import ch.plaintext.settings.entity.Setting;
 import ch.plaintext.settings.service.ModulVorgaben;
@@ -60,10 +61,19 @@ public class SettingsBackingBean implements Serializable {
     private transient PlaintextSecurity security;
     @Autowired
     private transient ModulVorgaben vorgaben;
+    /** Karte 2425 PR C: Geheimnisse eines Speichers nur schreiben (nie lesen); fehlt ohne Secret-Store. */
+    @Autowired(required = false)
+    private transient SecretWriter secretSchreiber;
 
     private List<Setting> settings;
     private Setting selected;
     private String searchFilter;
+    /** Karte 2425 PR C: Speicher und Feld des Geheimnisses, z. B. files / passwort. */
+    private String speicherName;
+    private String speicherFeld = "passwort";
+    /** Nur schreiben: nie angezeigt, nach jedem Versuch geleert, nie in toString (Lombok erzeugt hier keines). */
+    @Getter(lombok.AccessLevel.NONE)
+    private transient String speicherGeheimnis;
     /** Karte 2425: gewählte Gruppe («root» oder eine moduleId); {@code null} = alle. */
     private String gruppe;
     private boolean root;
@@ -257,6 +267,53 @@ public class SettingsBackingBean implements Serializable {
     public boolean istVorgabe(Setting setting) {
         return setting != null && vorgaben.istVorgabe(setting.getKey());
     }
+
+    /** Für das Eingabefeld: der Wert wird nie zurückgegeben (nur schreiben, Entscheid chef (299)). */
+    public String getSpeicherGeheimnis() {
+        return null;
+    }
+
+    /**
+     * Karte 2425 PR C (Fund claude2, Entscheid chef (299)): legt ein Geheimnis des Speichers im Secret-Store unter
+     * {@code speicher.<name>.<feld>} ab und setzt in settings den Verweis {@code speicher.<name>.<feld>-secret}.
+     * Ein Speicher darf nur so benannte Secrets nutzen; vorhandene fremde Secrets kann er nicht referenzieren.
+     */
+    public void speicherGeheimnisSetzen() {
+        String wert = speicherGeheimnis;
+        speicherGeheimnis = null;
+        if (!security.ifGranted("ROLE_ROOT")) {
+            addMessage(FacesMessage.SEVERITY_ERROR, "Fehler", "Nur ROOT");
+            return;
+        }
+        String n = speicherName == null ? "" : speicherName.strip();
+        String f = speicherFeld == null ? "" : speicherFeld.strip();
+        if (!NAME.matcher(n).matches() || !NAME.matcher(f).matches()) {
+            addMessage(FacesMessage.SEVERITY_ERROR, "Fehler", "Speicher und Feld: nur a-z, 0-9 und '-'");
+            return;
+        }
+        if (wert == null || wert.isEmpty()) {
+            addMessage(FacesMessage.SEVERITY_ERROR, "Fehler", "Kein Wert angegeben");
+            return;
+        }
+        if (secretSchreiber == null) {
+            addMessage(FacesMessage.SEVERITY_ERROR, "Fehler", "Kein Secret-Store in dieser Anwendung");
+            return;
+        }
+        String secret = "speicher." + n + "." + f;
+        try {
+            secretSchreiber.store(secret, wert, "Karte 2425: Geheimnis des Speichers «" + n + "» (nur schreiben)");
+            service.setSetting(secret + "-secret", SettingsKeys.MANDAT_GLOBAL, secret, "STRING",
+                    "Karte 2425: Verweis auf das Geheimnis im Secret-Store");
+            log.info("Settings: Geheimnis {} für Speicher {} gesetzt (Wert nicht protokolliert)", secret, n);
+            addMessage(FacesMessage.SEVERITY_INFO, "Gespeichert", secret + " im Secret-Store, Verweis " + secret + "-secret in settings");
+            loadData();
+        } catch (RuntimeException e) {
+            log.warn("Settings: Geheimnis {} nicht gesetzt: {}", secret, e.getClass().getSimpleName());
+            addMessage(FacesMessage.SEVERITY_ERROR, "Fehler", "Geheimnis nicht gespeichert");
+        }
+    }
+
+    private static final java.util.regex.Pattern NAME = java.util.regex.Pattern.compile("[a-z0-9][a-z0-9-]*");
 
     public List<String> getValueTypes() {
         return List.of("STRING", "INTEGER", "BOOLEAN", "DATE", "LIST");

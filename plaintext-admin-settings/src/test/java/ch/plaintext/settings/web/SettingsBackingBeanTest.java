@@ -290,6 +290,38 @@ class SettingsBackingBeanTest {
         assertThat(bean.getFilteredSettings()).hasSize(2);
     }
 
+    /** Karte 2425 PR C (Entscheid chef (299)): Speicher-Geheimnis nur schreiben, nur unter speicher.<name>.<feld>. */
+    @Test
+    void speicherGeheimnisNurSchreibenImEigenenNamensraum() {
+        ch.plaintext.secrets.SecretWriter w = org.mockito.Mockito.mock(ch.plaintext.secrets.SecretWriter.class);
+        bean.setSecretSchreiber(w);
+        org.mockito.Mockito.when(security.ifGranted("ROLE_ROOT")).thenReturn(true);
+        bean.setSpeicherName("files");
+        bean.setSpeicherFeld("passwort");
+        bean.setSpeicherGeheimnis("geheim-pw");
+        bean.speicherGeheimnisSetzen();
+        org.mockito.Mockito.verify(w).store(org.mockito.ArgumentMatchers.eq("speicher.files.passwort"),
+                org.mockito.ArgumentMatchers.eq("geheim-pw"), org.mockito.ArgumentMatchers.anyString());
+        org.mockito.Mockito.verify(service).setSetting(org.mockito.ArgumentMatchers.eq("speicher.files.passwort-secret"),
+                org.mockito.ArgumentMatchers.eq("global"), org.mockito.ArgumentMatchers.eq("speicher.files.passwort"),
+                org.mockito.ArgumentMatchers.eq("STRING"), org.mockito.ArgumentMatchers.anyString());
+        assertThat(bean.getSpeicherGeheimnis()).as("nie lesbar").isNull();
+
+        bean.setSpeicherName("../x");
+        bean.setSpeicherGeheimnis("y");
+        bean.speicherGeheimnisSetzen();
+        bean.setSpeicherName("files");
+        bean.setSpeicherFeld("a.b");
+        bean.setSpeicherGeheimnis("y");
+        bean.speicherGeheimnisSetzen();
+        org.mockito.Mockito.when(security.ifGranted("ROLE_ROOT")).thenReturn(false);
+        bean.setSpeicherFeld("passwort");
+        bean.setSpeicherGeheimnis("y");
+        bean.speicherGeheimnisSetzen();
+        org.mockito.Mockito.verify(w, org.mockito.Mockito.times(1)).store(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
     /** Karte 2425: Auswahl nach Gruppe (Präfix gleich moduleId, sonst root), zusammen mit der Suche. */
     @Test
     void getFilteredSettingsFiltertNachGruppe() {
