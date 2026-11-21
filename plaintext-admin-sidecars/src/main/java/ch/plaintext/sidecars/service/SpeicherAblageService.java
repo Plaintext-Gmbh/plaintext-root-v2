@@ -273,7 +273,7 @@ public class SpeicherAblageService implements DateiAblagenRegister {
     }
 
     /** Eigener Klon je Adresse und Zweig: ändert sich eins davon, wird nicht im alten weitergearbeitet. */
-    private static String kennung(String s) {
+    static String kennung(String s) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(s.getBytes(StandardCharsets.UTF_8)), 0, 6);
         } catch (NoSuchAlgorithmException e) {

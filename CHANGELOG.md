@@ -12,6 +12,15 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+- **Benannte Speicher** (Karte 2425, PR A, Auftrag Daniel):
+  - Neue Schnittstelle `DateiAblageArt` (root-interfaces): eine Speicher-Art mit Namen (`art()`) öffnet eine `DateiAblage` aus Einstellungen. Jede Anwendung kann eigene Arten als Bean beitragen (z. B. das Inventar eine Art für seinen Code-Service).
+  - Arten in root: `lokal` (root-common, Unterordner `pfad` unter `plaintext.ablagen.lokal.basis`), `nextcloud` und `git` (sidecars, dieselben Klassen wie unter Root > Sidecars).
+  - Ablagen per Name in der `application.yml`: `plaintext.speicher.<name>.art` plus die Einstellungen der Art. Geheimnisse stehen dort nie: `passwort-secret` nennt den Namen im Secret-Store.
+  - Das Register, das Module bekommen (`DateiAblagenRegister`, jetzt `KonfigurierteAblagenRegister` in root-common, `@Primary`), führt die yml-Ablagen mit Root > Sidecars zusammen; bei gleichem Namen gilt die yml (WARN). Eine unbekannte Art oder eine nicht nutzbare Ablage ergibt ein leeres Ergebnis mit Log-Zeile, kein Startabbruch.
+  - Damit hat auch eine Anwendung ohne sidecars (z. B. das Inventar) ein Register.
+  - **Achtung für Anwendungen:** Ein eigenes `DateiAblagenRegister` (z. B. `DemoAblagenRegister` oder ein Test-Register) bleibt eine Quelle und wird mit zusammengeführt. Es darf aber **nicht** `@Primary` sein, sonst gibt es zwei primäre Beans (`NoUniqueBeanDefinitionException`).
+
 ## [3.64.0] - 2026-11-21
 
 ### Added

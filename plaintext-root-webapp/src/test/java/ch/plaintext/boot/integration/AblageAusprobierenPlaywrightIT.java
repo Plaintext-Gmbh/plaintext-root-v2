@@ -30,7 +30,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
@@ -117,8 +116,8 @@ class AblageAusprobierenPlaywrightIT {
 
     @TestConfiguration
     static class AblageKonfiguration {
+        /** Karte 2425: eine Quelle unter mehreren; das Register von root (@Primary) führt sie mit Sidecars zusammen. */
         @Bean
-        @Primary
         DateiAblagenRegister testAblagen() {
             return new DateiAblagenRegister() {
                 @Override public List<String> namen() { return List.of("pw-speicher"); }
