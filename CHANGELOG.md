@@ -12,6 +12,15 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+- **Speicher-Konfiguration in settings** (Karte 2425, PR C, Entscheid Daniel (284) 1):
+  - Die Ablagen aus `plaintext.speicher.<name>` stehen auch in settings, Mandant `global`, unter `speicher.<name>.<einstellung>` (z. B. `speicher.files.art`, `speicher.files.pfad`). Beim Start schreibt root die yml-Werte als **fehlende** Vorgaben dorthin und überschreibt nie.
+  - Danach gilt je Einstellung der Wert aus settings, bei jedem Öffnen gelesen, also ohne Neustart. ROOT kann in settings auch einen neuen Speicher anlegen (`speicher.<name>.art` und die Einstellungen der Art).
+  - Geheimnisse nie in settings: Ein Schlüssel `passwort`, `token`, `secret` … wird nicht nach settings geschrieben, und ein Speicher mit einem solchen Schlüssel (aus yml oder settings) wird abgewiesen. Der Verweis heisst `passwort-secret` (Name im Secret-Store).
+  - **Secret-Verweise nur im eigenen Namensraum** (Fund claude2, Entscheid chef (299)): Ein `…-secret` muss auf `speicher.<name>.<feld>` zeigen, sonst bleibt der Speicher aus. So kann niemand über settings ein beliebiges vorhandenes Secret an einen fremden Host schicken.
+  - Settings-Seite: «Geheimnis eines Speichers setzen (nur schreiben)» legt den Wert über `SecretWriter` unter `speicher.<name>.<feld>` ab und setzt den Verweis `speicher.<name>.<feld>-secret`. Der Wert wird nie angezeigt.
+  - Ohne settings in der Anwendung gilt nur die yml.
+
 ## [3.66.0] - 2026-11-21
 
 ### Added

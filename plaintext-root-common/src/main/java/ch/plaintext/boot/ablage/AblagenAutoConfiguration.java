@@ -5,6 +5,7 @@ package ch.plaintext.boot.ablage;
 
 import ch.plaintext.ablagen.DateiAblageArt;
 import ch.plaintext.ablagen.DateiAblagenRegister;
+import ch.plaintext.settings.ISettingsService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -42,10 +43,11 @@ public class AblagenAutoConfiguration {
     @Bean
     @Primary
     public KonfigurierteAblagenRegister konfigurierteAblagenRegister(Environment env, ObjectProvider<DateiAblageArt> arten,
-                                                                     ObjectProvider<DateiAblagenRegister> weitere) {
+                                                                     ObjectProvider<DateiAblagenRegister> weitere,
+                                                                     ObjectProvider<ISettingsService> settings) {
         ResolvableType text = ResolvableType.forClass(String.class);
         Bindable<Map<String, Map<String, String>>> typ = Bindable.of(ResolvableType.forClassWithGenerics(Map.class, text,
                 ResolvableType.forClassWithGenerics(Map.class, String.class, String.class)));
-        return new KonfigurierteAblagenRegister(Binder.get(env).bind("plaintext.speicher", typ).orElse(Map.of()), arten, weitere);
+        return new KonfigurierteAblagenRegister(Binder.get(env).bind("plaintext.speicher", typ).orElse(Map.of()), arten, weitere, settings);
     }
 }

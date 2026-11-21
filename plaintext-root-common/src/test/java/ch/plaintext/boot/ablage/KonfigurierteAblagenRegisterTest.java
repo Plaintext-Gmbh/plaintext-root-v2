@@ -6,6 +6,7 @@ package ch.plaintext.boot.ablage;
 import ch.plaintext.ablagen.DateiAblage;
 import ch.plaintext.ablagen.DateiAblageArt;
 import ch.plaintext.ablagen.DateiAblagenRegister;
+import ch.plaintext.settings.ISettingsService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -72,6 +73,86 @@ class KonfigurierteAblagenRegisterTest {
                     assertThat(r.ablage("doku").orElseThrow().name()).isEqualTo("doku:/a");
                     assertThat(r.ablage("db").orElseThrow().name()).as("yml gewinnt").isEqualTo("db:null");
                     assertThat(r.ablage("sidecar").orElseThrow().name()).isEqualTo("aus-sidecars");
+                });
+    }
+
+    /** Karte 2425 PR C: yml als Vorgabe nach settings, danach gilt settings; neue Ablage nur in settings. */
+    @Test
+    void settingsUeberschreibtYmlUndLegtAn(@TempDir Path basis) {
+        Map<String, String> db = new java.util.concurrent.ConcurrentHashMap<>();
+        ISettingsService settings = mock(ISettingsService.class);
+        when(settings.exists(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq("global")))
+                .thenAnswer(i -> db.containsKey(i.<String>getArgument(0)));
+        org.mockito.Mockito.doAnswer(i -> db.put(i.getArgument(0), i.getArgument(2))).when(settings)
+                .setSetting(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq("global"),
+                        org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.anyString());
+        when(settings.getChildKeys("speicher", "global")).thenAnswer(i -> List.copyOf(db.keySet()));
+        when(settings.getString(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq("global")))
+                .thenAnswer(i -> db.get(i.<String>getArgument(0)));
+        runner.withBean(ISettingsService.class, () -> settings)
+                .withPropertyValues("plaintext.ablagen.lokal.basis=" + basis, "plaintext.speicher.files.art=lokal",
+                        "plaintext.speicher.files.pfad=files", "plaintext.speicher.files.passwort=nie")
+                .run(ctx -> {
+                    KonfigurierteAblagenRegister r = ctx.getBean(KonfigurierteAblagenRegister.class);
+                    assertThat(r.vorgabenNachSettings()).isEqualTo(2);
+                    assertThat(db).containsEntry("speicher.files.art", "lokal").containsEntry("speicher.files.pfad", "files")
+                            .doesNotContainKey("speicher.files.passwort");
+                    assertThat(r.vorgabenNachSettings()).as("nie überschreiben").isZero();
+                    db.put("speicher.files.pfad", "neu");
+                    db.put("speicher.extra.art", "lokal");
+                    db.put("speicher.extra.pfad", "extra");
+                    assertThat(r.namen()).containsExactly("extra", "files");
+                    // files hat noch passwort aus der yml und wird darum abgewiesen; extra kommt nur aus settings
+                    assertThat(r.ablage("files")).isEmpty();
+                    r.ablage("extra").orElseThrow().schreibe("x.txt", new byte[]{1}, null);
+                    assertThat(basis.resolve("extra/x.txt")).exists();
+                });
+        runner.withBean(ISettingsService.class, () -> settings)
+                .withPropertyValues("plaintext.ablagen.lokal.basis=" + basis, "plaintext.speicher.files.art=lokal",
+                        "plaintext.speicher.files.pfad=files")
+                .run(ctx -> {
+                    ctx.getBean(KonfigurierteAblagenRegister.class).ablage("files").orElseThrow().schreibe("y.txt", new byte[]{1}, null);
+                    assertThat(basis.resolve("neu/y.txt")).as("Pfad aus settings gilt").exists();
+                });
+    }
+
+    /**
+     * Fund claude2 / Entscheid chef (299): ein Speicher kann über settings kein fremdes Secret an einen fremden Host
+     * schicken. Die Art wird mit einem fremden Verweis gar nicht erst aufgerufen; nur speicher.<name>.* gilt.
+     */
+    @Test
+    void keinAbflussEinesFremdenSecrets() {
+        java.util.List<Map<String, String>> geoeffnet = new java.util.concurrent.CopyOnWriteArrayList<>();
+        DateiAblageArt netz = new DateiAblageArt() {
+            @Override
+            public String art() {
+                return "netz";
+            }
+
+            @Override
+            public DateiAblage oeffne(String name, Map<String, String> konfig) {
+                geoeffnet.add(konfig);   // hier würde eine echte Art das Secret auflösen und senden
+                return benannt(name);
+            }
+        };
+        runner.withBean("netz", DateiAblageArt.class, () -> netz)
+                .withPropertyValues("plaintext.speicher.boese.art=netz", "plaintext.speicher.boese.url=https://fremd.example",
+                        "plaintext.speicher.boese.passwort-secret=nextcloud-app",
+                        "plaintext.speicher.quer.art=netz", "plaintext.speicher.quer.url=https://fremd.example",
+                        "plaintext.speicher.quer.Passwort-Secret=speicher.gut.passwort",
+                        "plaintext.speicher.trick.art=netz", "plaintext.speicher.trick.passwort-secret=speicher.trick",
+                        "plaintext.speicher.gut.art=netz", "plaintext.speicher.gut.url=https://cloud.example",
+                        "plaintext.speicher.gut.passwort-secret=speicher.gut.passwort")
+                .run(ctx -> {
+                    DateiAblagenRegister r = ctx.getBean(DateiAblagenRegister.class);
+                    assertThat(r.ablage("boese")).as("beliebiges vorhandenes Secret").isEmpty();
+                    assertThat(r.ablage("quer")).as("Secret eines anderen Speichers").isEmpty();
+                    assertThat(r.ablage("trick")).as("nur der Präfix ohne Feld").isEmpty();
+                    assertThat(geoeffnet).as("die Art sah keinen fremden Verweis").isEmpty();
+                    assertThat(r.ablage("gut")).isPresent();
+                    assertThat(geoeffnet).singleElement().satisfies(k ->
+                            assertThat(k).containsEntry("passwort-secret", "speicher.gut.passwort"));
                 });
     }
 
