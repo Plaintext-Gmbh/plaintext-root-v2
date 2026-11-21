@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.68.0] - 2026-11-21
+
 ### Fixed
 - **Verbrauchter Bestätigungs- oder Reset-Link zeigt sofort «Link ungültig»** (Karte 2410): `GET /register/verify` und `GET /password-reset/confirm` zeigten bisher immer das Passwortformular; erst das Absenden meldete «Link ungültig». Jetzt prüfen beide den Link beim Aufruf (`tokenGueltig`: vorhanden, nicht verbraucht, `expiresAt > now`, wie das atomare `consumeToken`, ohne ihn zu verbrauchen) und zeigen sonst gleich die bekannte Seite «Link ungültig».
 
