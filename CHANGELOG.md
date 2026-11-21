@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.63.0] - 2026-11-21
+
 ### Added
 - **Lader: Quellen aus der Oberflaeche** (Karte 2408, Teil 1, Variante A nach chef (227)):
   - Neben `auswahl.yaml` darf `quellen-ui.txt` stehen. Erlaubt ist dieselbe Syntax wie in `module-quellen.txt`, aber nur `https` und ohne `anmeldung-env` und `eingebettet`. Die Datei enthält nie ein Passwort.
