@@ -281,6 +281,12 @@
             </dependency>
             <dependency>
                 <groupId>ch.plaintext.v2</groupId>
+                <artifactId>plaintext-root-tablesettings</artifactId>
+                <classifier>ohne-taglib</classifier>
+                <version>${plaintext-root.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.plaintext.v2</groupId>
                 <artifactId>plaintext-root-menu</artifactId>
                 <version>${plaintext-root.version}</version>
             </dependency>
