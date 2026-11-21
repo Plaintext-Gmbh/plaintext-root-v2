@@ -7,6 +7,7 @@ import ch.plaintext.boot.plugins.jsf.FacesMessages;
 import ch.plaintext.PlaintextSecurity;
 import ch.plaintext.settings.SettingsKeys;
 import ch.plaintext.settings.entity.Setting;
+import ch.plaintext.settings.service.ModulVorgaben;
 import ch.plaintext.settings.service.SettingsServiceImpl;
 import jakarta.faces.application.FacesMessage;
 import jakarta.faces.context.FacesContext;
@@ -57,10 +58,14 @@ public class SettingsBackingBean implements Serializable {
     private transient SettingsServiceImpl service;
     @Autowired
     private transient PlaintextSecurity security;
+    @Autowired
+    private transient ModulVorgaben vorgaben;
 
     private List<Setting> settings;
     private Setting selected;
     private String searchFilter;
+    /** Karte 2425: gewählte Gruppe («root» oder eine moduleId); {@code null} = alle. */
+    private String gruppe;
     private boolean root;
 
     /**
@@ -198,11 +203,13 @@ public class SettingsBackingBean implements Serializable {
     }
 
     public List<Setting> getFilteredSettings() {
+        List<Setting> inGruppe = gruppe == null || gruppe.isBlank() || settings == null ? settings
+                : settings.stream().filter(s -> gruppe.equals(vorgaben.gruppe(s.getKey()))).toList();
         if (searchFilter == null || searchFilter.trim().isEmpty()) {
-            return settings;
+            return inGruppe;
         }
         String filter = searchFilter.toLowerCase();
-        return settings.stream()
+        return inGruppe.stream()
                 .filter(s -> s.getKey().toLowerCase().contains(filter) ||
                            (s.getValue() != null && s.getValue().toLowerCase().contains(filter)) ||
                            (s.getDescription() != null && s.getDescription().toLowerCase().contains(filter)))
@@ -239,6 +246,16 @@ public class SettingsBackingBean implements Serializable {
      */
     public boolean istGlobal(Setting setting) {
         return setting != null && SettingsKeys.MANDAT_GLOBAL.equals(setting.getMandat());
+    }
+
+    /** Karte 2425: «root» und je registriertes Modul seine moduleId, für die Auswahl über der Tabelle. */
+    public List<String> getGruppen() {
+        return vorgaben.gruppen();
+    }
+
+    /** Karte 2425: ob die Zeile eine Vorgabe eines Moduls ist (Markierung; persönliche Werte wie files.ablauf.* nicht). */
+    public boolean istVorgabe(Setting setting) {
+        return setting != null && vorgaben.istVorgabe(setting.getKey());
     }
 
     public List<String> getValueTypes() {
