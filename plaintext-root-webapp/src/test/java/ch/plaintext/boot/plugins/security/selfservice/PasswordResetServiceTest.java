@@ -211,6 +211,27 @@ class PasswordResetServiceTest {
         assertTrue(stored.matches("[0-9a-f]{64}"));
     }
 
+    /** Karte 2410: lesende Prüfung wie consumeToken, verbraucht nichts. */
+    @Test
+    void tokenGueltigNurUnverbrauchtUndNichtAbgelaufen() {
+        PasswordResetToken frisch = newToken("u@x", "default", Duration.ofHours(1));
+        PasswordResetToken alt = newToken("u@x", "default", Duration.ofHours(-1));
+        PasswordResetToken verbraucht = newToken("u@x", "default", Duration.ofHours(1));
+        verbraucht.setConsumedAt(Instant.now());
+        when(tokenRepository.findByTokenHash(SelfServiceTokenHash.sha256Hex("frisch"))).thenReturn(Optional.of(frisch));
+        when(tokenRepository.findByTokenHash(SelfServiceTokenHash.sha256Hex("alt"))).thenReturn(Optional.of(alt));
+        when(tokenRepository.findByTokenHash(SelfServiceTokenHash.sha256Hex("verbraucht"))).thenReturn(Optional.of(verbraucht));
+        when(tokenRepository.findByTokenHash(SelfServiceTokenHash.sha256Hex("unbekannt"))).thenReturn(Optional.empty());
+
+        assertTrue(service.tokenGueltig("frisch"));
+        assertFalse(service.tokenGueltig("alt"));
+        assertFalse(service.tokenGueltig("verbraucht"));
+        assertFalse(service.tokenGueltig("unbekannt"));
+        assertFalse(service.tokenGueltig(" "));
+        assertFalse(service.tokenGueltig(null));
+        verify(tokenRepository, never()).consumeToken(anyString(), any(Instant.class));
+    }
+
     private static PasswordResetToken newToken(String username, String mandat, Duration ttl) {
         PasswordResetToken t = new PasswordResetToken();
         t.setTokenHash("anyhash");
