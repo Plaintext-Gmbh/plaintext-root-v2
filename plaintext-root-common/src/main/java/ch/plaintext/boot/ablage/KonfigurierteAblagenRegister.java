@@ -7,8 +7,12 @@ import ch.plaintext.ablagen.DateiAblage;
 import ch.plaintext.ablagen.DateiAblageArt;
 import ch.plaintext.ablagen.DateiAblagenRegister;
 import ch.plaintext.modules.ModulApiUmsetzung;
+import ch.plaintext.settings.ISettingsService;
+import ch.plaintext.settings.SettingsKeys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -25,6 +29,11 @@ import java.util.stream.Stream;
  * Karte 2425: das Register, das Module bekommen ({@code @Primary}). Es führt die Ablagen aus der
  * {@code application.yml} ({@code plaintext.speicher.<name>.art} und Einstellungen der Art) mit denen weiterer
  * Register zusammen (Root &gt; Sidecars, DB). Bei gleichem Namen gilt die yml (WARN im Log).
+ *
+ * <p>Karte 2425 PR C (Entscheid Daniel (284) 1): Die Konfiguration steht auch in settings, Mandant {@code global},
+ * unter {@code speicher.<name>.<einstellung>}. Beim Start schreibt {@link #vorgabenNachSettings()} die yml-Ablagen
+ * als fehlende Vorgaben dorthin; danach gilt je Einstellung der Wert aus settings (bei jedem Öffnen gelesen, kein
+ * Neustart). ROOT kann dort auch eine Ablage neu anlegen. Geheimnisse nie: dieselbe Klartext-Prüfung wie für die yml.</p>
  *
  * <p>Eine unbekannte Art oder eine Ablage, die sich nicht öffnen lässt, ergibt ein leeres {@link Optional} mit einer
  * Log-Zeile; die Anwendung startet trotzdem, wie bei einer kaputten Ablage unter Sidecars.</p>
@@ -45,20 +54,76 @@ public class KonfigurierteAblagenRegister implements DateiAblagenRegister {
     private final Map<String, Map<String, String>> eintraege;
     private final ObjectProvider<DateiAblageArt> arten;
     private final ObjectProvider<DateiAblagenRegister> weitere;
+    private final ObjectProvider<ISettingsService> settings;
+    static final String PRAEFIX = "speicher";
     /** Namensgleichheit nur einmal je Name melden (Hinweis claude2). */
     private final Set<String> gewarnt = ConcurrentHashMap.newKeySet();
 
     public KonfigurierteAblagenRegister(Map<String, Map<String, String>> eintraege, ObjectProvider<DateiAblageArt> arten,
-                                        ObjectProvider<DateiAblagenRegister> weitere) {
+                                        ObjectProvider<DateiAblagenRegister> weitere, ObjectProvider<ISettingsService> settings) {
         this.eintraege = new LinkedHashMap<>();
         eintraege.forEach((n, k) -> this.eintraege.put(n.strip(), Map.copyOf(k)));
         this.arten = arten;
         this.weitere = weitere;
+        this.settings = settings;
+    }
+
+    /** yml, darüber je Einstellung settings ({@code speicher.<name>.<einstellung>}, Mandant global). */
+    Map<String, Map<String, String>> aktuell() {
+        Map<String, Map<String, String>> out = new LinkedHashMap<>();
+        eintraege.forEach((n, k) -> out.put(n, new LinkedHashMap<>(k)));
+        ISettingsService s = settings.getIfAvailable();
+        if (s == null) {
+            return out;
+        }
+        try {
+            for (String key : s.getChildKeys(PRAEFIX, SettingsKeys.MANDAT_GLOBAL)) {
+                String[] t = key.split("\\.", 3);
+                if (t.length == 3 && PRAEFIX.equals(t[0]) && !t[1].isBlank() && !t[2].isBlank()) {
+                    String wert = s.getString(key, SettingsKeys.MANDAT_GLOBAL);
+                    out.computeIfAbsent(t[1], x -> new LinkedHashMap<>()).put(t[2], wert == null ? "" : wert);
+                }
+            }
+        } catch (RuntimeException e) {
+            log.warn("Speicher: settings nicht lesbar, es gilt die application.yml: {}", e.getMessage());
+        }
+        return out;
+    }
+
+    /** Beim Start: die yml-Ablagen als fehlende Vorgaben nach settings; nie überschreiben, nie ein Geheimnis. */
+    @EventListener(ApplicationReadyEvent.class)
+    public int vorgabenNachSettings() {
+        ISettingsService s = settings.getIfAvailable();
+        int neu = 0;
+        if (s == null) {
+            return neu;
+        }
+        for (Map.Entry<String, Map<String, String>> e : eintraege.entrySet()) {
+            for (Map.Entry<String, String> k : e.getValue().entrySet()) {
+                if (KLARTEXT.contains(k.getKey().strip().toLowerCase(Locale.ROOT))) {
+                    continue;   // ablage() weist den Speicher ohnehin ab und meldet es
+                }
+                String key = PRAEFIX + "." + e.getKey() + "." + k.getKey();
+                try {
+                    if (!s.exists(key, SettingsKeys.MANDAT_GLOBAL)) {
+                        s.setSetting(key, SettingsKeys.MANDAT_GLOBAL, k.getValue(), "STRING",
+                                "Karte 2425: Speicher «" + e.getKey() + "», Vorgabe aus der application.yml");
+                        neu++;
+                    }
+                } catch (RuntimeException ex) {
+                    log.warn("Speicher: Vorgabe {} nicht nach settings geschrieben: {}", key, ex.getMessage());
+                }
+            }
+        }
+        if (neu > 0) {
+            log.info("Speicher: {} Vorgabe(n) aus der application.yml nach settings geschrieben", neu);
+        }
+        return neu;
     }
 
     @Override
     public List<String> namen() {
-        TreeSet<String> n = new TreeSet<>(eintraege.keySet());
+        TreeSet<String> n = new TreeSet<>(aktuell().keySet());
         andere().forEach(r -> n.addAll(r.namen()));
         return List.copyOf(n);
     }
@@ -66,13 +131,13 @@ public class KonfigurierteAblagenRegister implements DateiAblagenRegister {
     @Override
     public Optional<DateiAblage> ablage(String name) {
         String n = name == null ? "" : name.strip();
-        Map<String, String> konfig = eintraege.get(n);
+        Map<String, String> konfig = aktuell().get(n);
         if (konfig == null) {
             return andere().map(r -> r.ablage(n)).flatMap(Optional::stream).findFirst();
         }
         if (!gewarnt.contains(n) && andere().anyMatch(r -> r.namen().contains(n))) {
             gewarnt.add(n);
-            log.warn("Speicher «{}» steht in der application.yml und unter Sidecars; es gilt die application.yml", n);
+            log.warn("Speicher «{}» steht in der application.yml oder settings und unter Sidecars; es gelten yml und settings", n);
         }
         String art = konfig.getOrDefault(ART, "").strip();
         Optional<String> klartext = konfig.keySet().stream()

@@ -19,6 +19,11 @@ exhaustive.
   - `ModuleDescriptor.einstellungen()` (neu, Vorgabe leer) meldet die Vorgaben eines Moduls als `Vorgabe(schluessel, wert, typ, beschreibung)`. Beim Start schreibt admin-settings (`ModulVorgaben`) jede **fehlende** nach Mandant `global`; ein vorhandener Wert wird nie überschrieben.
   - Ein Schlüssel muss mit `<moduleId>.` beginnen; sonst, oder wenn er wie ein Geheimnis heisst (`…passwort`, `…token`, `…secret`), wird er mit einer Log-Zeile übergangen.
   - Settings-Seite: Auswahl «Gruppe» über der Tabelle. Die Gruppe ist der Teil des Schlüssels vor dem ersten Punkt, wenn er eine `moduleId` ist, sonst «root». Vorgaben eines Moduls sind als «Vorgabe des Moduls» markiert; andere Schlüssel derselben Gruppe (z. B. persönliche Werte) nicht.
+- **Speicher-Konfiguration in settings** (Karte 2425, PR C, Entscheid Daniel (284) 1):
+  - Die Ablagen aus `plaintext.speicher.<name>` stehen auch in settings, Mandant `global`, unter `speicher.<name>.<einstellung>` (z. B. `speicher.files.art`, `speicher.files.pfad`). Beim Start schreibt root die yml-Werte als **fehlende** Vorgaben dorthin und überschreibt nie.
+  - Danach gilt je Einstellung der Wert aus settings, bei jedem Öffnen gelesen, also ohne Neustart. ROOT kann in settings auch einen neuen Speicher anlegen (`speicher.<name>.art` und die Einstellungen der Art).
+  - Geheimnisse nie in settings: Ein Schlüssel `passwort`, `token`, `secret` … wird nicht nach settings geschrieben, und ein Speicher mit einem solchen Schlüssel (aus yml oder settings) wird abgewiesen. Der Verweis heisst `passwort-secret` (Name im Secret-Store).
+  - Ohne settings in der Anwendung gilt nur die yml.
 
 ## [3.65.0] - 2026-11-21
 
