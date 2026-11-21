@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.67.0] - 2026-11-21
+
 ### Added
 - **Speicher-Konfiguration in settings** (Karte 2425, PR C, Entscheid Daniel (284) 1):
   - Die Ablagen aus `plaintext.speicher.<name>` stehen auch in settings, Mandant `global`, unter `speicher.<name>.<einstellung>` (z. B. `speicher.files.art`, `speicher.files.pfad`). Beim Start schreibt root die yml-Werte als **fehlende** Vorgaben dorthin und überschreibt nie.
