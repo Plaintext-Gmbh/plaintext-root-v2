@@ -56,6 +56,15 @@ public class KonfigurierteAblagenRegister implements DateiAblagenRegister {
     private final ObjectProvider<DateiAblagenRegister> weitere;
     private final ObjectProvider<ISettingsService> settings;
     static final String PRAEFIX = "speicher";
+    /** Verweise auf den Secret-Store enden so, z. B. {@code passwort-secret}. */
+    static final String SECRET_VERWEIS = "-secret";
+
+    /** Ob {@code verweis} ein Secret dieses Speichers nennt: {@code speicher.<name>.<feld>} (Entscheid chef (299)). */
+    static boolean eigenesSecret(String name, String verweis) {
+        String v = verweis == null ? "" : verweis.strip();
+        String vorsatz = PRAEFIX + "." + name + ".";
+        return v.startsWith(vorsatz) && v.length() > vorsatz.length() && !v.substring(vorsatz.length()).contains("..");
+    }
     /** Namensgleichheit nur einmal je Name melden (Hinweis claude2). */
     private final Set<String> gewarnt = ConcurrentHashMap.newKeySet();
 
@@ -145,6 +154,18 @@ public class KonfigurierteAblagenRegister implements DateiAblagenRegister {
         if (klartext.isPresent()) {   // Hinweis claude2: abweisen statt still uebergehen; der Wert erscheint nie im Log
             log.warn("Speicher «{}»: Einstellung «{}» ist nicht erlaubt, Geheimnisse nur über passwort-secret (Secret-Store)",
                     n, klartext.get());
+            return Optional.empty();
+        }
+        // Fund claude2, Entscheid chef (299): ein Speicher darf nur Secrets im eigenen Namensraum speicher.<name>.*
+        // referenzieren. Sonst koennte ROOT ueber settings (url + Verweis) ein beliebiges vorhandenes Secret als
+        // Anmeldung an einen fremden Host schicken.
+        Optional<String> fremd = konfig.entrySet().stream()
+                .filter(e -> e.getKey().strip().toLowerCase(Locale.ROOT).endsWith(SECRET_VERWEIS))
+                .filter(e -> !eigenesSecret(n, e.getValue()))
+                .map(Map.Entry::getKey).findFirst();
+        if (fremd.isPresent()) {
+            log.warn("Speicher «{}»: {} darf nur auf ein Secret «{}.{}.…» zeigen; der Speicher bleibt aus", n, fremd.get(),
+                    PRAEFIX, n);
             return Optional.empty();
         }
         Optional<DateiAblageArt> a = arten.orderedStream().filter(x -> x.art().equals(art)).findFirst();

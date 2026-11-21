@@ -117,6 +117,45 @@ class KonfigurierteAblagenRegisterTest {
                 });
     }
 
+    /**
+     * Fund claude2 / Entscheid chef (299): ein Speicher kann über settings kein fremdes Secret an einen fremden Host
+     * schicken. Die Art wird mit einem fremden Verweis gar nicht erst aufgerufen; nur speicher.<name>.* gilt.
+     */
+    @Test
+    void keinAbflussEinesFremdenSecrets() {
+        java.util.List<Map<String, String>> geoeffnet = new java.util.concurrent.CopyOnWriteArrayList<>();
+        DateiAblageArt netz = new DateiAblageArt() {
+            @Override
+            public String art() {
+                return "netz";
+            }
+
+            @Override
+            public DateiAblage oeffne(String name, Map<String, String> konfig) {
+                geoeffnet.add(konfig);   // hier würde eine echte Art das Secret auflösen und senden
+                return benannt(name);
+            }
+        };
+        runner.withBean("netz", DateiAblageArt.class, () -> netz)
+                .withPropertyValues("plaintext.speicher.boese.art=netz", "plaintext.speicher.boese.url=https://fremd.example",
+                        "plaintext.speicher.boese.passwort-secret=nextcloud-app",
+                        "plaintext.speicher.quer.art=netz", "plaintext.speicher.quer.url=https://fremd.example",
+                        "plaintext.speicher.quer.Passwort-Secret=speicher.gut.passwort",
+                        "plaintext.speicher.trick.art=netz", "plaintext.speicher.trick.passwort-secret=speicher.trick",
+                        "plaintext.speicher.gut.art=netz", "plaintext.speicher.gut.url=https://cloud.example",
+                        "plaintext.speicher.gut.passwort-secret=speicher.gut.passwort")
+                .run(ctx -> {
+                    DateiAblagenRegister r = ctx.getBean(DateiAblagenRegister.class);
+                    assertThat(r.ablage("boese")).as("beliebiges vorhandenes Secret").isEmpty();
+                    assertThat(r.ablage("quer")).as("Secret eines anderen Speichers").isEmpty();
+                    assertThat(r.ablage("trick")).as("nur der Präfix ohne Feld").isEmpty();
+                    assertThat(geoeffnet).as("die Art sah keinen fremden Verweis").isEmpty();
+                    assertThat(r.ablage("gut")).isPresent();
+                    assertThat(geoeffnet).singleElement().satisfies(k ->
+                            assertThat(k).containsEntry("passwort-secret", "speicher.gut.passwort"));
+                });
+    }
+
     @Configuration
     static class Weitere {
         /** Wie eine Art, die eine Anwendung selbst beiträgt (z.B. das Inventar); kein Geheimnis in konfig. */
