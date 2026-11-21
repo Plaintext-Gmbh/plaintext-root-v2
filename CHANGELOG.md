@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.62.0] - 2026-11-21
+
 ### Fixed
 - **pt:-Tags fehlten in root-v2-Apps** (Karte 2411): `plaintext-root-tablesettings` bringt eine eigene Taglib im
   Namensraum `http://plaintext.ch/ui` mit (nur `tableSettings`). Mojarra fuehrt Taglibs mit gleichem Namensraum nicht
