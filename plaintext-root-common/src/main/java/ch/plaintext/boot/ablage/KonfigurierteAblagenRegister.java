@@ -13,6 +13,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -74,7 +75,8 @@ public class KonfigurierteAblagenRegister implements DateiAblagenRegister {
             log.warn("Speicher «{}» steht in der application.yml und unter Sidecars; es gilt die application.yml", n);
         }
         String art = konfig.getOrDefault(ART, "").strip();
-        Optional<String> klartext = konfig.keySet().stream().filter(KLARTEXT::contains).findFirst();
+        Optional<String> klartext = konfig.keySet().stream()
+                .filter(k -> KLARTEXT.contains(k.strip().toLowerCase(Locale.ROOT))).findFirst();
         if (klartext.isPresent()) {   // Hinweis claude2: abweisen statt still uebergehen; der Wert erscheint nie im Log
             log.warn("Speicher «{}»: Einstellung «{}» ist nicht erlaubt, Geheimnisse nur über passwort-secret (Secret-Store)",
                     n, klartext.get());

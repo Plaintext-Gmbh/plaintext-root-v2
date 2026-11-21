@@ -49,9 +49,11 @@ class KonfigurierteAblagenRegisterTest {
                 assertThat(ctx.getBean(DateiAblagenRegister.class).ablage("ohne")).isEmpty());
         runner.withPropertyValues("plaintext.ablagen.lokal.basis=" + basis, "plaintext.speicher.fremd.art=codeservice",
                 "plaintext.speicher.raus.art=lokal", "plaintext.speicher.raus.pfad=../x",
-                "plaintext.speicher.klar.art=lokal", "plaintext.speicher.klar.pfad=k", "plaintext.speicher.klar.passwort=pw").run(ctx -> {
+                "plaintext.speicher.klar.art=lokal", "plaintext.speicher.klar.pfad=k", "plaintext.speicher.klar.passwort=pw",
+                "plaintext.speicher.gross.art=lokal", "plaintext.speicher.gross.pfad=g", "plaintext.speicher.gross[Token]=t").run(ctx -> {
             DateiAblagenRegister r = ctx.getBean(DateiAblagenRegister.class);
             assertThat(r.ablage("klar")).as("Geheimnis im Klartext wird abgewiesen").isEmpty();
+            assertThat(r.ablage("gross")).as("auch gross geschrieben").isEmpty();
             assertThat(r.ablage("fremd")).isEmpty();
             assertThat(r.ablage("raus")).isEmpty();
             assertThat(r.ablage("gibtsnicht")).isEmpty();
