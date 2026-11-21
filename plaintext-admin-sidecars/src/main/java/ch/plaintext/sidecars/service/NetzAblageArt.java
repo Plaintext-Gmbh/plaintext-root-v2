@@ -32,8 +32,8 @@ import java.util.Set;
         hinweise = {"Settings: url, benutzer, pfad, passwort-secret (name in the secret store); git also zweig",
                 "The address must be public or allowed in plaintext.ausgehend.erlaubte-hosts",
                 "A missing secret makes opening fail; the value never appears in a message"},
-        beispiele = {"plaintext.speicher.ablage: {art: nextcloud, url: https://cloud.example.ch, benutzer: app, pfad: /Apps, "
-                + "passwort-secret: nextcloud-app}"})
+        beispiele = {"plaintext.speicher.ablage with art nextcloud, url https://cloud.example.ch, benutzer app, pfad /Apps "
+                + "and the name of the password in the secret store"})
 public class NetzAblageArt implements DateiAblageArt {
 
     public static final String NEXTCLOUD = "nextcloud";
