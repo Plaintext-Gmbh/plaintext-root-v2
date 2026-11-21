@@ -15,7 +15,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 /**
@@ -36,10 +38,14 @@ import java.util.stream.Stream;
 public class KonfigurierteAblagenRegister implements DateiAblagenRegister {
 
     static final String ART = "art";
+    /** Entscheid Daniel (284): Geheimnisse nie im Klartext, nur als Verweis ({@code passwort-secret}) in den Secret-Store. */
+    static final Set<String> KLARTEXT = Set.of("passwort", "password", "token", "secret", "app-passwort");
 
     private final Map<String, Map<String, String>> eintraege;
     private final ObjectProvider<DateiAblageArt> arten;
     private final ObjectProvider<DateiAblagenRegister> weitere;
+    /** Namensgleichheit nur einmal je Name melden (Hinweis claude2). */
+    private final Set<String> gewarnt = ConcurrentHashMap.newKeySet();
 
     public KonfigurierteAblagenRegister(Map<String, Map<String, String>> eintraege, ObjectProvider<DateiAblageArt> arten,
                                         ObjectProvider<DateiAblagenRegister> weitere) {
@@ -63,10 +69,17 @@ public class KonfigurierteAblagenRegister implements DateiAblagenRegister {
         if (konfig == null) {
             return andere().map(r -> r.ablage(n)).flatMap(Optional::stream).findFirst();
         }
-        if (andere().anyMatch(r -> r.namen().contains(n))) {
+        if (!gewarnt.contains(n) && andere().anyMatch(r -> r.namen().contains(n))) {
+            gewarnt.add(n);
             log.warn("Speicher «{}» steht in der application.yml und unter Sidecars; es gilt die application.yml", n);
         }
         String art = konfig.getOrDefault(ART, "").strip();
+        Optional<String> klartext = konfig.keySet().stream().filter(KLARTEXT::contains).findFirst();
+        if (klartext.isPresent()) {   // Hinweis claude2: abweisen statt still uebergehen; der Wert erscheint nie im Log
+            log.warn("Speicher «{}»: Einstellung «{}» ist nicht erlaubt, Geheimnisse nur über passwort-secret (Secret-Store)",
+                    n, klartext.get());
+            return Optional.empty();
+        }
         Optional<DateiAblageArt> a = arten.orderedStream().filter(x -> x.art().equals(art)).findFirst();
         if (a.isEmpty()) {
             log.warn("Speicher «{}»: Art «{}» unbekannt (vorhanden: {})", n, art,
