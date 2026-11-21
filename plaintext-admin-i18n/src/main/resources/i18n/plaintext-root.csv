@@ -712,6 +712,18 @@ Alle Gruppen;it;Tutti i gruppi
 Vorgabe des Moduls;en;Module default
 Vorgabe des Moduls;fr;Valeur par défaut du module
 Vorgabe des Moduls;it;Predefinito del modulo
+Geheimnis eines Speichers setzen (nur schreiben);en;Set a store secret (write only)
+Geheimnis eines Speichers setzen (nur schreiben);fr;Définir le secret d'un stockage (écriture seule)
+Geheimnis eines Speichers setzen (nur schreiben);it;Imposta il segreto di un archivio (solo scrittura)
+Speicher;en;Store
+Speicher;fr;Stockage
+Speicher;it;Archivio
+Feld;en;Field
+Feld;fr;Champ
+Feld;it;Campo
+Geheimnis setzen;en;Set secret
+Geheimnis setzen;fr;Définir le secret
+Geheimnis setzen;it;Imposta segreto
 Einstellung wirklich löschen?;en;Really delete this setting?
 Einstellung wirklich löschen?;fr;Supprimer vraiment ce paramètre?
 Einstellung wirklich löschen?;it;Eliminare davvero questa impostazione?
