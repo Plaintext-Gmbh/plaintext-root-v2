@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.64.0] - 2026-11-21
+
 ### Added
 - **Laufzeit-Module: Quelle per JSON aus modules** (Karte 2408, Teil 2):
   - Auf «Laufzeit-Module» kann ROOT das JSON `plaintext-modul-quelle/1` (Seite «Meine Zugänge» auf modules) einfügen. Geprüft wird streng: unbekannte Felder werden abgewiesen, `index` nur https, Ed25519-Schlüssel, und der Index muss mit dem Zugang abrufbar sein und mindestens ein Modul mit gültiger Signatur enthalten.
