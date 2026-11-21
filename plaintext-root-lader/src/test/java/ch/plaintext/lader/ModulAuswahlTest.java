@@ -476,6 +476,88 @@ class ModulAuswahlTest {
         assertThat(namen(starten())).containsExactly("plaintext-z-a-1.0.0.jar");
     }
 
+    // ------------------------------------------------------------------ Karte 2408: Quellen aus der Oberflaeche
+
+    /** Schreibt quellen-ui.txt (Schluessel + https-Registry) und, wenn gewuenscht, das Vorgeladene der App. */
+    private Path uiQuelle(String name, boolean vorgeladen, byte[] jar) throws IOException {
+        Files.writeString(dir.resolve(ModulAuswahl.QUELLEN_UI), "schluessel ed25519 "
+                + Base64.getEncoder().encodeToString(schluessel.getPublic().getEncoded())
+                + "\nregistry " + name + " https://modules.example.invalid/nosec/k/index.txt\n");
+        Path v = dir.resolve(ModulAuswahl.VORBEREITET).resolve(name);
+        if (vorgeladen) {
+            Files.createDirectories(v.resolve("jars"));
+            Files.write(v.resolve("jars/plaintext-z-a-1.0.0.jar"), jar);
+            Files.writeString(v.resolve(ModulAuswahl.EINGEBETTET_INDEX), String.join("\n", index));
+        }
+        return v;
+    }
+
+    private void auswahlAus(String registry) throws IOException {
+        Files.writeString(dir.resolve(ModulAuswahl.AUSWAHL), ModulAuswahl.auswahlText(
+                List.of(new ModulAuswahl.Wahl("plaintext-z-a", "1.0.0", registry)), "Test"));
+    }
+
+    @Test
+    void uiQuelleLaedtOhneNetzAusDemVorgeladenen() throws Exception {
+        modul("plaintext-z-a", "1.0.0", "1.770.0", A1);
+        Files.writeString(konfig.resolve(ModulAuswahl.QUELLEN), "# ohne Schluessel: der kommt aus quellen-ui.txt\n");
+        uiQuelle("kunde", true, A1);
+        server.stop(0); // die https-Adresse ist ohnehin nicht erreichbar: es darf kein Netz brauchen
+        auswahlAus("kunde");
+
+        assertThat(namen(starten())).containsExactly("plaintext-z-a-1.0.0.jar");
+        assertThat(status()).containsEntry("ergebnis", "OK");
+        assertThat(cache()).contains("plaintext-z-a-1.0.0.jar");
+    }
+
+    @Test
+    void vorgeladenesJarAusgetauschtWirdAbgelehnt() throws Exception {
+        modul("plaintext-z-a", "1.0.0", "1.770.0", A1);
+        uiQuelle("kunde", true, A2);
+        auswahlAus("kunde");
+
+        assertThat(starten()).isEmpty();
+        assertThat(status().get("grund")).contains("passt nicht zur signierten Zeile");
+    }
+
+    @Test
+    void ersterStartOhneVorgeladenesMeldetStattAbzubrechen() throws Exception {
+        modul("plaintext-z-a", "1.0.0", "1.770.0", A1);
+        uiQuelle("kunde", false, A1);
+        auswahlAus("kunde");
+
+        assertThat(starten()).isEmpty();
+        assertThat(status()).containsEntry("ergebnis", "OHNE-MODULE");
+        assertThat(status().get("grund")).contains("kunde");
+    }
+
+    @Test
+    void kaputteUiQuellenKippenDenStartNicht() throws Exception {
+        modul("plaintext-z-a", "1.0.0", "1.770.0", A1);
+        Files.writeString(dir.resolve(ModulAuswahl.QUELLEN_UI), "das ist keine Quelle\n");
+        auswahl("plaintext-z-a", "1.0.0");
+
+        assertThat(namen(starten())).containsExactly("plaintext-z-a-1.0.0.jar");
+    }
+
+    @Test
+    void uiQuelleNurHttpsOhneAnmeldungUndDateiQuelleHatVorrang() throws Exception {
+        ModulAuswahl.Quellen datei = ModulAuswahl.quellenLesen(konfig.resolve(ModulAuswahl.QUELLEN));
+        Files.writeString(dir.resolve(ModulAuswahl.QUELLEN_UI), "registry kunde http://x.example/index.txt\n");
+        assertThatThrownBy(() -> ModulAuswahl.mitUiQuellen(datei, dir)).hasMessageContaining("nur mit https");
+        Files.writeString(dir.resolve(ModulAuswahl.QUELLEN_UI), "registry kunde https://x.example/index.txt anmeldung-env=X\n");
+        assertThatThrownBy(() -> ModulAuswahl.mitUiQuellen(datei, dir)).hasMessageContaining("Secret-Store");
+        Files.writeString(dir.resolve(ModulAuswahl.QUELLEN_UI), "eingebettet ueberschreibbar\n");
+        assertThatThrownBy(() -> ModulAuswahl.mitUiQuellen(datei, dir)).hasMessageContaining("nur in");
+
+        Files.writeString(dir.resolve(ModulAuswahl.QUELLEN_UI), "registry test https://x.example/index.txt\n"
+                + "registry kunde https://x.example/index.txt\n");
+        List<ModulAuswahl.Registry> r = ModulAuswahl.mitUiQuellen(datei, dir).registries();
+        assertThat(r).extracting(ModulAuswahl.Registry::name).containsExactly("test", "kunde");
+        assertThat(r.get(0).url().toString()).isEqualTo(url()); // module-quellen.txt gewinnt
+        assertThat(r.get(1).url()).isEqualTo(dir.resolve("vorbereitet/kunde/index.txt").toUri());
+    }
+
     @Test
     void festesImageEinbettenUndStartenOhneRegistry() throws Exception {
         modul("plaintext-z-a", "1.0.0", "1.770.0", A1);

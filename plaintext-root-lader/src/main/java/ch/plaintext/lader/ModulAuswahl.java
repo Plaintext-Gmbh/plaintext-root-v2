@@ -54,6 +54,10 @@ public final class ModulAuswahl {
     public static final String STAND = "stand.txt";
     public static final String STATUS = "status.txt";
     public static final String QUELLEN = "module-quellen.txt";
+    /** Karte 2408: Quellen aus der Oberflaeche (neben {@code auswahl.yaml}, schreibt die App; nie ein Passwort darin). */
+    public static final String QUELLEN_UI = "quellen-ui.txt";
+    /** Karte 2408: von der App vorgeladen, je UI-Quelle {@code <name>/index.txt} (signierte Zeilen) und deren Jars. */
+    public static final String VORBEREITET = "vorbereitet";
     public static final String KONFIG_ENV = "PLAINTEXT_KONFIG_VERZEICHNIS";
     public static final String STANDARD_KONFIG = "/data/config";
     public static final String EINGEBETTET_ENV = "PLAINTEXT_MODULE_EINGEBETTET";
@@ -199,6 +203,42 @@ public final class ModulAuswahl {
             }
         }
         return new Quellen(List.copyOf(schluessel), List.copyOf(registries), ueberschreibbar);
+    }
+
+    /**
+     * Karte 2408 (Entscheid chef (227), Variante A): haengt die Quellen aus {@code quellen-ui.txt} im Modulverzeichnis
+     * an. Deren Zugang liegt im Secret-Store der App, die beim Speichern Index und Jars holt, prueft und unter
+     * {@code vorbereitet/<name>/} ablegt; der Lader liest darum nie das Netz, sondern dieses Verzeichnis als
+     * file:-Registry (je Slot in den eigenen Cache, sha256 und Signatur wie bei jeder Registry). Fehlt es (erster
+     * Start, nicht vorgeladen), gilt der bestehende Weg: Meldung in status.txt, letzter guter Stand.
+     * Bei gleichem Namen gilt {@code module-quellen.txt}.
+     */
+    public static Quellen mitUiQuellen(Quellen datei, Path auswahlVerzeichnis) throws IOException {
+        Path ui = auswahlVerzeichnis.resolve(QUELLEN_UI);
+        if (!Files.isRegularFile(ui)) {
+            return datei;
+        }
+        Quellen u = quellenLesen(ui);
+        if (u.eingebettetUeberschreibbar()) {
+            throw new IllegalArgumentException(ui + ": 'eingebettet ueberschreibbar' nur in " + QUELLEN);
+        }
+        List<PublicKey> schluessel = new ArrayList<>(datei.schluessel());
+        schluessel.addAll(u.schluessel());
+        List<Registry> registries = new ArrayList<>(datei.registries());
+        for (Registry r : u.registries()) {
+            if (r.anmeldungEnv() != null || !"https".equals(r.url().getScheme())) {
+                throw new IllegalArgumentException(ui + ": Registry '" + r.name()
+                        + "' nur mit https und ohne anmeldung-env (der Zugang liegt im Secret-Store der App)");
+            }
+            if (registries.stream().anyMatch(d -> d.name().equals(r.name()))) {
+                System.out.println("[modul-lader] Quelle '" + r.name() + "' aus " + QUELLEN_UI + " ignoriert: "
+                        + QUELLEN + " hat eine gleichnamige");
+                continue;
+            }
+            registries.add(new Registry(r.name(),
+                    auswahlVerzeichnis.resolve(VORBEREITET).resolve(r.name()).resolve(EINGEBETTET_INDEX).toUri()));
+        }
+        return new Quellen(List.copyOf(schluessel), List.copyOf(registries), datei.eingebettetUeberschreibbar());
     }
 
     /** Eine {@code registry}-Zeile mit Format-, Adress- und Doppelungspruefung ({@code t[0]} ist "registry"). */

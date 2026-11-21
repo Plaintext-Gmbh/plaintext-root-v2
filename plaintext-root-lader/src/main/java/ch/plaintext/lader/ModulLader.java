@@ -168,9 +168,19 @@ public final class ModulLader {
             if (hatEingebettet) {
                 log("eingebettete Module uebersteuert: Laufzeit-Auswahl gilt ('eingebettet ueberschreibbar')");
             }
-            return auswahlLaden(q, auswahl);
+            return auswahlLaden(mitUiQuellen(q), auswahl);
         }
         return konfigLaden();
+    }
+
+    /** Karte 2408: eine kaputte {@code quellen-ui.txt} (schreibt die App) darf den Start nie kippen: ohne sie weiter. */
+    private ModulAuswahl.Quellen mitUiQuellen(ModulAuswahl.Quellen q) {
+        try {
+            return ModulAuswahl.mitUiQuellen(q, auswahlVerzeichnis);
+        } catch (Exception ex) {
+            log(ModulAuswahl.QUELLEN_UI + " unlesbar (" + ex.getMessage() + "): ohne Quellen aus der Oberflaeche");
+            return q;
+        }
     }
 
     /** Der {@code module.yaml}-Weg (ohne Auswahl, und Karte 1618 als Rueckfall beim ersten Start). */

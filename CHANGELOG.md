@@ -12,6 +12,16 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+- **Lader: Quellen aus der Oberflaeche** (Karte 2408, Teil 1, Variante A nach chef (227)):
+  - Neben `auswahl.yaml` darf `quellen-ui.txt` stehen. Erlaubt ist dieselbe Syntax wie in `module-quellen.txt`, aber nur `https` und ohne `anmeldung-env` und `eingebettet`. Die Datei enthält nie ein Passwort.
+  - Der Zugang liegt im Secret-Store der App. Die App lädt beim Speichern Index und Jars nach `vorbereitet/<name>/` (`index.txt` mit signierten Zeilen samt Jars).
+  - Der Lader liest dieses Verzeichnis als `file:`-Registry, also ohne Netz und ohne Passwort. Signatur und sha256 prüft er wie bei jeder Registry, je Slot in den eigenen Cache.
+  - Bei gleichem Namen gilt `module-quellen.txt`.
+  - **Erster Start ohne Vorgeladenes:** kein Absturz. `status.txt` nennt die Quelle, dann gilt der letzte gute Stand, ohne ihn `module.yaml`, ohne beide ein Start ohne Module.
+  - Eine unlesbare `quellen-ui.txt` wird mit einer Log-Zeile übergangen.
+  - Die Oberfläche (JSON einfügen, Secret, Vorladen) folgt in Teil 2 (admin-modules).
+
 ## [3.62.0] - 2026-11-21
 
 ### Fixed
