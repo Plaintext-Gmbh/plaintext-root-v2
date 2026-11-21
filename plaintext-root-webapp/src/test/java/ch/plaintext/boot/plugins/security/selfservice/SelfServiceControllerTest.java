@@ -58,6 +58,26 @@ class SelfServiceControllerTest {
                 eigeneAdresse, plaintextBaseurl);
     }
 
+    /** Karte 2410: ein verbrauchter oder abgelaufener Link zeigt beim Aufruf gleich «Link ungültig», kein Formular. */
+    @Test
+    void verbrauchterLinkZeigtGleichLinkUngueltig() {
+        SelfServiceController c = controller(null);
+        when(registrationService.tokenGueltig("alt")).thenReturn(false);
+        when(registrationService.tokenGueltig("frisch")).thenReturn(true);
+        when(passwordResetService.tokenGueltig("alt")).thenReturn(false);
+        when(passwordResetService.tokenGueltig("frisch")).thenReturn(true);
+
+        String reg = c.registerVerifyForm("alt", request).getBody();
+        org.assertj.core.api.Assertions.assertThat(reg).contains("Link ungültig").doesNotContain("type=\"password\"");
+        org.assertj.core.api.Assertions.assertThat(c.registerVerifyForm("frisch", request).getBody())
+                .contains("Passwort wählen").contains("type=\"password\"");
+
+        String res = c.resetConfirmForm("alt", request).getBody();
+        org.assertj.core.api.Assertions.assertThat(res).contains("Link ungültig").doesNotContain("type=\"password\"");
+        org.assertj.core.api.Assertions.assertThat(c.resetConfirmForm("frisch", request).getBody())
+                .contains("Neues Passwort wählen").contains("type=\"password\"");
+    }
+
     @Test
     void resetLinkNimmtDieKonfigurierteAdresse_nichtDenRequest() {
         ReflectionTestUtils.setField(eigeneAdresse, "ausKonfiguration", "https://app.plaintext.ch/");

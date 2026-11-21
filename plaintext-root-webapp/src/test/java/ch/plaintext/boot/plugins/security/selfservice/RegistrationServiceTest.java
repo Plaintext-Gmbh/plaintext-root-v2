@@ -170,6 +170,27 @@ class RegistrationServiceTest {
         verify(tokenRepository).consumeToken(anyString(), any(Instant.class));
     }
 
+    /** Karte 2410: lesende Prüfung wie consumeToken, verbraucht nichts. */
+    @Test
+    void tokenGueltigNurUnverbrauchtUndNichtAbgelaufen() {
+        RegistrationToken frisch = newToken("u@x", "default", Duration.ofHours(1));
+        RegistrationToken alt = newToken("u@x", "default", Duration.ofHours(-1));
+        RegistrationToken verbraucht = newToken("u@x", "default", Duration.ofHours(1));
+        verbraucht.setConsumedAt(Instant.now());
+        when(tokenRepository.findByTokenHash(SelfServiceTokenHash.sha256Hex("frisch"))).thenReturn(Optional.of(frisch));
+        when(tokenRepository.findByTokenHash(SelfServiceTokenHash.sha256Hex("alt"))).thenReturn(Optional.of(alt));
+        when(tokenRepository.findByTokenHash(SelfServiceTokenHash.sha256Hex("verbraucht"))).thenReturn(Optional.of(verbraucht));
+        when(tokenRepository.findByTokenHash(SelfServiceTokenHash.sha256Hex("unbekannt"))).thenReturn(Optional.empty());
+
+        assertTrue(service.tokenGueltig("frisch"));
+        assertFalse(service.tokenGueltig("alt"));
+        assertFalse(service.tokenGueltig("verbraucht"));
+        assertFalse(service.tokenGueltig("unbekannt"));
+        assertFalse(service.tokenGueltig(" "));
+        assertFalse(service.tokenGueltig(null));
+        verify(tokenRepository, never()).consumeToken(anyString(), any(Instant.class));
+    }
+
     private static RegistrationToken newToken(String email, String mandat, Duration ttl) {
         RegistrationToken t = new RegistrationToken();
         t.setTokenHash("anyhash");

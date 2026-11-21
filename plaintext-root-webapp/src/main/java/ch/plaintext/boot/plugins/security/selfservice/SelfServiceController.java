@@ -95,6 +95,10 @@ public class SelfServiceController {
     @GetMapping(value = "/register/verify", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> registerVerifyForm(@RequestParam("token") String token,
                                                      HttpServletRequest request) {
+        // Karte 2410: ein verbrauchter oder abgelaufener Link zeigt gleich «Link ungültig», nicht erst nach dem Absenden.
+        if (!registrationService.tokenGueltig(token)) {
+            return registrierungLinkUngueltig();
+        }
         return html(page("Passwort setzen", """
                 <form method="post" action="/register/verify" class="card">
                   <h1>Passwort wählen</h1>
@@ -114,14 +118,7 @@ public class SelfServiceController {
         RegistrationService.RegistrationResult result =
                 registrationService.completeRegistration(token, password);
         if (!result.ok()) {
-            return html(page("Fehler", """
-                    <div class="card">
-                      <h1>Link ungültig</h1>
-                      <p>Der Verifikationslink ist abgelaufen oder bereits verbraucht.
-                      Bitte starten Sie die Registrierung neu.</p>
-                      <p class="subtle"><a href="/register">Erneut registrieren</a></p>
-                    </div>
-                    """));
+            return registrierungLinkUngueltig();
         }
         return html(page("Konto angelegt", """
                 <div class="card">
@@ -166,6 +163,10 @@ public class SelfServiceController {
     @GetMapping(value = "/password-reset/confirm", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> resetConfirmForm(@RequestParam("token") String token,
                                                    HttpServletRequest request) {
+        // Karte 2410: wie bei der Registrierung - ungültiger Link sofort, ohne Formular.
+        if (!passwordResetService.tokenGueltig(token)) {
+            return resetLinkUngueltig();
+        }
         return html(page("Neues Passwort", """
                 <form method="post" action="/password-reset/confirm" class="card">
                   <h1>Neues Passwort wählen</h1>
@@ -185,14 +186,7 @@ public class SelfServiceController {
         PasswordResetService.ResetResult result =
                 passwordResetService.completeReset(token, password);
         if (!result.ok()) {
-            return html(page("Fehler", """
-                    <div class="card">
-                      <h1>Link ungültig</h1>
-                      <p>Der Reset-Link ist abgelaufen oder bereits verbraucht.
-                      Bitte fordern Sie einen neuen an.</p>
-                      <p class="subtle"><a href="/password-reset">Neuen Link anfordern</a></p>
-                    </div>
-                    """));
+            return resetLinkUngueltig();
         }
         return html(page("Passwort gespeichert", """
                 <div class="card">
@@ -204,6 +198,28 @@ public class SelfServiceController {
     }
 
     // ---------- Helpers ----------
+
+    private ResponseEntity<String> registrierungLinkUngueltig() {
+        return html(page("Fehler", """
+                <div class="card">
+                  <h1>Link ungültig</h1>
+                  <p>Der Verifikationslink ist abgelaufen oder bereits verbraucht.
+                  Bitte starten Sie die Registrierung neu.</p>
+                  <p class="subtle"><a href="/register">Erneut registrieren</a></p>
+                </div>
+                """));
+    }
+
+    private ResponseEntity<String> resetLinkUngueltig() {
+        return html(page("Fehler", """
+                <div class="card">
+                  <h1>Link ungültig</h1>
+                  <p>Der Reset-Link ist abgelaufen oder bereits verbraucht.
+                  Bitte fordern Sie einen neuen an.</p>
+                  <p class="subtle"><a href="/password-reset">Neuen Link anfordern</a></p>
+                </div>
+                """));
+    }
 
     /**
      * Hidden CSRF input field for the HTML POST forms. Without this field Spring Security rejects
