@@ -22,7 +22,7 @@
 
                 <div style="margin-bottom: 10px;">
                     <!-- Karte 2425: Gruppe = Schlüssel-Präfix gleich moduleId, sonst «root» (Entscheid Daniel (284)). -->
-                    <p:selectOneMenu id="gruppe" value="#{settingsBackingBean.gruppe}" style="margin-right: 10px;">
+                    <p:selectOneMenu id="gruppe" value="#{settingsBackingBean.gruppe}">
                         <f:selectItem itemLabel="#{i18n.t('Alle Gruppen')}" itemValue="#{null}" noSelectionOption="true"/>
                         <f:selectItems value="#{settingsBackingBean.gruppen}"/>
                         <p:ajax update="tbl" process="@this"/>
