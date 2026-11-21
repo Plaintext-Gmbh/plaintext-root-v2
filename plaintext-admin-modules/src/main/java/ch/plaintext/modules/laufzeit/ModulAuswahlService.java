@@ -7,7 +7,10 @@ import ch.plaintext.PlaintextSecurity;
 import ch.plaintext.audit.DestructiveActionAuditService;
 import ch.plaintext.lader.ModulAuswahl;
 import ch.plaintext.lader.ModulLader;
+import ch.plaintext.secrets.SecretResolver;
+import ch.plaintext.secrets.SecretWriter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.context.ApplicationContext;
@@ -19,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -72,6 +76,24 @@ public class ModulAuswahlService {
     private final Path konfigVerzeichnis;
     /** Karte 1618: hier liegt auswahl.yaml (gemeinsam fuer beide Slots); ohne Angabe das Modulverzeichnis. */
     private final Path auswahlVerzeichnis;
+    /** Karte 2408: Zugang der UI-Quellen; optional wie bei jedem Verbraucher des Secret-Stores. */
+    private SecretResolver secretLeser;
+    private SecretWriter secretSchreiber;
+
+    @Autowired(required = false)
+    void setSecretLeser(SecretResolver r) {
+        this.secretLeser = r;
+    }
+
+    @Autowired(required = false)
+    void setSecretSchreiber(SecretWriter w) {
+        this.secretSchreiber = w;
+    }
+
+    /** Karte 2408: Datei- und UI-Quellen zusammen, so wie der Lader sie beim Start sieht (Datei zuerst). */
+    record Gesamt(ModulAuswahl.Angebot angebot, List<PublicKey> schluessel, List<String> registryNamen,
+                  List<UiQuellen.Quelle> ui, Map<String, String> zugaenge, String quellenFehler) {
+    }
 
     public ModulAuswahlService(PlaintextSecurity security, DestructiveActionAuditService audit, ApplicationContext kontext,
                                @Value("${" + ModulLader.VERZEICHNIS_ENV + ":" + ModulLader.STANDARD_VERZEICHNIS + "}")
@@ -99,21 +121,11 @@ public class ModulAuswahlService {
             throw new SecurityException("Laufzeit-Module: nur ROOT");
         }
         ModulLader.Huelle huelle = huelle();
-        String quellenFehler = null;
-        List<String> registryNamen = new ArrayList<>();
-        ModulAuswahl.Angebot angebot = new ModulAuswahl.Angebot(List.of(), Map.of());
-        List<java.security.PublicKey> schluessel = List.of();
-        try {
-            ModulAuswahl.Quellen q = ModulAuswahl.quellenLesen(konfigVerzeichnis.resolve(ModulAuswahl.QUELLEN));
-            schluessel = q.schluessel();
-            q.registries().forEach(r -> registryNamen.add(r.name()));
-            if (q.registries().isEmpty()) {
-                quellenFehler = "keine Registry in " + konfigVerzeichnis.resolve(ModulAuswahl.QUELLEN);
-            }
-            angebot = ModulAuswahl.angebot(konfigVerzeichnis);
-        } catch (RuntimeException ex) {
-            quellenFehler = ex.getMessage();
-        }
+        Gesamt gesamt = gesamt();
+        String quellenFehler = gesamt.quellenFehler();
+        List<String> registryNamen = gesamt.registryNamen();
+        ModulAuswahl.Angebot angebot = gesamt.angebot();
+        List<java.security.PublicKey> schluessel = gesamt.schluessel();
         String auswahlFehler = null;
         Map<String, ModulAuswahl.Wahl> gewaehlt = new LinkedHashMap<>();
         try {
@@ -173,8 +185,9 @@ public class ModulAuswahlService {
     /** Schreibt die Auswahl; jedes Modul muss im Angebot stehen, die Version dort oder {@code latest}. */
     public synchronized List<ModulAuswahl.Wahl> speichern(List<ModulAuswahl.Wahl> neu) throws IOException {
         nurRoot();
+        Gesamt g = gesamt();
         Map<String, List<ModulAuswahl.Zeile>> angebot = new LinkedHashMap<>();
-        ModulAuswahl.angebot(konfigVerzeichnis).zeilen().stream().filter(ModulAuswahl.Zeile::istModul)
+        g.angebot().zeilen().stream().filter(ModulAuswahl.Zeile::istModul)
                 .forEach(z -> angebot.computeIfAbsent(z.name(), n -> new ArrayList<>()).add(z));
         for (ModulAuswahl.Wahl w : neu) {
             List<ModulAuswahl.Zeile> v = angebot.get(w.name());
@@ -192,6 +205,7 @@ public class ModulAuswahlService {
                 throw new IllegalArgumentException("'" + w.name() + "' " + w.version() + " steht " + wo);
             }
         }
+        vorladen(neu, g);
         List<ModulAuswahl.Wahl> alt = nachsichtig();
         String text = ModulAuswahl.auswahlText(neu, "geschrieben von der Seite Laufzeit-Module (Karte 1608), "
                 + security.getUser());
@@ -225,6 +239,152 @@ public class ModulAuswahlService {
         }, "modul-auswahl-neustart");
         t.setDaemon(false);
         t.start();
+    }
+
+    // ------------------------------------------------------------------------------------------- UI-Quellen (Karte 2408)
+
+    /** Quellen aus der Oberflaeche (ohne Zugang), fuer die Seite. */
+    public List<UiQuellen.Quelle> uiQuellen() throws IOException {
+        nurRoot();
+        return UiQuellen.lesen(auswahlVerzeichnis.resolve(ModulAuswahl.QUELLEN_UI));
+    }
+
+    /**
+     * JSON von modules uebernehmen: pruefen, Index mit dem Zugang abrufen (mindestens eine gueltig signierte Zeile),
+     * Zugang in den Secret-Store, Quelle (ohne Zugang) nach quellen-ui.txt. Gleicher Name ersetzt die Quelle.
+     */
+    public synchronized UiQuellen.Quelle quelleAnlegen(String json) throws IOException {
+        nurRoot();
+        return uebernehmen(UiQuellen.lesen(json));
+    }
+
+    /** Nach der Formatpruefung (dort auch: nur https). */
+    UiQuellen.Quelle uebernehmen(UiQuellen.Eingabe e) throws IOException {
+        nurRoot();
+        if (secretSchreiber == null) {
+            throw new IllegalStateException("kein Secret-Store in dieser App (plaintext-admin-secrets): Quellen aus der Oberflaeche gehen nicht");
+        }
+        if (dateiQuellen().stream().anyMatch(r -> r.name().equals(e.name()))) {
+            throw new IllegalArgumentException("'" + e.name() + "' steht schon in " + ModulAuswahl.QUELLEN + " (anderen Namen waehlen)");
+        }
+        UiQuellen.Quelle q = new UiQuellen.Quelle(e.name(), e.index(), UiQuellen.schluesselBase64(e.schluessel()));
+        String zugang = e.benutzer() + ":" + e.passwort();
+        ModulAuswahl.Angebot probe = ModulAuswahl.angebot(List.of(q.registry()), Map.of(q.name(), zugang));
+        if (!probe.fehler().isEmpty()) {
+            throw new IllegalArgumentException("Index nicht abrufbar: " + probe.fehler().get(q.name()));
+        }
+        PublicKey k = UiQuellen.schluessel(q.schluessel());
+        if (probe.zeilen().stream().noneMatch(z -> z.istModul() && ModulAuswahl.signaturGueltig(z, List.of(k)))) {
+            throw new IllegalArgumentException("Index ohne Modul mit gueltiger Signatur dieses Schluessels");
+        }
+        secretSchreiber.store(UiQuellen.SECRET_PRAEFIX + q.name(), zugang, "Karte 2408: Zugang der Modul-Quelle " + q.name());
+        List<UiQuellen.Quelle> alle = new ArrayList<>(UiQuellen.lesen(auswahlVerzeichnis.resolve(ModulAuswahl.QUELLEN_UI)));
+        alle.removeIf(x -> x.name().equals(q.name()));
+        alle.add(q);
+        Files.createDirectories(auswahlVerzeichnis);
+        atomar(auswahlVerzeichnis.resolve(ModulAuswahl.QUELLEN_UI), UiQuellen.text(alle, security.getUser()));
+        protokoll("MODUL_QUELLE_ANLEGEN", q.name() + " " + q.index(), "Zugang im Secret-Store " + UiQuellen.SECRET_PRAEFIX + q.name());
+        return q;
+    }
+
+    /** Quelle entfernen: aus quellen-ui.txt, Vorgeladenes und Zugang weg. Wirksam nach «Neu starten». */
+    public synchronized void quelleEntfernen(String name) throws IOException {
+        nurRoot();
+        List<UiQuellen.Quelle> alle = new ArrayList<>(UiQuellen.lesen(auswahlVerzeichnis.resolve(ModulAuswahl.QUELLEN_UI)));
+        if (!alle.removeIf(x -> x.name().equals(name))) {
+            throw new IllegalArgumentException("keine Quelle '" + name + "'");
+        }
+        atomar(auswahlVerzeichnis.resolve(ModulAuswahl.QUELLEN_UI), UiQuellen.text(alle, security.getUser()));
+        ModulAuswahl.loeschen(auswahlVerzeichnis.resolve(ModulAuswahl.VORBEREITET).resolve(name));
+        if (secretSchreiber != null) {
+            secretSchreiber.remove(UiQuellen.SECRET_PRAEFIX + name);
+        }
+        protokoll("MODUL_QUELLE_ENTFERNEN", name, "Vorgeladenes und Zugang entfernt");
+    }
+
+    private List<ModulAuswahl.Registry> dateiQuellen() {
+        try {
+            return ModulAuswahl.quellenLesen(konfigVerzeichnis.resolve(ModulAuswahl.QUELLEN)).registries();
+        } catch (IOException | RuntimeException ex) {
+            return List.of();
+        }
+    }
+
+    /** Datei-Quellen wie bisher, dazu die UI-Quellen mit Zugang aus dem Secret-Store (gleicher Name: Datei gewinnt). */
+    Gesamt gesamt() throws IOException {
+        String fehler = null;
+        List<PublicKey> schluessel = new ArrayList<>();
+        List<String> namen = new ArrayList<>();
+        ModulAuswahl.Angebot datei = new ModulAuswahl.Angebot(List.of(), Map.of());
+        try {
+            ModulAuswahl.Quellen q = ModulAuswahl.quellenLesen(konfigVerzeichnis.resolve(ModulAuswahl.QUELLEN));
+            schluessel.addAll(q.schluessel());
+            q.registries().forEach(r -> namen.add(r.name()));
+            datei = ModulAuswahl.angebot(konfigVerzeichnis);
+        } catch (RuntimeException ex) {
+            fehler = ex.getMessage();
+        }
+        List<UiQuellen.Quelle> ui = new ArrayList<>();
+        try {
+            UiQuellen.lesen(auswahlVerzeichnis.resolve(ModulAuswahl.QUELLEN_UI)).stream()
+                    .filter(u -> !namen.contains(u.name())).forEach(ui::add);
+        } catch (RuntimeException ex) {
+            fehler = (fehler == null ? "" : fehler + "; ") + ex.getMessage();
+        }
+        Map<String, String> zugaenge = new LinkedHashMap<>();
+        Map<String, String> uiFehler = new LinkedHashMap<>();
+        for (UiQuellen.Quelle u : ui) {
+            namen.add(u.name());
+            schluessel.add(UiQuellen.schluessel(u.schluessel()));
+            java.util.Optional<String> z = secretLeser == null ? java.util.Optional.empty()
+                    : secretLeser.resolve(UiQuellen.SECRET_PRAEFIX + u.name());
+            if (z.isPresent()) {
+                zugaenge.put(u.name(), z.get());
+            } else {
+                uiFehler.put(u.name(), "Zugang fehlt im Secret-Store (" + UiQuellen.SECRET_PRAEFIX + u.name() + ")");
+            }
+        }
+        ModulAuswahl.Angebot uiAngebot = ModulAuswahl.angebot(
+                ui.stream().filter(u -> zugaenge.containsKey(u.name())).map(UiQuellen.Quelle::registry).toList(), zugaenge);
+        List<ModulAuswahl.Zeile> zeilen = new ArrayList<>(datei.zeilen());
+        zeilen.addAll(uiAngebot.zeilen());
+        Map<String, String> alleFehler = new LinkedHashMap<>(datei.fehler());
+        alleFehler.putAll(uiAngebot.fehler());
+        alleFehler.putAll(uiFehler);
+        if (fehler == null && namen.isEmpty()) {
+            fehler = "keine Registry in " + konfigVerzeichnis.resolve(ModulAuswahl.QUELLEN) + " und keine Quelle aus der Oberflaeche";
+        }
+        return new Gesamt(new ModulAuswahl.Angebot(List.copyOf(zeilen), alleFehler), List.copyOf(schluessel), List.copyOf(namen),
+                List.copyOf(ui), zugaenge, fehler);
+    }
+
+    /**
+     * Wahlen, die beim Start aus einer UI-Quelle kommen (registry = ihr Name, oder ohne registry die erste Quelle mit
+     * dem Modul, Datei zuerst, wie der Lader), werden jetzt mit dem Zugang vorgeladen; scheitert das, wird nichts
+     * gespeichert.
+     */
+    void vorladen(List<ModulAuswahl.Wahl> neu, Gesamt g) throws IOException {
+        for (UiQuellen.Quelle u : g.ui()) {
+            List<ModulAuswahl.Wahl> hier = neu.stream().filter(w -> u.name().equals(w.registry())
+                    || w.registry() == null && u.name().equals(ersteQuelle(w, g))).toList();
+            if (hier.isEmpty() || !g.zugaenge().containsKey(u.name())) {
+                continue;
+            }
+            try {
+                ModulAuswahl.vorladen(auswahlVerzeichnis, u.registry(), g.zugaenge().get(u.name()), g.schluessel(), hier, huelle());
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Vorladen unterbrochen", ex);
+            } catch (RuntimeException ex) {
+                throw new IllegalArgumentException("Vorladen aus '" + u.name() + "': " + ex.getMessage(), ex);
+            }
+        }
+    }
+
+    private static String ersteQuelle(ModulAuswahl.Wahl w, Gesamt g) {
+        return g.angebot().zeilen().stream().filter(z -> z.istModul() && z.name().equals(w.name())
+                        && (ModulAuswahl.LATEST.equals(w.version()) || z.version().equals(w.version())))
+                .map(ModulAuswahl.Zeile::registry).findFirst().orElse(null);
     }
 
     // ------------------------------------------------------------------------------------------- intern

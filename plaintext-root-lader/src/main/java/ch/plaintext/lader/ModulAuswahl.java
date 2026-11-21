@@ -504,6 +504,15 @@ public final class ModulAuswahl {
         return new Angebot(List.copyOf(zeilen), fehler);
     }
 
+    /**
+     * Karte 2408 Teil 2, fuer die App: Angebot der UI-Quellen, je Name mit {@code benutzer:passwort} aus dem
+     * Secret-Store der App (nie aus einer Datei oder Umgebung). Fehlt ein Zugang, steht die Quelle in den Fehlern.
+     */
+    public static Angebot angebot(List<Registry> uiQuellen, Map<String, String> zugaenge) {
+        List<Registry> mitZugang = uiQuellen.stream().map(r -> new Registry(r.name(), r.url(), r.name())).toList();
+        return angebot(new Quellen(List.of(), mitZugang, false), new ModulQuelle(), zugaenge);
+    }
+
     /** Fuer die Seite: Angebot aller Registries aus {@code module-quellen.txt} im Konfig-Verzeichnis. */
     public static Angebot angebot(Path konfigVerzeichnis) throws IOException {
         return angebot(quellenLesen(konfigVerzeichnis.resolve(QUELLEN)), new ModulQuelle());
@@ -811,6 +820,66 @@ public final class ModulAuswahl {
             return ziel;
         } finally {
             Files.deleteIfExists(temp);
+        }
+    }
+
+    /**
+     * Karte 2408 Teil 2: ruft die App beim Speichern auf, mit dem Zugang aus ihrem Secret-Store (der Lader kennt ihn
+     * nie). Holt den Index der UI-Quelle {@code r} per HTTP Basic, loest die Wahlen gegen diese Quelle allein auf
+     * ({@code braucht}, Bibliotheken), laedt jede Datei, prueft Signatur und sha256 wie der Lader und legt Index und
+     * Jars nach {@code vorbereitet/<name>/}: erst vollstaendig daneben, dann umbenannt; ein Fehler laesst den
+     * bisherigen Stand stehen. Die https-Pflicht prueft der Aufrufer (und {@link #mitUiQuellen}).
+     */
+    public static List<Zeile> vorladen(Path auswahlVerzeichnis, Registry r, String benutzerPasswort, List<PublicKey> schluessel,
+                                       List<Wahl> wahl, ModulLader.Huelle huelle) throws IOException, InterruptedException {
+        return vorladen(auswahlVerzeichnis, r, benutzerPasswort, schluessel, wahl, huelle, new ModulQuelle());
+    }
+
+    static List<Zeile> vorladen(Path auswahlVerzeichnis, Registry r, String benutzerPasswort, List<PublicKey> schluessel,
+                                List<Wahl> wahl, ModulLader.Huelle huelle, ModulQuelle quelle)
+            throws IOException, InterruptedException {
+        quelle.anmeldung(r.url(), benutzerPasswort);
+        List<Zeile> angebot = indexParsen(quelle.text(r.url()), r.name(), r.url());
+        List<Wahl> hier = wahl.stream().map(w -> new Wahl(w.name(), w.version(), null)).toList();
+        List<Zeile> soll = aufloesen(hier, new Angebot(angebot, Map.of()), schluessel, huelle, true);
+        Path ziel = auswahlVerzeichnis.resolve(VORBEREITET).resolve(r.name());
+        Path neu = ziel.resolveSibling("." + r.name() + "." + UUID.randomUUID());
+        try {
+            Files.createDirectories(neu);
+            for (Zeile z : soll) {
+                Path d = neu.resolve(z.datei()).normalize();
+                if (!d.startsWith(neu)) {
+                    throw new IllegalArgumentException("'" + z.name() + "': Datei ausserhalb von " + neu);
+                }
+                Files.createDirectories(d.getParent());
+                String ist = quelle.laden(adresse(z), d, "'" + z.name() + "' " + z.version());
+                if (!ist.equals(z.sha256())) {
+                    throw new IllegalStateException("'" + z.name() + "' " + z.version() + ": sha256 " + ist
+                            + " passt nicht zur signierten Zeile (" + z.sha256() + ") - nicht vorgeladen");
+                }
+            }
+            atomarSchreiben(neu.resolve(EINGEBETTET_INDEX), indexText(soll, "vorgeladen von der App fuer Quelle " + r.name()));
+            if (Files.exists(ziel)) {
+                Path alt = ziel.resolveSibling("." + r.name() + ".alt." + UUID.randomUUID());
+                Files.move(ziel, alt, StandardCopyOption.ATOMIC_MOVE);
+                loeschen(alt);
+            }
+            Files.move(neu, ziel, StandardCopyOption.ATOMIC_MOVE);
+            return soll;
+        } finally {
+            loeschen(neu);
+        }
+    }
+
+    /** Ein Verzeichnis samt Inhalt; fehlt es, nichts. */
+    public static void loeschen(Path p) throws IOException {
+        if (!Files.exists(p)) {
+            return;
+        }
+        try (java.util.stream.Stream<Path> s = Files.walk(p)) {
+            for (Path x : s.sorted(Comparator.reverseOrder()).toList()) {
+                Files.delete(x);
+            }
         }
     }
 
