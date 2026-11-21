@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.65.0] - 2026-11-21
+
 ### Added
 - **Benannte Speicher** (Karte 2425, PR A, Auftrag Daniel):
   - Neue Schnittstelle `DateiAblageArt` (root-interfaces): eine Speicher-Art mit Namen (`art()`) öffnet eine `DateiAblage` aus Einstellungen. Jede Anwendung kann eigene Arten als Bean beitragen (z. B. das Inventar eine Art für seinen Code-Service).
