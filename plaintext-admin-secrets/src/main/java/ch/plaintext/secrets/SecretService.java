@@ -34,7 +34,7 @@ import java.util.Optional;
         seiteneffekte = ModulApiUmsetzung.Seiteneffekte.KEINE,
         hinweise = {"Never for the UI: the page stays write-only", "An unknown name yields an empty Optional"},
         beispiele = {})
-public class SecretService implements SecretResolver {
+public class SecretService implements SecretResolver, SecretWriter {
 
     private final SecretEntryRepository entryRepo;
     private final SecretBackendConfigRepository configRepo;
@@ -107,6 +107,31 @@ public class SecretService implements SecretResolver {
             }
         }
         return entryRepo.save(entry);
+    }
+
+    /** Karte 2408: {@link SecretWriter} - in the active backend; a soft-deleted entry of that name comes back. */
+    @Override
+    @Transactional
+    @ModulApiUmsetzung(beschreibung = "Stores a credential of the current tenant in the active backend (Karte 2408, e.g. the access of a module source).",
+            seiteneffekte = ModulApiUmsetzung.Seiteneffekte.INTERN, hinweise = {"The value never goes to a file or the log"}, beispiele = {})
+    public void store(String name, String value, String note) {
+        SecretEntry e = set(name, activeBackend(), value, note);
+        if (Boolean.TRUE.equals(e.getDeleted())) {
+            e.setDeleted(false);
+            entryRepo.save(e);
+        }
+    }
+
+    /** Karte 2408: {@link SecretWriter} - soft delete by name in the current tenant. */
+    @Override
+    @Transactional
+    @ModulApiUmsetzung(beschreibung = "Soft-deletes a secret of the current tenant by name (Karte 2408).",
+            seiteneffekte = ModulApiUmsetzung.Seiteneffekte.INTERN, hinweise = {"Unknown names are ignored"}, beispiele = {})
+    public void remove(String name) {
+        entryRepo.findByMandatAndName(PlaintextSecurityHolder.getMandat(), name).ifPresent(e -> {
+            e.setDeleted(true);
+            entryRepo.save(e);
+        });
     }
 
     /** Soft delete of a managed secret (metadata entry; the external value stays untouched). */

@@ -3,6 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.modules.laufzeit;
 
+import ch.plaintext.lader.ModulLader;
+import ch.plaintext.secrets.SecretResolver;
+import ch.plaintext.secrets.SecretWriter;
 import ch.plaintext.PlaintextSecurity;
 import ch.plaintext.audit.DestructiveActionAuditService;
 import ch.plaintext.lader.ModulAuswahl;
@@ -29,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -234,5 +238,110 @@ class ModulAuswahlServiceTest {
         assertThat(a.module().get(0).gewaehltRegistry()).isEqualTo("test");
         assertThat(a.registries()).extracting(ModulAuswahlService.Registry::name).containsExactly("test");
         assertThat(a.registries().get(0).status()).contains("Modul(e)").contains("ungueltiger Signatur");
+    }
+
+    // ------------------------------------------------------------------ Karte 2408: Quellen aus der Oberflaeche
+
+    private static final byte[] JAR_C = "jar-c".getBytes(StandardCharsets.UTF_8);
+
+    /** Zweite Registry unter /ui/, nur mit HTTP Basic k-1:pw (wie /nosec/k/ auf modules). */
+    private String uiRegistry() throws Exception {
+        String sha = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(JAR_C));
+        ModulAuswahl.Zeile z = new ModulAuswahl.Zeile("modul", "plaintext-z-c", "1.0.0", "1.770.0", sha, List.of(), List.of(),
+                "jars/plaintext-z-c-1.0.0.jar", "x", "kunde", null);
+        Signature s = Signature.getInstance("Ed25519");
+        s.initSign(schluessel.getPrivate());
+        s.update(z.nachricht().getBytes(StandardCharsets.UTF_8));
+        String idx = "plaintext-modul-index 1\n" + z.alsIndexZeile().replace("signatur=x", "signatur=" + Base64.getEncoder().encodeToString(s.sign()));
+        String kopf = "Basic " + Base64.getEncoder().encodeToString("k-1:pw".getBytes(StandardCharsets.UTF_8));
+        server.createContext("/ui/", ex -> {
+            byte[] b = !kopf.equals(ex.getRequestHeaders().getFirst("Authorization")) ? null
+                    : ex.getRequestURI().getPath().equals("/ui/index.txt") ? idx.getBytes(StandardCharsets.UTF_8)
+                    : ex.getRequestURI().getPath().equals("/ui/jars/plaintext-z-c-1.0.0.jar") ? JAR_C : null;
+            ex.sendResponseHeaders(b == null ? 401 : 200, b == null ? -1 : b.length);
+            if (b != null) {
+                try (OutputStream o = ex.getResponseBody()) {
+                    o.write(b);
+                }
+            }
+            ex.close();
+        });
+        return "http://127.0.0.1:" + server.getAddress().getPort() + "/ui/index.txt";
+    }
+
+    private ModulAuswahlService mitHuelle() {
+        return new ModulAuswahlService(security, audit, mock(ApplicationContext.class), module.toString(), konfig.toString(), "") {
+            @Override
+            ModulLader.Huelle huelle() {
+                return new ModulLader.Huelle("1.780.0", "1.767.0", null);
+            }
+        };
+    }
+
+    private UiQuellen.Eingabe eingabe(String index) {
+        return new UiQuellen.Eingabe(UiQuellen.FORMAT, "kunde", null, index,
+                "ed25519 " + Base64.getEncoder().encodeToString(schluessel.getPublic().getEncoded()), "k-1", "pw");
+    }
+
+    @Test
+    void uiQuelleUebernehmenAnsichtUndVorladenBeimSpeichern() throws Exception {
+        als("ROOT");
+        String index = uiRegistry();
+        java.util.Map<String, String> store = new java.util.HashMap<>();
+        ModulAuswahlService s = mitHuelle();
+        s.setSecretSchreiber(new SecretWriter() {
+            public void store(String name, String value, String note) { store.put(name, value); }
+            public void remove(String name) { store.remove(name); }
+        });
+        s.setSecretLeser(name -> java.util.Optional.ofNullable(store.get(name)));
+
+        s.uebernehmen(eingabe(index));
+        assertThat(store).containsEntry("modul-quelle.kunde", "k-1:pw");
+        String datei = Files.readString(module.resolve(ModulAuswahl.QUELLEN_UI));
+        assertThat(datei).contains("registry kunde " + index).doesNotContain("pw");
+        org.mockito.ArgumentCaptor<String> texte = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(audit).logDestructiveAction(eq("UI"), eq("MODUL_QUELLE_ANLEGEN"), any(), texte.capture(), texte.capture());
+        assertThat(texte.getAllValues()).noneMatch(t -> t.contains("k-1:pw"));
+
+        assertThat(s.gesamt().toString()).doesNotContain("k-1:pw");
+        assertThat(s.ansicht().module()).extracting(ModulAuswahlService.Modul::name).contains("plaintext-z-c");
+        s.speichern(List.of(new ModulAuswahl.Wahl("plaintext-z-c", "1.0.0")));
+        assertThat(module.resolve("vorbereitet/kunde/jars/plaintext-z-c-1.0.0.jar")).hasBinaryContent(JAR_C);
+        assertThat(Files.readString(module.resolve("vorbereitet/kunde/index.txt"))).contains("modul plaintext-z-c 1.0.0 ");
+
+        s.quelleEntfernen("kunde");
+        assertThat(store).isEmpty();
+        assertThat(module.resolve("vorbereitet/kunde")).doesNotExist();
+        assertThat(s.uiQuellen()).isEmpty();
+    }
+
+    @Test
+    void uiQuelleOhneSecretStoreOderFalschemZugangOderFremdemSchluessel() throws Exception {
+        als("ROOT");
+        String index = uiRegistry();
+        ModulAuswahlService s = mitHuelle();
+        assertThatThrownBy(() -> s.uebernehmen(eingabe(index))).hasMessageContaining("kein Secret-Store");
+        s.setSecretSchreiber(mock(SecretWriter.class));
+        UiQuellen.Eingabe falsch = new UiQuellen.Eingabe(UiQuellen.FORMAT, "kunde", null, index, eingabe(index).schluessel(), "k-1", "nein");
+        assertThatThrownBy(() -> s.uebernehmen(falsch)).hasMessageContaining("401").hasMessageNotContaining("nein");
+        String fremd = "ed25519 " + Base64.getEncoder().encodeToString(KeyPairGenerator.getInstance("Ed25519").generateKeyPair().getPublic().getEncoded());
+        assertThatThrownBy(() -> s.uebernehmen(new UiQuellen.Eingabe(UiQuellen.FORMAT, "kunde", null, index, fremd, "k-1", "pw")))
+                .hasMessageContaining("gueltiger Signatur");
+        assertThatThrownBy(() -> s.uebernehmen(new UiQuellen.Eingabe(UiQuellen.FORMAT, "test", null, index, fremd, "k-1", "pw")))
+                .hasMessageContaining("schon in");
+        assertThat(module.resolve(ModulAuswahl.QUELLEN_UI)).doesNotExist();
+        als("ADMIN");
+        assertThatThrownBy(() -> s.quelleAnlegen("{}")).isInstanceOf(SecurityException.class);
+    }
+
+    @Test
+    void uiQuelleOhneZugangImStoreStehtAlsFehler() throws Exception {
+        als("ROOT");
+        Files.writeString(module.resolve(ModulAuswahl.QUELLEN_UI), UiQuellen.text(List.of(new UiQuellen.Quelle("kunde",
+                uiRegistry(), Base64.getEncoder().encodeToString(schluessel.getPublic().getEncoded()))), "t"));
+        ModulAuswahlService s = mitHuelle();
+        s.setSecretLeser(name -> java.util.Optional.empty());
+        assertThat(s.ansicht().registryFehler()).containsKey("kunde");
+        assertThat(s.ansicht().registryFehler().get("kunde")).contains("Zugang fehlt");
     }
 }

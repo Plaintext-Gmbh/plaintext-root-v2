@@ -53,6 +53,35 @@
                     </h:column>
                 </h:dataTable>
 
+                <!-- Karte 2408: Quellen aus der Oberflaeche. Der Zugang geht in den Secret-Store, nie in eine Datei;
+                     der Lader liest beim Start nur, was «Auswahl speichern» vorgeladen hat. -->
+                <h2>Quellen aus der Oberfläche</h2>
+                <h:dataTable id="uiQuellen" value="#{modulAuswahlBackingBean.uiQuellen}" var="q" styleClass="mobile-safe"
+                             rendered="#{not empty modulAuswahlBackingBean.uiQuellen}">
+                    <h:column>
+                        <f:facet name="header">Name</f:facet>
+                        <h:outputText value="#{q.name}"/>
+                    </h:column>
+                    <h:column>
+                        <f:facet name="header">Index</f:facet>
+                        <h:outputText value="#{q.index}"/>
+                    </h:column>
+                    <h:column>
+                        <f:facet name="header">Aktion</f:facet>
+                        <h:commandButton id="btnQuelleEntfernen" value="Entfernen"
+                                         action="#{modulAuswahlBackingBean.quelleEntfernen(q.name)}"/>
+                    </h:column>
+                </h:dataTable>
+                <p>
+                    <h:outputLabel for="quelleJson" value="JSON von modules (Seite «Meine Zugänge»):"/><br/>
+                    <h:inputTextarea id="quelleJson" value="#{modulAuswahlBackingBean.quelleJson}" rows="5" cols="70"
+                                     autocomplete="off" styleClass="mobile-safe"/><br/>
+                    <h:commandButton id="btnQuelleAnlegen" value="Quelle übernehmen" action="#{modulAuswahlBackingBean.quelleAnlegen}"/>
+                </p>
+                <p>Die App prüft das JSON, ruft den Index mit dem Zugang ab und legt den Zugang im Secret-Store ab
+                    (modul-quelle.&lt;name&gt;). Danach erscheinen die Module der Quelle unten. «Auswahl speichern» lädt die gewählten
+                    Module dieser Quelle vor, der Lader liest sie beim nächsten Start ohne Netz.</p>
+
                 <h2>Module aus allen Registries</h2>
                 <h:dataTable id="tbl" value="#{modulAuswahlBackingBean.zeilen}" var="z" styleClass="mobile-safe">
                     <h:column>

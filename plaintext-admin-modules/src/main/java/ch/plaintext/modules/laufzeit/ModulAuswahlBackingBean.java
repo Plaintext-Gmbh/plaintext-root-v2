@@ -52,6 +52,11 @@ public class ModulAuswahlBackingBean implements Serializable {
 
     private ModulAuswahlService.Ansicht ansicht;
     private List<Zeile> zeilen = new ArrayList<>();
+    /** Karte 2408: Quellen aus der Oberflaeche (ohne Zugang). */
+    private List<UiQuellen.Quelle> uiQuellen = new ArrayList<>();
+    /** Karte 2408: eingefuegtes JSON mit Passwort; nie in toString, nach jedem Versuch geleert. */
+    @lombok.ToString.Exclude
+    private String quelleJson;
 
     /** preRenderView: feuert auch im Postback, dort darf die Eingabe nicht zurueckgesetzt werden. */
     public void load() {
@@ -65,6 +70,7 @@ public class ModulAuswahlBackingBean implements Serializable {
     void neuLesen() {
         try {
             ansicht = service.ansicht();
+            uiQuellen = new ArrayList<>(service.uiQuellen());
             List<Zeile> neu = new ArrayList<>();
             for (ModulAuswahlService.Modul m : ansicht.module()) {
                 Zeile z = new Zeile();
@@ -126,6 +132,37 @@ public class ModulAuswahlBackingBean implements Serializable {
         } catch (Exception ex) {
             log.warn("Modul-Auswahl abgewiesen: {}", ex.getMessage());
             meldung(FacesMessage.SEVERITY_ERROR, "Nicht gespeichert: " + ex.getMessage());
+        }
+    }
+
+    /** Karte 2408: JSON von modules uebernehmen. */
+    public void quelleAnlegen() {
+        if (verweigert()) {
+            return;
+        }
+        String json = quelleJson;
+        quelleJson = null; // das Passwort bleibt nicht in der Sitzung, auch nicht nach einem Fehler
+        try {
+            UiQuellen.Quelle q = service.quelleAnlegen(json);
+            meldung(FacesMessage.SEVERITY_INFO, "Quelle '" + q.name() + "' übernommen, Zugang im Secret-Store. "
+                    + "Module wählen, «Auswahl speichern», dann «Neu starten».");
+            neuLesen();
+        } catch (Exception ex) {
+            log.warn("Modul-Quelle abgewiesen: {}", ex.getMessage());
+            meldung(FacesMessage.SEVERITY_ERROR, "Quelle nicht übernommen: " + ex.getMessage());
+        }
+    }
+
+    public void quelleEntfernen(String name) {
+        if (verweigert()) {
+            return;
+        }
+        try {
+            service.quelleEntfernen(name);
+            meldung(FacesMessage.SEVERITY_INFO, "Quelle '" + name + "' entfernt. Wirksam nach «Neu starten».");
+            neuLesen();
+        } catch (Exception ex) {
+            meldung(FacesMessage.SEVERITY_ERROR, "Quelle nicht entfernt: " + ex.getMessage());
         }
     }
 

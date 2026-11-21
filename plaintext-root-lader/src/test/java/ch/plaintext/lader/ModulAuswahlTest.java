@@ -558,6 +558,43 @@ class ModulAuswahlTest {
         assertThat(r.get(1).url()).isEqualTo(dir.resolve("vorbereitet/kunde/index.txt").toUri());
     }
 
+    private ModulAuswahl.Registry geheim() {
+        return new ModulAuswahl.Registry("kunde", java.net.URI.create(url().replace("/reg/", "/geheim/")));
+    }
+
+    @Test
+    void vorladenMitZugangDannStartOhneNetz() throws Exception {
+        modul("plaintext-z-a", "1.0.0", "1.770.0", A1);
+        uiQuelle("kunde", false, A1);
+        List<ModulAuswahl.Wahl> w = List.of(new ModulAuswahl.Wahl("plaintext-z-a", "1.0.0", "kunde"));
+
+        List<ModulAuswahl.Zeile> z = ModulAuswahl.vorladen(dir, geheim(), "tok:pw", List.of(schluessel.getPublic()), w, huelle);
+        assertThat(z).extracting(ModulAuswahl.Zeile::name).containsExactly("plaintext-z-a");
+        assertThat(dir.resolve("vorbereitet/kunde/jars/plaintext-z-a-1.0.0.jar")).hasBinaryContent(A1);
+
+        server.stop(0);
+        auswahlAus("kunde");
+        assertThat(namen(starten())).containsExactly("plaintext-z-a-1.0.0.jar");
+        assertThat(status()).containsEntry("ergebnis", "OK");
+    }
+
+    @Test
+    void vorladenMitFalschemZugangOderFalschemJarLaesstDenAltenStand() throws Exception {
+        modul("plaintext-z-a", "1.0.0", "1.770.0", A1);
+        Path alt = uiQuelle("kunde", true, A1);
+        List<ModulAuswahl.Wahl> w = List.of(new ModulAuswahl.Wahl("plaintext-z-a", "1.0.0"));
+        List<java.security.PublicKey> k = List.of(schluessel.getPublic());
+
+        assertThatThrownBy(() -> ModulAuswahl.vorladen(dir, geheim(), "tok:falsch", k, w, huelle)).hasMessageContaining("401");
+        dateien.put("/reg/jars/plaintext-z-a-1.0.0.jar", A2);
+        assertThatThrownBy(() -> ModulAuswahl.vorladen(dir, geheim(), "tok:pw", k, w, huelle))
+                .hasMessageContaining("passt nicht zur signierten Zeile");
+        assertThat(alt.resolve("jars/plaintext-z-a-1.0.0.jar")).hasBinaryContent(A1);
+        try (Stream<Path> s = Files.list(dir.resolve(ModulAuswahl.VORBEREITET))) {
+            assertThat(s.map(p -> p.getFileName().toString()).toList()).containsExactly("kunde"); // keine Reste
+        }
+    }
+
     @Test
     void festesImageEinbettenUndStartenOhneRegistry() throws Exception {
         modul("plaintext-z-a", "1.0.0", "1.770.0", A1);

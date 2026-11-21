@@ -361,4 +361,29 @@ class SecretServiceVerwaltungTest {
             assertTrue(ex.getMessage().contains("kein Token"));
         }
     }
+
+    @Test
+    @DisplayName("Karte 2408: SecretWriter.store legt an, holt einen geloeschten Eintrag zurueck; remove loescht weich")
+    void secretWriterStoreUndRemove() {
+        SecretBackendConfig lokal = new SecretBackendConfig();
+        lokal.setBackendType(SecretBackendType.LOCAL_DB);
+        when(configRepo.findFirstByMandatAndAktivAndDeleted("plaintext", true, false)).thenReturn(java.util.Optional.of(lokal));
+        when(entryRepo.findByMandatAndName("plaintext", "modul-quelle.kunde")).thenReturn(java.util.Optional.empty());
+        service.store("modul-quelle.kunde", "k-1:pw", "Zugang");
+        org.mockito.ArgumentCaptor<SecretEntry> neu = org.mockito.ArgumentCaptor.forClass(SecretEntry.class);
+        org.mockito.Mockito.verify(entryRepo, org.mockito.Mockito.atLeastOnce()).save(neu.capture());
+        org.assertj.core.api.Assertions.assertThat(neu.getValue().getName()).isEqualTo("modul-quelle.kunde");
+        org.assertj.core.api.Assertions.assertThat(neu.getValue().getWertEncrypted()).isEqualTo("enc(k-1:pw)");
+
+        SecretEntry geloescht = eintrag("modul-quelle.kunde", SecretBackendType.LOCAL_DB, "enc(alt)");
+        geloescht.setDeleted(true);
+        when(entryRepo.findByMandatAndName("plaintext", "modul-quelle.kunde")).thenReturn(java.util.Optional.of(geloescht));
+        service.store("modul-quelle.kunde", "k-1:neu", null);
+        org.assertj.core.api.Assertions.assertThat(geloescht.getDeleted()).isFalse();
+        org.assertj.core.api.Assertions.assertThat(geloescht.getWertEncrypted()).isEqualTo("enc(k-1:neu)");
+
+        service.remove("modul-quelle.kunde");
+        org.assertj.core.api.Assertions.assertThat(geloescht.getDeleted()).isTrue();
+        service.remove("gibt-es-nicht"); // unbekannt: nichts
+    }
 }
