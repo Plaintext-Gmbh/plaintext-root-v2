@@ -40,4 +40,26 @@ public interface ModuleDescriptor {
     default java.util.List<Class<?>> entities() {
         return java.util.List.of();
     }
+
+    /**
+     * Default settings of the module (card 2425). On start the application writes every missing one to the
+     * settings (tenant {@code global}); an existing value is never overwritten, so an operator's change stays.
+     * Keys start with {@code <moduleId>.}, so the settings page lists them in the module's group; other keys are
+     * skipped with a log line. Never put a password or token here: those live in the secret store.
+     * Default: none.
+     */
+    default java.util.List<Vorgabe> einstellungen() {
+        return java.util.List.of();
+    }
+
+    /**
+     * A default setting.
+     *
+     * @param schluessel   key, starting with {@code <moduleId>.}
+     * @param wert         default value as text
+     * @param typ          {@code STRING}, {@code INTEGER}, {@code BOOLEAN}, {@code DATE} or {@code LIST}
+     * @param beschreibung what the setting does, shown on the settings page
+     */
+    record Vorgabe(String schluessel, String wert, String typ, String beschreibung) {
+    }
 }

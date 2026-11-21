@@ -21,6 +21,12 @@
             <p:fieldset legend="#{i18n.t('Settings')}">
 
                 <div style="margin-bottom: 10px;">
+                    <!-- Karte 2425: Gruppe = Schlüssel-Präfix gleich moduleId, sonst «root» (Entscheid Daniel (284)). -->
+                    <p:selectOneMenu id="gruppe" value="#{settingsBackingBean.gruppe}">
+                        <f:selectItem itemLabel="#{i18n.t('Alle Gruppen')}" itemValue="#{null}" noSelectionOption="true"/>
+                        <f:selectItems value="#{settingsBackingBean.gruppen}"/>
+                        <p:ajax update="tbl" process="@this"/>
+                    </p:selectOneMenu>
                     <p:inputText value="#{settingsBackingBean.searchFilter}" placeholder="#{i18n.t('Suchen...')}"
                                  style="width: 300px; margin-right: 10px;">
                         <p:ajax event="keyup" update="tbl" process="@this"/>
@@ -58,6 +64,7 @@
 
                     <p:column headerText="#{i18n.t('Schlüssel')}" sortBy="#{obj.key}" filterBy="#{obj.key}">
                         <h:outputText value="#{obj.key}"/>
+                        <h:outputText value=" (#{i18n.t('Vorgabe des Moduls')})" rendered="#{settingsBackingBean.istVorgabe(obj)}"/>
                     </p:column>
 
                     <p:column headerText="#{i18n.t('Wert')}" sortBy="#{obj.value}">

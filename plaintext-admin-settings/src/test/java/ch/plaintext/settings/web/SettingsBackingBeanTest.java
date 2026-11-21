@@ -290,6 +290,32 @@ class SettingsBackingBeanTest {
         assertThat(bean.getFilteredSettings()).hasSize(2);
     }
 
+    /** Karte 2425: Auswahl nach Gruppe (Präfix gleich moduleId, sonst root), zusammen mit der Suche. */
+    @Test
+    void getFilteredSettingsFiltertNachGruppe() {
+        ch.plaintext.settings.service.ModulVorgaben vorgaben = org.mockito.Mockito.mock(ch.plaintext.settings.service.ModulVorgaben.class);
+        org.mockito.Mockito.when(vorgaben.gruppe("files.frist")).thenReturn("files");
+        org.mockito.Mockito.when(vorgaben.gruppe("files.max-mb")).thenReturn("files");
+        org.mockito.Mockito.when(vorgaben.gruppe("mail.host")).thenReturn("root");
+        bean.setVorgaben(vorgaben);
+        Setting a = new Setting();
+        a.setKey("files.frist");
+        Setting b = new Setting();
+        b.setKey("files.max-mb");
+        Setting c = new Setting();
+        c.setKey("mail.host");
+        bean.setSettings(List.of(a, b, c));
+        bean.setGruppe("files");
+        assertThat(bean.getFilteredSettings()).containsExactly(a, b);
+        bean.setSearchFilter("frist");
+        assertThat(bean.getFilteredSettings()).containsExactly(a);
+        bean.setSearchFilter(null);
+        bean.setGruppe("root");
+        assertThat(bean.getFilteredSettings()).containsExactly(c);
+        bean.setGruppe(null);
+        assertThat(bean.getFilteredSettings()).hasSize(3);
+    }
+
     @Test
     void getFilteredSettingsFiltersByKey() {
         Setting s1 = new Setting();

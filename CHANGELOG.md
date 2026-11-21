@@ -12,6 +12,12 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+- **Vorgaben der Module in settings, Gruppen je Modul** (Karte 2425, PR B, Auftrag Daniel):
+  - `ModuleDescriptor.einstellungen()` (neu, Vorgabe leer) meldet die Vorgaben eines Moduls als `Vorgabe(schluessel, wert, typ, beschreibung)`. Beim Start schreibt admin-settings (`ModulVorgaben`) jede **fehlende** nach Mandant `global`; ein vorhandener Wert wird nie überschrieben.
+  - Ein Schlüssel muss mit `<moduleId>.` beginnen; sonst, oder wenn er wie ein Geheimnis heisst (`…passwort`, `…token`, `…secret`), wird er mit einer Log-Zeile übergangen.
+  - Settings-Seite: Auswahl «Gruppe» über der Tabelle. Die Gruppe ist der Teil des Schlüssels vor dem ersten Punkt, wenn er eine `moduleId` ist, sonst «root». Vorgaben eines Moduls sind als «Vorgabe des Moduls» markiert; andere Schlüssel derselben Gruppe (z. B. persönliche Werte) nicht.
+
 ## [3.65.0] - 2026-11-21
 
 ### Added
