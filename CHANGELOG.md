@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.66.0] - 2026-11-21
+
 ### Added
 - **Vorgaben der Module in settings, Gruppen je Modul** (Karte 2425, PR B, Auftrag Daniel):
   - `ModuleDescriptor.einstellungen()` (neu, Vorgabe leer) meldet die Vorgaben eines Moduls als `Vorgabe(schluessel, wert, typ, beschreibung)`. Beim Start schreibt admin-settings (`ModulVorgaben`) jede **fehlende** nach Mandant `global`; ein vorhandener Wert wird nie überschrieben.
