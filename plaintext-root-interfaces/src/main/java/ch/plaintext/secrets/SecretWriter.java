@@ -8,8 +8,9 @@ import ch.plaintext.modules.ModulApi;
 /**
  * Karte 2408: stores a secret of the current tenant in the active backend of <i>Root → Secrets</i>, for technical
  * producers that receive a credential and must never put it into a file or the log (e.g. the access of a module
- * source pasted on «Laufzeit-Module»). Counterpart of {@link SecretResolver}; implemented by the {@code SecretService}
- * in {@code plaintext-admin-secrets}. Keep the dependency optional, like the resolver.
+ * source pasted on «Laufzeit-Module»). The write side of the read-only resolver in this package (named only by role:
+ * the catalogue search on «Module» looks into this text); implemented by the {@code SecretService} in
+ * {@code plaintext-admin-secrets}. Keep the dependency optional, like the resolver.
  */
 @ModulApi(art = ModulApi.Art.SCHNITTSTELLE, stabilitaet = ModulApi.Stabilitaet.NEU)
 public interface SecretWriter {
