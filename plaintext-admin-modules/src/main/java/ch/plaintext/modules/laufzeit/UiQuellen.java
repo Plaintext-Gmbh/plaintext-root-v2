@@ -69,8 +69,8 @@ public final class UiQuellen {
             throw new IllegalArgumentException("name: nur a-z, 0-9, '-' und '.' (z. B. kunde)");
         }
         URI index = e.index() == null ? null : URI.create(e.index());
-        if (index == null || !"https".equals(index.getScheme()) || index.getHost() == null) {
-            throw new IllegalArgumentException("index: nur eine https-Adresse");
+        if (index == null || !"https".equals(index.getScheme()) || index.getHost() == null || index.getRawUserInfo() != null) {
+            throw new IllegalArgumentException("index: nur eine https-Adresse, ohne Zugang darin");
         }
         if (e.benutzer() == null || e.benutzer().isBlank() || e.benutzer().contains(":") || e.passwort() == null
                 || e.passwort().isBlank()) {

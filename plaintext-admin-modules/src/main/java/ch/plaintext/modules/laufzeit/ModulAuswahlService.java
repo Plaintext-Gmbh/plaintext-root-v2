@@ -93,6 +93,10 @@ public class ModulAuswahlService {
     /** Karte 2408: Datei- und UI-Quellen zusammen, so wie der Lader sie beim Start sieht (Datei zuerst). */
     record Gesamt(ModulAuswahl.Angebot angebot, List<PublicKey> schluessel, List<String> registryNamen,
                   List<UiQuellen.Quelle> ui, Map<String, String> zugaenge, String quellenFehler) {
+        @Override
+        public String toString() { // nie die Zugaenge (benutzer:passwort), auch nicht in einem spaeteren Log
+            return "Gesamt[" + registryNamen + ", " + angebot.zeilen().size() + " Zeilen, Zugaenge fuer " + zugaenge.keySet() + "]";
+        }
     }
 
     public ModulAuswahlService(PlaintextSecurity security, DestructiveActionAuditService audit, ApplicationContext kontext,

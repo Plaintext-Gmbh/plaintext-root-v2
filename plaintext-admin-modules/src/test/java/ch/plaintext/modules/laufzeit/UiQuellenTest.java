@@ -39,6 +39,8 @@ class UiQuellenTest {
                 .hasMessageContaining("unbekanntem Feld").hasMessageNotContaining("geheim-pw");
         assertThatThrownBy(() -> UiQuellen.lesen(json("", "plaintext-modul-quelle/2", https))).hasMessageContaining("nicht unterstuetzt");
         assertThatThrownBy(() -> UiQuellen.lesen(json("", UiQuellen.FORMAT, "http://modules.plaintext.ch/x"))).hasMessageContaining("https");
+        assertThatThrownBy(() -> UiQuellen.lesen(json("", UiQuellen.FORMAT, "https://u:geheim-pw@modules.plaintext.ch/x")))
+                .hasMessageContaining("ohne Zugang").hasMessageNotContaining("geheim-pw");
         assertThatThrownBy(() -> UiQuellen.lesen(json("", UiQuellen.FORMAT, https).replace("\"kunde\"", "\"../x\"")))
                 .hasMessageContaining("name");
         assertThatThrownBy(() -> UiQuellen.lesen(json("", UiQuellen.FORMAT, https).replace("ed25519 ", "ed25519 kaputt")))

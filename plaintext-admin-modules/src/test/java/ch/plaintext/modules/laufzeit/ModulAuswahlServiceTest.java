@@ -303,6 +303,7 @@ class ModulAuswahlServiceTest {
         verify(audit).logDestructiveAction(eq("UI"), eq("MODUL_QUELLE_ANLEGEN"), any(), texte.capture(), texte.capture());
         assertThat(texte.getAllValues()).noneMatch(t -> t.contains("k-1:pw"));
 
+        assertThat(s.gesamt().toString()).doesNotContain("k-1:pw");
         assertThat(s.ansicht().module()).extracting(ModulAuswahlService.Modul::name).contains("plaintext-z-c");
         s.speichern(List.of(new ModulAuswahl.Wahl("plaintext-z-c", "1.0.0")));
         assertThat(module.resolve("vorbereitet/kunde/jars/plaintext-z-c-1.0.0.jar")).hasBinaryContent(JAR_C);

@@ -12,6 +12,15 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+- **Laufzeit-Module: Quelle per JSON aus modules** (Karte 2408, Teil 2):
+  - Auf «Laufzeit-Module» kann ROOT das JSON `plaintext-modul-quelle/1` (Seite «Meine Zugänge» auf modules) einfügen. Geprüft wird streng: unbekannte Felder werden abgewiesen, `index` nur https, Ed25519-Schlüssel, und der Index muss mit dem Zugang abrufbar sein und mindestens ein Modul mit gültiger Signatur enthalten.
+  - Der Zugang geht über die neue Schnittstelle `SecretWriter` (root-interfaces, umgesetzt von `SecretService`) in das **aktive Backend des Secret-Stores** unter `modul-quelle.<name>`. In `quellen-ui.txt` steht nur Name, Index und Schlüssel.
+  - Die Seite zeigt Datei- und UI-Quellen zusammen.
+  - «Auswahl speichern» lädt die gewählten Module einer UI-Quelle mit `ModulAuswahl.vorladen` nach `vorbereitet/<name>/` vor (Signatur, sha256; erst vollständig, dann umbenannt). Scheitert das, wird nichts gespeichert.
+  - «Entfernen» nimmt Quelle, Vorgeladenes und Zugang weg.
+  - Hinweis: Ohne eingerichtetes Backend ist das aktive Backend des Secret-Stores VAULTWARDEN. Wer LOCAL_DB will, stellt es unter Root > Secrets ein.
+
 ## [3.63.0] - 2026-11-21
 
 ### Added
@@ -23,13 +32,6 @@ exhaustive.
   - **Erster Start ohne Vorgeladenes:** kein Absturz. `status.txt` nennt die Quelle, dann gilt der letzte gute Stand, ohne ihn `module.yaml`, ohne beide ein Start ohne Module.
   - Eine unlesbare `quellen-ui.txt` wird mit einer Log-Zeile übergangen.
   - Die Oberfläche (JSON einfügen, Secret, Vorladen) folgt in Teil 2 (admin-modules).
-- **Laufzeit-Module: Quelle per JSON aus modules** (Karte 2408, Teil 2):
-  - Auf «Laufzeit-Module» kann ROOT das JSON `plaintext-modul-quelle/1` (Seite «Meine Zugänge» auf modules) einfügen. Geprüft wird streng: unbekannte Felder werden abgewiesen, `index` nur https, Ed25519-Schlüssel, und der Index muss mit dem Zugang abrufbar sein und mindestens ein Modul mit gültiger Signatur enthalten.
-  - Der Zugang geht über die neue Schnittstelle `SecretWriter` (root-interfaces, umgesetzt von `SecretService`) in das **aktive Backend des Secret-Stores** unter `modul-quelle.<name>`. In `quellen-ui.txt` steht nur Name, Index und Schlüssel.
-  - Die Seite zeigt Datei- und UI-Quellen zusammen.
-  - «Auswahl speichern» lädt die gewählten Module einer UI-Quelle mit `ModulAuswahl.vorladen` nach `vorbereitet/<name>/` vor (Signatur, sha256; erst vollständig, dann umbenannt). Scheitert das, wird nichts gespeichert.
-  - «Entfernen» nimmt Quelle, Vorgeladenes und Zugang weg.
-  - Hinweis: Ohne eingerichtetes Backend ist das aktive Backend des Secret-Stores VAULTWARDEN. Wer LOCAL_DB will, stellt es unter Root > Secrets ein.
 
 ## [3.62.0] - 2026-11-21
 
