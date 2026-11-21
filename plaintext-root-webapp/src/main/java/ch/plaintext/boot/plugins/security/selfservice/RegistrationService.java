@@ -91,6 +91,21 @@ public class RegistrationService {
     }
 
     /**
+     * Card 2410: whether the link can still be used — without consuming it. Same condition as {@code consumeToken}
+     * (exists, not consumed, {@code expiresAt > now}), so the GET shows the form only when the POST would accept it.
+     */
+    @Transactional(readOnly = true)
+    public boolean tokenGueltig(String tokenValue) {
+        if (tokenValue == null || tokenValue.isBlank()) {
+            return false;
+        }
+        Instant now = Instant.now();
+        return tokenRepository.findByTokenHash(SelfServiceTokenHash.sha256Hex(tokenValue))
+                .filter(t -> !t.isConsumed() && t.getExpiresAt() != null && t.getExpiresAt().isAfter(now))
+                .isPresent();
+    }
+
+    /**
      * Validate a token and create the {@link MyUserEntity}. The token is
      * marked consumed in the same transaction.
      */
