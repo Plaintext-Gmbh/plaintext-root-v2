@@ -331,4 +331,21 @@ class ModuleRoleServiceTest {
         assertTrue(finde(menues, "Wiki").isOn(), "Rolle leer: frei");
         assertFalse(finde(menues, "Wiki").isModuleRoleStreng());
     }
+
+    @Test
+    void nichtSichtbarBlendetNurMenueUndKachelNichtDieSeite() {
+        List<MenuItemImpl> menues = menueBaum(USER_MIT_WIKI);
+        ModuleRoleProperties properties = new ModuleRoleProperties();
+        properties.setModuleRoles(new LinkedHashMap<>(Map.of("wiki", "wiki")));
+        properties.setNichtSichtbar(List.of("wiki"));
+        ModuleRoleService service = new ModuleRoleService(null, properties);
+        service.resolve(menues);
+
+        assertTrue(finde(menues, "Wiki").isOn(), "isOn/PageAccessGuard unveraendert: Link bleibt erreichbar");
+        assertFalse(finde(menues, "Wiki").isModuleRoleSichtbar(), "Menuepunkt ausgeblendet");
+        assertFalse(finde(menues, "Projekte").isModuleRoleSichtbar(), "Kind ohne eigene moduleId folgt dem Modul");
+        assertTrue(finde(menues, "Kontakte").isModuleRoleSichtbar(), "anderes Modul bleibt im Menue");
+        assertFalse(service.isModuleSichtbarForLink("wiki.html", "Wiki"), "Kachel per Link ausgeblendet");
+        assertTrue(service.isModuleSichtbarForLink("kontakte.html", "Kontakte"), "andere Kachel bleibt");
+    }
 }

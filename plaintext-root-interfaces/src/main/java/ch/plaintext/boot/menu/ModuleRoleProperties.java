@@ -106,6 +106,57 @@ public class ModuleRoleProperties {
     }
 
     /**
+     * Karte 2390 Teil 2: module keys whose menu item and dashboard tile are hidden
+     * ({@code <key>.zugriff.sichtbar=false} in the module administration), although the user may use
+     * the module: the direct link and the API stay reachable. Filled by {@code ModulZugriff}, rarely
+     * in the yml.
+     *
+     * @since 3.71.0
+     */
+    private volatile List<String> nichtSichtbar = new ArrayList<>();
+
+    /**
+     * Karte 2390 Teil 2: module keys that are read-only even for users who may use them
+     * ({@code <key>.zugriff.bearbeiten=false}): {@code @modulRolle.darfBearbeiten} answers
+     * {@code false}, also for ROOT/ADMIN. Filled by {@code ModulZugriff}, rarely in the yml.
+     *
+     * @since 3.71.0
+     */
+    private volatile List<String> ohneBearbeitung = new ArrayList<>();
+
+    public List<String> getNichtSichtbar() {
+        return nichtSichtbar;
+    }
+
+    public void setNichtSichtbar(List<String> nichtSichtbar) {
+        this.nichtSichtbar = nichtSichtbar == null ? new ArrayList<>() : nichtSichtbar;
+    }
+
+    public List<String> getOhneBearbeitung() {
+        return ohneBearbeitung;
+    }
+
+    public void setOhneBearbeitung(List<String> ohneBearbeitung) {
+        this.ohneBearbeitung = ohneBearbeitung == null ? new ArrayList<>() : ohneBearbeitung;
+    }
+
+    /**
+     * @return module keys hidden from menu and tiles, canonical
+     * @since 3.71.0
+     */
+    public Set<String> canonicalNichtSichtbar() {
+        return canonical(nichtSichtbar);
+    }
+
+    /**
+     * @return module keys without editing permission, canonical
+     * @since 3.71.0
+     */
+    public Set<String> canonicalOhneBearbeitung() {
+        return canonical(ohneBearbeitung);
+    }
+
+    /**
      * @return module keys without root bypass: {@code strenge-module-roles} plus {@code ohne-root-umgehung}, canonical
      * @since 3.70.0
      */

@@ -71,4 +71,19 @@ class ModuleRolePropertiesTest {
         properties.setStrengeModuleRoles(null);
         assertTrue(properties.canonicalStrengeModuleRoles().isEmpty());
     }
+
+    @Test
+    void nichtSichtbarUndOhneBearbeitungWerdenKanonisch() {
+        ModuleRoleProperties properties = mit(Map.of());
+        assertTrue(properties.canonicalNichtSichtbar().isEmpty());
+        assertTrue(properties.canonicalOhneBearbeitung().isEmpty());
+        properties.setNichtSichtbar(java.util.List.of(" Wiki ", "files"));
+        properties.setOhneBearbeitung(java.util.List.of("files"));
+        assertEquals(java.util.Set.of("files", "wiki"), properties.canonicalNichtSichtbar());
+        assertEquals(java.util.Set.of("files"), properties.canonicalOhneBearbeitung());
+        properties.setNichtSichtbar(null);
+        properties.setOhneBearbeitung(null);
+        assertTrue(properties.canonicalNichtSichtbar().isEmpty());
+        assertTrue(properties.canonicalOhneBearbeitung().isEmpty());
+    }
 }

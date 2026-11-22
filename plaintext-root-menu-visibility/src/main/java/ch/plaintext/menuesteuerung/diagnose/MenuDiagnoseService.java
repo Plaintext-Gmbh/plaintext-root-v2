@@ -108,6 +108,9 @@ public class MenuDiagnoseService {
         if (!item.isSichtbar()) {
             text = (text.isEmpty() ? "" : text + "; ") + "nicht im Menue (sichtbar: false)";
         }
+        if (!item.isModuleRoleSichtbar()) {
+            text = (text.isEmpty() ? "" : text + "; ") + "nicht im Menue (Modul-Zugriff sichtbar: false)";
+        }
         if (item.isGruppe()) {
             text = "Gruppe aus plaintext.menu.gruppen";
         }

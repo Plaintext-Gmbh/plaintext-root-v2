@@ -92,6 +92,13 @@ public class TileItemImpl {
             return false;
         }
 
+        // Karte 2390 Teil 2: <key>.zugriff.sichtbar=false hides menu AND tiles (also for ROOT/ADMIN),
+        // the page itself stays reachable by link.
+        if (moduleRoleService != null && !moduleRoleService.isModuleSichtbarForLink(link, getVisibilityTitle())) {
+            log.debug("Modul unsichtbar - Kachel '{}' ausgeblendet", title);
+            return false;
+        }
+
         // Load the MenuVisibilityProvider lazily from the BeanFactory if needed
         if (menuVisibilityProvider == null && beanFactory != null) {
             try {

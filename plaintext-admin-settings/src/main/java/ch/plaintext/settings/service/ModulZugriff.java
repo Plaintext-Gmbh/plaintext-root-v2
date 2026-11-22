@@ -28,6 +28,10 @@ import java.util.TreeSet;
  * &lt;key&gt;.zugriff.rolle   die Modulrolle, z. B. files; leer = frei
  * &lt;key&gt;.zugriff.root    true/false: ROOT darf ohne die Rolle
  * &lt;key&gt;.zugriff.admin   true/false: ADMIN darf ohne die Rolle
+ * &lt;key&gt;.zugriff.sichtbar   true/false: Menue und Kachel zeigen das Modul (Teil 2; «false» blendet nur
+ *                            die Eintrittspunkte aus, die Seite bleibt per Link erreichbar)
+ * &lt;key&gt;.zugriff.bearbeiten true/false: wer das Modul nutzen darf, darf es auch aendern (Teil 2;
+ *                            «false» = nur lesen, auch fuer ROOT/ADMIN, siehe @modulRolle.darfBearbeiten)
  * </pre>
  *
  * <ul>
@@ -49,6 +53,8 @@ public class ModulZugriff {
     static final String ROLLE = TEIL + "rolle";
     static final String ROOT = TEIL + "root";
     static final String ADMIN = TEIL + "admin";
+    static final String SICHTBAR = TEIL + "sichtbar";
+    static final String BEARBEITEN = TEIL + "bearbeiten";
 
     private final ModuleRoleProperties properties;
     private final ObjectProvider<ModuleRoleService> rollenDienst;
@@ -122,11 +128,21 @@ public class ModulZugriff {
         Map<String, String> rollen = new TreeMap<>(ymlRollen);
         Set<String> ohneRoot = new TreeSet<>(ymlOhneRoot);
         Set<String> ohneAdmin = new TreeSet<>(ymlOhneAdmin);
+        Set<String> nichtSichtbar = new TreeSet<>(properties.canonicalNichtSichtbar());
+        Set<String> ohneBearbeitung = new TreeSet<>(properties.canonicalOhneBearbeitung());
         Set<String> keys = new TreeSet<>(ymlRollen.keySet());
         try {
             for (String s : settings.getAllKeys(SettingsKeys.MANDAT_GLOBAL)) {
-                if (s != null && s.endsWith(ROLLE) && s.length() > ROLLE.length()) {
+                if (s == null) {
+                    continue;
+                }
+                // Karte 2390 Teil 2: auch Module ohne Rollen-Eintrag koennen sichtbar/bearbeiten gesetzt haben.
+                if (s.endsWith(ROLLE) && s.length() > ROLLE.length()) {
                     keys.add(ModuleRoleProperties.canonicalKey(s.substring(0, s.length() - ROLLE.length())));
+                } else if (s.endsWith(SICHTBAR) && s.length() > SICHTBAR.length()) {
+                    keys.add(ModuleRoleProperties.canonicalKey(s.substring(0, s.length() - SICHTBAR.length())));
+                } else if (s.endsWith(BEARBEITEN) && s.length() > BEARBEITEN.length()) {
+                    keys.add(ModuleRoleProperties.canonicalKey(s.substring(0, s.length() - BEARBEITEN.length())));
                 }
             }
             for (String k : keys) {
@@ -140,6 +156,10 @@ public class ModulZugriff {
                 }
                 setzen(ohneRoot, k, settings.getString(k + ROOT, SettingsKeys.MANDAT_GLOBAL));
                 setzen(ohneAdmin, k, settings.getString(k + ADMIN, SettingsKeys.MANDAT_GLOBAL));
+                // Fehlt der Schalter, gilt der yml-Stand bzw. der Standard (sichtbar, bearbeitbar);
+                // nur exakt «true» oeffnet, alles andere schliesst (fail-closed).
+                setzen(nichtSichtbar, k, settings.getString(k + SICHTBAR, SettingsKeys.MANDAT_GLOBAL));
+                setzen(ohneBearbeitung, k, settings.getString(k + BEARBEITEN, SettingsKeys.MANDAT_GLOBAL));
             }
         } catch (RuntimeException ex) {
             log.warn("Modul-Zugriff: settings nicht lesbar ({}), es gilt die yml", ex.getMessage());
@@ -151,10 +171,13 @@ public class ModulZugriff {
         // Fenster, in dem ModulRolle.darf (andere Threads) eine Umgehung sieht, die es nach dem Wechsel nicht gibt.
         properties.setOhneRootUmgehung(new ArrayList<>(ohneRoot));
         properties.setOhneAdminUmgehung(new ArrayList<>(ohneAdmin));
+        properties.setNichtSichtbar(new ArrayList<>(nichtSichtbar));
+        properties.setOhneBearbeitung(new ArrayList<>(ohneBearbeitung));
         properties.setModuleRoles(new TreeMap<>(rollen));
         properties.setStrengeModuleRoles(new ArrayList<>());
         rollenDienst.ifAvailable(ModuleRoleService::neuAufloesen);
-        log.info("Modul-Zugriff aus settings: Rollen {}, ohne Root-Umgehung {}, ohne Admin-Umgehung {}", rollen, ohneRoot, ohneAdmin);
+        log.info("Modul-Zugriff aus settings: Rollen {}, ohne Root-Umgehung {}, ohne Admin-Umgehung {}, "
+                + "nicht sichtbar {}, ohne Bearbeitung {}", rollen, ohneRoot, ohneAdmin, nichtSichtbar, ohneBearbeitung);
     }
 
     /** Fehlt der Wert, bleibt die yml; sonst «true» = Umgehung erlaubt, alles andere = nicht. */

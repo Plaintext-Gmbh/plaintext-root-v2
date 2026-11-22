@@ -87,9 +87,12 @@ public class MenuModelBuilder {
 
         // Filter only visible items
         // sichtbar=false (plaintext.menu.platzierung): not in the menu, the page stays reachable.
+        // moduleRoleSichtbar=false (Karte 2390 Teil 2, <key>.zugriff.sichtbar=false): hidden from
+        // menu and tiles only, also for ROOT/ADMIN, the page stays reachable by link.
         List<MenuItemImpl> onItems = allMenuItems.stream()
             .filter(MenuItemImpl::isOn)
             .filter(MenuItemImpl::isSichtbar)
+            .filter(MenuItemImpl::isModuleRoleSichtbar)
             .toList();
         // A created group without a visible child would render as a dead leaf.
         List<MenuItemImpl> visibleItems = onItems.stream()
