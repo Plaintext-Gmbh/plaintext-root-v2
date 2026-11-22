@@ -6,6 +6,7 @@ package ch.plaintext.settings.service;
 import ch.plaintext.boot.menu.MenuItemImpl;
 import ch.plaintext.settings.ISettingsService;
 import ch.plaintext.settings.SettingsKeys;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.context.ApplicationContext;
@@ -27,6 +28,7 @@ import java.util.regex.Pattern;
  * @since 3.76.0
  */
 @Component
+@Slf4j
 public class MenuePlatzierungSettingsService implements SmartInitializingSingleton {
 
     static final String PREFIX = "plaintext.menu.platzierung.";
@@ -35,6 +37,8 @@ public class MenuePlatzierungSettingsService implements SmartInitializingSinglet
 
     private final ApplicationContext context;
     private final ObjectProvider<ISettingsService> settings;
+    /** Gemerkte Ursprungswerte je menuId und Feld, um gelöschte Schlüssel zurücksetzen zu können. */
+    private final Map<String, Map<String, Object>> urspruenge = new HashMap<>();
 
     public MenuePlatzierungSettingsService(ApplicationContext context, ObjectProvider<ISettingsService> settings) {
         this.context = context;
@@ -55,7 +59,7 @@ public class MenuePlatzierungSettingsService implements SmartInitializingSinglet
     }
 
     /** Liest die Platzierung aus den Settings und wendet sie auf alle Menue-Items an. */
-    public void anwenden() {
+    public synchronized void anwenden() {
         ISettingsService s = settings.getIfAvailable();
         if (s == null) {
             return;
@@ -69,32 +73,74 @@ public class MenuePlatzierungSettingsService implements SmartInitializingSinglet
             }
         }
         if (werte.isEmpty()) {
+            zuruecksetzen();
             return;
         }
+        zuruecksetzen(werte);
         context.getBeansOfType(MenuItemImpl.class).values().forEach(item -> {
             Map<String, String> eintraege = werte.get(item.getMenuId());
             if (eintraege == null) {
                 return;
             }
+            Map<String, Object> merken = urspruenge.computeIfAbsent(item.getMenuId(), id -> new HashMap<>());
             if (eintraege.containsKey("parent")) {
+                merken.putIfAbsent("parent", item.getParent());
                 item.setParent(eintraege.get("parent"));
             }
             if (eintraege.containsKey("title")) {
+                merken.putIfAbsent("title", item.getTitle());
                 item.setTitle(eintraege.get("title"));
             }
             if (eintraege.containsKey("order")) {
                 try {
+                    merken.putIfAbsent("order", item.getOrder());
                     item.setOrder(Integer.parseInt(eintraege.get("order").trim()));
                 } catch (NumberFormatException e) {
-                    // ungueltige Zahl: Wert ignorieren, Annotation bleibt
+                    log.warn("Menueplatzierung: order '{}' fuer menuId '{}' keine Zahl, ignoriert",
+                            eintraege.get("order"), item.getMenuId());
                 }
             }
             if (eintraege.containsKey("icon")) {
+                merken.putIfAbsent("icon", item.getIcon());
                 item.setIcon(eintraege.get("icon"));
             }
             if (eintraege.containsKey("sichtbar")) {
+                merken.putIfAbsent("sichtbar", item.isSichtbar());
                 item.setSichtbar(Boolean.parseBoolean(eintraege.get("sichtbar").trim()));
             }
         });
+    }
+
+    /** Setzt Felder zurueck, deren Schluessel es nicht mehr gibt (alle, wenn keine Settings mehr da sind). */
+    private void zuruecksetzen() {
+        zuruecksetzen(Map.of());
+    }
+
+    private void zuruecksetzen(Map<String, Map<String, String>> aktuelle) {
+        if (urspruenge.isEmpty()) {
+            return;
+        }
+        context.getBeansOfType(MenuItemImpl.class).values().forEach(item -> {
+            Map<String, Object> merken = urspruenge.get(item.getMenuId());
+            if (merken == null) {
+                return;
+            }
+            Map<String, String> eintraege = aktuelle.getOrDefault(item.getMenuId(), Map.of());
+            merken.forEach((feld, wert) -> {
+                if (eintraege.containsKey(feld)) {
+                    return; // wird gleich neu gesetzt
+                }
+                switch (feld) {
+                    case "parent" -> item.setParent((String) wert);
+                    case "title" -> item.setTitle((String) wert);
+                    case "order" -> item.setOrder((Integer) wert);
+                    case "icon" -> item.setIcon((String) wert);
+                    case "sichtbar" -> item.setSichtbar((Boolean) wert);
+                    default -> { }
+                }
+            });
+            merken.keySet().removeIf(feld -> !eintraege.containsKey(feld));
+        });
+        urspruenge.values().removeIf(Map::isEmpty);
     }
 }

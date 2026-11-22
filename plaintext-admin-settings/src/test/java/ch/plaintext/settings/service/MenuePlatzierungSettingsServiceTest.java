@@ -91,6 +91,19 @@ class MenuePlatzierungSettingsServiceTest {
     }
 
     @Test
+    void geloeschterSchluesselSetztUrsprungswertZurueck() {
+        global.put("plaintext.menu.platzierung.files.parent", "Marthaler");
+        MenuItemImpl files = item("files");
+        MenuePlatzierungSettingsService d = dienst(settings(), Map.of("files", files));
+        d.anwenden();
+        assertThat(files.getParent()).isEqualTo("Marthaler");
+
+        global.clear(); // Schluessel geloescht
+        d.anwenden();
+        assertThat(files.getParent()).isEqualTo("Werkzeuge"); // Ursprung wiederhergestellt
+    }
+
+    @Test
     void ereignisUnterPrefixWendetNeuAn() {
         MenuItemImpl files = item("files");
         MenuePlatzierungSettingsService d = dienst(settings(), Map.of("files", files));
