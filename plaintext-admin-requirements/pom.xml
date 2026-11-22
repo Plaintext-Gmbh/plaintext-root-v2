@@ -68,8 +68,9 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Geteilte Architektur-Regeln (siehe <build>): dieses Modul haengt NICHT an
-             plaintext-root-webapp, deshalb sieht der dortige ArchUnit-Lauf seine Klassen nicht. -->
+        <!-- Geteilte Architektur-Regeln (siehe <build>): Karte 2450 haengt plaintext-root-webapp
+             COMPILE an diesem Modul, darum wird es vor der webapp gebaut und der webapp-ArchUnit-Lauf
+             sieht seine Klassen (der eigene Lauf unten deckt es weiterhin ab). -->
         <dependency>
             <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-root-archtests</artifactId>

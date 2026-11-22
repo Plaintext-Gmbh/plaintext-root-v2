@@ -13,6 +13,18 @@ exhaustive.
 ## [Unreleased]
 
 ### Added
+- **Die Hülle liefert `plaintext-admin-requirements` mit** (Karte 2450): `plaintext-root-webapp`
+  hängt compile an `ch.plaintext.v2:plaintext-admin-requirements` (optional, eigene Version). Das
+  Artefakt steckt damit im Hüllen-Exec-Jar; Apps und Module können es künftig `provided` einbinden
+  statt es als eigenes Modul mitzubringen. Das löst bei app den registry.sh-Classifier-Fund
+  (Karte 2459): `registry.sh` überspringt es als Hüllen-Modul, die Zeile
+  `plaintext-root-tablesettings:jar:ohne-taglib` wird nicht mehr geparst. `spring-ai-mcp`
+  (spring-ai-starter-mcp-server-webmvc samt Transitiven) liefert die Hülle schon seit 3.0.0 mit
+  (zuletzt gehoben auf 2.0.2); Module mit MCP (z. B. z-schuetu) können ebenfalls auf `provided`
+  umstellen. Folgeschritte je App
+  (provided-Umstellen) sind eigene Karten. Wegen der neuen Abhängigkeit baut Maven
+  `plaintext-admin-requirements` vor `plaintext-root-webapp`; der ArchUnit-Lauf der webapp prüft
+  seine Klassen nun mit (Regelkommentar angepasst), der eigene Lauf des Moduls bleibt.
 - **Modul-Zugriff je App in settings** (Karte 2390, Teil 1, Entscheide Daniel 21.11.2026):
   - Wer ein Modul mit Modulrolle nutzen darf, steht in settings (Mandant `global`): `<key>.zugriff.rolle` (leer = frei), `<key>.zugriff.root` und `<key>.zugriff.admin` (`true` = darf ohne die Rolle). Pflege über die settings-Seite (Gruppe des Moduls); die Oberfläche in der Modulverwaltung folgt in Teil 3.
   - Beim ersten Start schreibt `ModulZugriff` (plaintext-admin-settings) aus `plaintext.menu.module-roles`/`strenge-module-roles` die fehlenden Schlüssel, nie überschreibend: root/admin `true`, bei strengen Modulen `false`. Module ohne Eintrag bekommen nichts (frei bleibt frei). Danach gilt settings; eine Änderung wirkt sofort (Ereignis `EinstellungGeaendert` aus `SettingsServiceImpl`), ohne Neustart, und steht im Log mit Benutzer.

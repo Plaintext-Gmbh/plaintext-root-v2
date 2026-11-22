@@ -97,9 +97,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>A consequence of that:</b> only what has already been compiled by the time of the test run
  * is checked. In root this test therefore runs in two places: in {@code plaintext-root-webapp} (which
- * sees everything built before it) and in {@code plaintext-admin-requirements}, which only comes
- * afterwards and has no classes at all yet during the webapp run of a clean build. Together the
- * two runs cover the reactor. A module whose {@code target/classes} is missing in both runs
+ * sees everything built before it) and in {@code plaintext-admin-requirements}. Since Karte 2450
+ * {@code plaintext-root-webapp} has a compile dependency on {@code plaintext-admin-requirements},
+ * the latter is built <em>before</em> the webapp and its classes are seen in the webapp run as well;
+ * its own run still covers it. Together the two runs cover the reactor. A module whose
+ * {@code target/classes} is missing in both runs
  * would stay unchecked — hence the positive control {@link #derTestSiehtEtwas()}.
  *
  * <p><b>Exceptions:</b> the reactor's allowlist ({@code plaintext-arch-allowlist.txt}, justification
