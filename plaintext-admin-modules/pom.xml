@@ -44,6 +44,16 @@
             <artifactId>snakeyaml</artifactId>
         </dependency>
 
+        <!-- Karte 2390 Teil 3: «Zugriff» je Modul schreibt <key>.zugriff.* in settings (Mandant global).
+             optional: ohne admin-settings in einer App bleibt der Dialog ausgeblendet, der Modul-Zugriff
+             greift dann wie bisher aus der yml. -->
+        <dependency>
+            <groupId>ch.plaintext.v2</groupId>
+            <artifactId>plaintext-admin-settings</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>

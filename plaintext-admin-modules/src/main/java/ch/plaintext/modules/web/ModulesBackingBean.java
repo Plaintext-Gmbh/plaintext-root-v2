@@ -3,13 +3,18 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.modules.web;
 
+import ch.plaintext.PlaintextRoles;
+import ch.plaintext.PlaintextSecurity;
 import ch.plaintext.boot.plugins.jsf.FacesMessages;
+import ch.plaintext.boot.menu.ModuleRoleProperties;
 import ch.plaintext.modules.ModuleDangerZoneService;
 import ch.plaintext.modules.ModuleDataService;
 import ch.plaintext.modules.ModuleService;
 import ch.plaintext.modules.ModuleView;
 import ch.plaintext.modules.katalog.ModulAnalyse;
 import ch.plaintext.modules.katalog.SchnittstellenKatalog;
+import ch.plaintext.settings.ISettingsService;
+import ch.plaintext.settings.SettingsKeys;
 import jakarta.faces.application.FacesMessage;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +22,7 @@ import org.primefaces.event.FileUploadEvent;
 import org.primefaces.model.DefaultStreamedContent;
 import org.primefaces.model.StreamedContent;
 import org.primefaces.model.file.UploadedFile;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
@@ -77,6 +83,14 @@ public class ModulesBackingBean implements Serializable {
     @Autowired
     private transient ModulAnalyse analyse;
 
+    /** Karte 2390 Teil 3: «Zugriff» je Modul schreibt {@code <key>.zugriff.*} in settings (nur wenn admin-settings da ist). */
+    @Autowired
+    private transient ObjectProvider<ISettingsService> settings;
+
+    /** Karte 2390 Teil 3 (Review kimi1): serverseitiger ROOT-Schutz — «rendered» schützt nur die Anzeige. */
+    @Autowired
+    private transient ObjectProvider<PlaintextSecurity> security;
+
     private List<ModuleView> module = new ArrayList<>();
 
     // ── Schnittstellen (Karte 1422) ─────────────────────────
@@ -100,6 +114,80 @@ public class ModulesBackingBean implements Serializable {
     private String clearModuleId;
     private String clearModuleDisplayName;
     private String clearBestaetigung;
+
+    // ── Modul-Zugriff (Karte 2390 Teil 3) ─────────────────
+    private String zugriffModuleId;
+    private String zugriffModuleDisplayName;
+    /** Rolle des Moduls, leer = frei. */
+    private String zugriffRolle = "";
+    /** ROOT darf ohne die Rolle. */
+    private boolean zugriffRoot = true;
+    /** ADMIN darf ohne die Rolle. */
+    private boolean zugriffAdmin = true;
+    /** Menü und Kachel zeigen das Modul (Seite bleibt per Link erreichbar). */
+    private boolean zugriffSichtbar = true;
+    /** Wer das Modul nutzen darf, darf es auch ändern (false = nur lesen, auch für ROOT/ADMIN). */
+    private boolean zugriffBearbeiten = true;
+
+    /** @return true, wenn admin-settings in dieser App läuft und der «Zugriff»-Dialog angeboten wird */
+    public boolean isZugriffVerfuegbar() {
+        return settings.getIfAvailable() != null;
+    }
+
+    /** Serverseitiger Schutz der Zugriffs-Pflege (Review kimi1): nur ROOT, ohne Kontext gar nichts. */
+    private void nurRoot() {
+        if (!PlaintextRoles.isRoot(security.getIfAvailable())) {
+            throw new SecurityException("Der Modul-Zugriff ist nur für ROOT.");
+        }
+    }
+
+    /** Öffnet den Zugriffs-Dialog: liest die fünf {@code <key>.zugriff.*}-Schlüssel (Standard: frei/alle ja). */
+    public void zugriffVorbereiten(ModuleView m) {
+        nurRoot();
+        ISettingsService s = settings.getIfAvailable();
+        zugriffModuleId = ModuleRoleProperties.canonicalKey(m.getModuleId());
+        zugriffModuleDisplayName = m.getDisplayName();
+        zugriffRolle = s == null ? "" : s.getString(zugriffModuleId + ".zugriff.rolle", SettingsKeys.MANDAT_GLOBAL);
+        if (zugriffRolle == null) {
+            zugriffRolle = "";
+        }
+        zugriffRoot = alsJa(s == null ? null : s.getString(zugriffModuleId + ".zugriff.root", SettingsKeys.MANDAT_GLOBAL));
+        zugriffAdmin = alsJa(s == null ? null : s.getString(zugriffModuleId + ".zugriff.admin", SettingsKeys.MANDAT_GLOBAL));
+        zugriffSichtbar = alsJa(s == null ? null : s.getString(zugriffModuleId + ".zugriff.sichtbar", SettingsKeys.MANDAT_GLOBAL));
+        zugriffBearbeiten = alsJa(s == null ? null : s.getString(zugriffModuleId + ".zugriff.bearbeiten", SettingsKeys.MANDAT_GLOBAL));
+    }
+
+    /** Fehlt der Schalter, gilt der Standard «ja»; nur exakt «true» öffnet sonst (fail-closed, wie ModulZugriff.setzen). */
+    private static boolean alsJa(String wert) {
+        return wert == null || wert.isBlank() || Boolean.parseBoolean(wert.strip());
+    }
+
+    /**
+     * Speichert die fünf Schalter; jedes Schreiben meldet {@code EinstellungGeaendert}, {@code ModulZugriff}
+     * wendet sie nach dem Commit ohne Neustart an und protokolliert wer/was. Ein fehlender Dienst
+     * (kein admin-settings) bricht ab, bevor etwas geschrieben wird.
+     */
+    public void zugriffSpeichern() {
+        nurRoot();
+        ISettingsService s = settings.getIfAvailable();
+        if (s == null || zugriffModuleId == null || zugriffModuleId.isBlank()) {
+            return;
+        }
+        String k = zugriffModuleId;
+        String rolle = ModuleRoleProperties.canonicalRole(zugriffRolle);
+        s.setSetting(k + ".zugriff.rolle", SettingsKeys.MANDAT_GLOBAL, rolle, "STRING",
+                "Karte 2390: Modulrolle für " + k + " (leer = frei)");
+        s.setSetting(k + ".zugriff.root", SettingsKeys.MANDAT_GLOBAL, String.valueOf(zugriffRoot), "BOOLEAN",
+                "Karte 2390: ROOT darf " + k + " ohne die Rolle");
+        s.setSetting(k + ".zugriff.admin", SettingsKeys.MANDAT_GLOBAL, String.valueOf(zugriffAdmin), "BOOLEAN",
+                "Karte 2390: ADMIN darf " + k + " ohne die Rolle");
+        s.setSetting(k + ".zugriff.sichtbar", SettingsKeys.MANDAT_GLOBAL, String.valueOf(zugriffSichtbar), "BOOLEAN",
+                "Karte 2390: Menü und Kachel zeigen " + k + " (Seite bleibt per Link erreichbar)");
+        s.setSetting(k + ".zugriff.bearbeiten", SettingsKeys.MANDAT_GLOBAL, String.valueOf(zugriffBearbeiten), "BOOLEAN",
+                "Karte 2390: wer " + k + " nutzen darf, darf es auch ändern");
+        addMessage(FacesMessage.SEVERITY_INFO,
+                "Zugriff für Modul '" + zugriffModuleDisplayName + "' gespeichert.");
+    }
 
     public void load() {
         module = moduleService.list();
