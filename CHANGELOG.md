@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.72.0] - 2026-11-22
+
 ### Added
 - **Modul-Zugriff, Teil 2: Sichtbarkeit und Bearbeiten je Modul** (Karte 2390, Entscheid 3):
   - `<key>.zugriff.sichtbar=false` blendet Menüpunkt und Dashboard-Kachel des Moduls aus — auch
