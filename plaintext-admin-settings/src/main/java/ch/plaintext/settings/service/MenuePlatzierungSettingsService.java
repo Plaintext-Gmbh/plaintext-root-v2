@@ -27,6 +27,8 @@ import java.util.regex.Pattern;
  *
  * @since 3.76.0
  */
+// Systemwaechter mit 60-s-Takt fuer Laufzeit-Module (kein Fachjob, kein Cron-Ausdruck noetig), Karte 2469.
+@ch.plaintext.arch.AllowRawScheduled
 @Component
 @Slf4j
 public class MenuePlatzierungSettingsService implements SmartInitializingSingleton {
