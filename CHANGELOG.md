@@ -18,6 +18,11 @@ exhaustive.
   wenn der Aufrufer nicht ROOT ist. Bisher konnte ein globaler Admin-Token den Modul-Zugriff ändern;
   UI-Wege (settings-Seite, Modulverwaltung) prüften ROOT bereits. Schreiben im eigenen Mandanten
   bleibt Admin-Sache und wirkt auf den Modul-Zugriff nicht.
+- **Übersetzungen: Tabelle mit Tabellen-Einstellungen** (Karte 2464): `i18n-translations.html`
+  nutzt jetzt denselben Bedienbereich wie die übrigen Tabellen (Vorbild useradmin, Karte 1904):
+  Spalten wählen und ordnen, Breiten ziehen, Sortierung und Seitengrosse speichern je Benutzer
+  und Mandant. Neue Bean-Felder: `I18nBackingBean.anzeige` (TableSettings) mit init über den
+  optionalen `TableStateStore`; die Aktionen-Spalte ist weder ausblendbar noch verschiebbar.
 
 ## [3.73.0] - 2026-11-22
 
