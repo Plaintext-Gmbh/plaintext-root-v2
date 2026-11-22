@@ -111,7 +111,7 @@ public class ModuleRoleProperties {
      * the module: the direct link and the API stay reachable. Filled by {@code ModulZugriff}, rarely
      * in the yml.
      *
-     * @since 3.71.0
+     * @since 3.72.0
      */
     private volatile List<String> nichtSichtbar = new ArrayList<>();
 
@@ -120,7 +120,7 @@ public class ModuleRoleProperties {
      * ({@code <key>.zugriff.bearbeiten=false}): {@code @modulRolle.darfBearbeiten} answers
      * {@code false}, also for ROOT/ADMIN. Filled by {@code ModulZugriff}, rarely in the yml.
      *
-     * @since 3.71.0
+     * @since 3.72.0
      */
     private volatile List<String> ohneBearbeitung = new ArrayList<>();
 
@@ -142,7 +142,7 @@ public class ModuleRoleProperties {
 
     /**
      * @return module keys hidden from menu and tiles, canonical
-     * @since 3.71.0
+     * @since 3.72.0
      */
     public Set<String> canonicalNichtSichtbar() {
         return canonical(nichtSichtbar);
@@ -150,7 +150,7 @@ public class ModuleRoleProperties {
 
     /**
      * @return module keys without editing permission, canonical
-     * @since 3.71.0
+     * @since 3.72.0
      */
     public Set<String> canonicalOhneBearbeitung() {
         return canonical(ohneBearbeitung);

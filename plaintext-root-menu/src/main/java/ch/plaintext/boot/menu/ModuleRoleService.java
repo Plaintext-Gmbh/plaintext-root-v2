@@ -168,7 +168,7 @@ public class ModuleRoleService implements SmartInitializingSingleton {
      * @param link      canonicalised by this method (e.g. {@code wiki.html})
      * @param menuTitle menu title, may be empty
      * @return {@code false} only if the module is explicitly hidden
-     * @since 3.71.0
+     * @since 3.72.0
      */
     public boolean isModuleSichtbarForLink(String link, String menuTitle) {
         ensureResolved();

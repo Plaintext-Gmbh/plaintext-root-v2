@@ -58,7 +58,7 @@ public class ModulRolle {
      *
      * @param modulKey Modul-Key wie in {@code plaintext.menu.module-roles}, z. B. {@code files}
      * @return true, wenn der angemeldete Benutzer im Modul aendern darf
-     * @since 3.71.0
+     * @since 3.72.0
      */
     public boolean darfBearbeiten(String modulKey) {
         ModuleRoleProperties p = properties.getIfAvailable();

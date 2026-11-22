@@ -85,7 +85,7 @@ public class MenuItemImpl extends AbstractMenuItem implements MenuRegistry.MenuI
      * {@link #isOn()}: the page stays reachable by link, like
      * {@code plaintext.menu.platzierung.<menuId>.sichtbar}.
      *
-     * @since 3.71.0
+     * @since 3.72.0
      */
     private boolean moduleRoleSichtbar = true;
 
