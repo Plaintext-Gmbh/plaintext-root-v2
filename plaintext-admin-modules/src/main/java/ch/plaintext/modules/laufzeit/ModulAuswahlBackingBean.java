@@ -16,8 +16,12 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Karte 1608: Seite {@code modulauswahl.html}, nur ROOT (Karte 1612). Schalt-Aktionen eines Nicht-ROOT
@@ -77,14 +81,22 @@ public class ModulAuswahlBackingBean implements Serializable {
                 z.setName(m.name());
                 z.setAktiv(m.gewaehlt() != null);
                 z.getOptionen().add(new jakarta.faces.model.SelectItem(ModulAuswahl.LATEST, ModulAuswahl.LATEST));
-                // ROOT-9: liegt eine Version in mehreren Registries, nennt der Wert die Registry (version@registry)
-                Map<String, Long> jeVersion = m.versionen().stream()
-                        .collect(java.util.stream.Collectors.groupingBy(ModulAuswahlService.Version::version, java.util.stream.Collectors.counting()));
-                m.versionen().forEach(v -> z.getOptionen().add(jeVersion.get(v.version()) > 1
-                        ? new jakarta.faces.model.SelectItem(v.version() + "@" + v.registry(), v.version() + " (" + v.registry() + ")")
-                        : new jakarta.faces.model.SelectItem(v.version(), v.version())));
+                // ROOT-9/Karte 2456: jede Version einmal. Die Registry nennt der Wert (version@registry) nur, wenn die Kopien
+                // einer Version sich unterscheiden (Inhalt, Signatur, Passung); gleiche Kopien laedt der Lader ohne Registry
+                // aus der ersten, das Ergebnis ist dasselbe.
+                Set<String> verschieden = verschiedeneKopien(m);
+                Set<String> schon = new HashSet<>();
+                for (ModulAuswahlService.Version v : m.versionen()) {
+                    if (verschieden.contains(v.version())) {
+                        z.getOptionen().add(new jakarta.faces.model.SelectItem(v.version() + "@" + v.registry(), v.version() + " (" + v.registry() + ")"));
+                    } else if (schon.add(v.version())) {
+                        z.getOptionen().add(new jakarta.faces.model.SelectItem(v.version(), v.version()));
+                    }
+                }
+                // Eine gespeicherte Registry bei gleichen Kopien zeigt die Seite als die eine Version (sonst stuende sie doppelt).
                 String gewaehlt = m.gewaehlt() == null ? ModulAuswahl.LATEST
-                        : m.gewaehltRegistry() == null ? m.gewaehlt() : m.gewaehlt() + "@" + m.gewaehltRegistry();
+                        : m.gewaehltRegistry() == null || !verschieden.contains(m.gewaehlt()) && schon.contains(m.gewaehlt())
+                        ? m.gewaehlt() : m.gewaehlt() + "@" + m.gewaehltRegistry();
                 // Karte 1612: die gespeicherte Version bleibt waehlbar, auch wenn keine Registry sie gerade anbietet
                 // (sonst zeigt die Seite die erste Option vorgewaehlt, und "Auswahl speichern" stellte still um).
                 if (z.getOptionen().stream().noneMatch(o -> gewaehlt.equals(o.getValue()))) {
@@ -103,14 +115,38 @@ public class ModulAuswahlBackingBean implements Serializable {
         }
     }
 
-    private static String hinweis(ModulAuswahlService.Modul m) {
-        List<String> t = new ArrayList<>();
-        for (ModulAuswahlService.Version v : m.versionen()) {
-            String s = v.version() + " (" + v.registry() + (v.signiert() ? "" : ", Signatur ungültig")
-                    + (v.passt() == null ? "" : ", passt nicht: " + v.passt()) + ")";
-            t.add(s);
+    /** Versionen, deren Kopien in den Registries sich unterscheiden (sha256, Signatur oder Passung). */
+    static Set<String> verschiedeneKopien(ModulAuswahlService.Modul m) {
+        Map<String, Set<String>> je = new HashMap<>();
+        m.versionen().forEach(v -> je.computeIfAbsent(v.version(), x -> new HashSet<>()).add(v.sha256() + "|" + v.signiert() + "|" + v.passt()));
+        Set<String> aus = new HashSet<>();
+        je.forEach((v, k) -> {
+            if (k.size() > 1) {
+                aus.add(v);
+            }
+        });
+        return aus;
+    }
+
+    /**
+     * Karte 2456: kurz statt jede Kopie aufzuzaehlen (die Versionen stehen im Dropdown): Anzahl Versionen und Registries,
+     * dahinter nur, was nicht geht (Signatur ungueltig, passt nicht zur Huelle).
+     */
+    static String hinweis(ModulAuswahlService.Modul m) {
+        if (m.versionen().isEmpty()) {
+            return "in keiner Registry";
         }
-        return t.isEmpty() ? "in keiner Registry" : String.join("; ", t);
+        long versionen = m.versionen().stream().map(ModulAuswahlService.Version::version).distinct().count();
+        String registries = String.join(", ", new LinkedHashSet<>(m.versionen().stream().map(ModulAuswahlService.Version::registry).toList()));
+        List<String> t = new ArrayList<>();
+        t.add(versionen + (versionen == 1 ? " Version" : " Versionen") + " (" + registries + ")");
+        for (ModulAuswahlService.Version v : m.versionen()) {
+            if (!v.signiert() || v.passt() != null) {
+                t.add(v.version() + " (" + v.registry() + "): " + (v.signiert() ? "" : "Signatur ungültig")
+                        + (!v.signiert() && v.passt() != null ? ", " : "") + (v.passt() == null ? "" : "passt nicht: " + v.passt()));
+            }
+        }
+        return String.join("; ", t);
     }
 
     /** {@code <version>@<registry>} aus der Auswahlliste zurueck in eine Wahl mit Registry. */

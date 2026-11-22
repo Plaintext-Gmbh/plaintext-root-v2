@@ -12,6 +12,15 @@ exhaustive.
 
 ## [Unreleased]
 
+### Changed
+- **Seite «Laufzeit-Module» übersichtlicher** (Karte 2456, Test Daniel im Träger):
+  - Im Dropdown steht jede Version einmal. Die Registry nennt es nur, wenn sich die Kopien einer Version in den Registries unterscheiden (sha256, Signatur oder Passung zur Hülle). Gleiche Kopien lädt der Lader ohne Registry aus der ersten, mit demselben Ergebnis. Eine gespeicherte Registry bei gleichen Kopien zeigt die Seite als diese eine Version.
+  - «Verfügbar» zählt nicht mehr jede Kopie auf, sondern zeigt «n Versionen (Registries)» und dahinter nur, was nicht geht (Signatur ungültig, passt nicht).
+  - Die Registry-Liste zählt Module und Versionen («1 Modul, 4 Versionen») statt Index-Zeilen als «4 Modul(e)».
+
+### Fixed
+- **Kein «Registry-Fehler» beim Start für eine noch nicht vorgeladene Quelle aus der Oberfläche** (Karte 2456): Eine mit «Quelle übernehmen» angelegte Quelle hat `vorbereitet/<name>/index.txt` erst, wenn «Auswahl speichern» ein Modul daraus gewählt hat. Bis dahin meldete jeder Start «Registry-Fehler (Auswahl trotzdem aufgelöst): {kunde=…/vorbereitet/kunde/index.txt}». Jetzt übergeht der Lader die Quelle mit einer Logzeile. Nennt die Auswahl sie trotzdem, scheitert das Auflösen wie bisher, und es gilt der letzte gute Stand.
+
 ## [3.68.0] - 2026-11-21
 
 ### Fixed
