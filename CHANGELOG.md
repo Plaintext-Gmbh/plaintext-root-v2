@@ -28,6 +28,12 @@ exhaustive.
   - Neu: `ModuleRoleProperties.nichtSichtbar`/`ohneBearbeitung` (canonical),
     `ModuleRoleService.isModuleSichtbarForLink` (Kacheln), `MenuItemImpl.moduleRoleSichtbar`
     (Menü-Filter im MenuModelBuilder, bewusst nicht in `isOn()`).
+- **Modul-Zugriff, Teil 3: Pflege-Oberfläche in der Modulverwaltung** (Karte 2390): in
+  `module.xhtml` je Modul ein «Zugriff»-Dialog (Schloss-Knopf), der dieselben fünf
+  `<key>.zugriff.*`-Schlüssel in settings pflegt (Mandant `global`). Dialog nur, wenn
+  `plaintext-admin-settings` läuft (optionale Abhängigkeit von `plaintext-admin-modules`); ohne
+  ihn bleibt alles wie bisher. Seitenhilfe nennt die Semantik inkl. Root-trägt-meist-ADMIN und
+  «Rolle leer öffnet wieder».
 
 ## [3.70.0] - 2026-11-22
 

@@ -64,6 +64,11 @@
                                          actionListener="#{modulesBackingBean.clearVorbereiten(m)}"
                                          update=":fm:dlgClear" oncomplete="PF('dlgClear').show()"
                                          styleClass="ui-button-danger"/>
+                        <p:commandButton icon="pi pi-lock" title="Zugriff" process="@this"
+                                         actionListener="#{modulesBackingBean.zugriffVorbereiten(m)}"
+                                         update=":fm:dlgZugriff" oncomplete="PF('dlgZugriff').show()"
+                                         styleClass="ui-button-secondary"
+                                         rendered="#{modulesBackingBean.zugriffVerfuegbar and not empty m.moduleId}"/>
                     </p:column>
 
                     <!-- Karte 1438: was das Modul anbietet, umsetzt und nutzt (aus Katalog und laufenden Beans) -->
@@ -242,6 +247,40 @@
                                      oncomplete="PF('dlgImport').hide()"/>
                     <p:commandButton value="Abbrechen" icon="pi pi-times" type="button"
                                      onclick="PF('dlgImport').hide()" styleClass="ui-button-secondary"/>
+                </f:facet>
+            </p:dialog>
+
+            <p:dialog id="dlgZugriff" header="Zugriff: #{modulesBackingBean.zugriffModuleDisplayName}" widgetVar="dlgZugriff" modal="true"
+                      resizable="false" styleClass="mobile-safe" showEffect="fade">
+                <p:outputPanel layout="block" rendered="#{not empty modulesBackingBean.zugriffModuleId}">
+                    <h:panelGrid columns="2" cellpadding="6">
+                        <h:outputLabel value="Modulrolle (leer = frei):"/>
+                        <p:inputText id="zugriffRolle" value="#{modulesBackingBean.zugriffRolle}"
+                                     placeholder="z. B. files"/>
+                        <h:outputLabel value="ROOT darf ohne die Rolle:"/>
+                        <p:selectBooleanButton value="#{modulesBackingBean.zugriffRoot}" onLabel="ja" offLabel="nein"/>
+                        <h:outputLabel value="ADMIN darf ohne die Rolle:"/>
+                        <p:selectBooleanButton value="#{modulesBackingBean.zugriffAdmin}" onLabel="ja" offLabel="nein"/>
+                        <h:outputLabel value="Menü und Kachel zeigen das Modul:"/>
+                        <p:selectBooleanButton value="#{modulesBackingBean.zugriffSichtbar}" onLabel="ja" offLabel="nein"/>
+                        <h:outputLabel value="Nutzung erlaubt das Ändern:"/>
+                        <p:selectBooleanButton value="#{modulesBackingBean.zugriffBearbeiten}" onLabel="ja" offLabel="nein"/>
+                    </h:panelGrid>
+                    <p:outputPanel layout="block" style="margin-top:.5rem; font-size:0.85em; color:var(--pt-text-color-secondary); max-width:26rem;">
+                        «nein» bei Menü und Kachel blendet nur die Eintrittspunkte aus — die Seite bleibt per
+                        direktem Link erreichbar. «nein» beim Ändern macht das Modul nur-lesen, auch für
+                        ROOT/ADMIN. Ein Root-Benutzer trägt meist auch ADMIN: Mit «ROOT nein, ADMIN ja» kommt
+                        er über die Admin-Umgehung trotzdem hinein. Wird die Modulrolle geleert, öffnet sich
+                        das Modul wieder.
+                    </p:outputPanel>
+                </p:outputPanel>
+                <f:facet name="footer">
+                    <p:commandButton value="Speichern" icon="pi pi-check"
+                                     actionListener="#{modulesBackingBean.zugriffSpeichern}"
+                                     update=":fm:dlgZugriff"
+                                     oncomplete="PF('dlgZugriff').hide()"/>
+                    <p:commandButton value="Abbrechen" icon="pi pi-times" type="button"
+                                     onclick="PF('dlgZugriff').hide()" styleClass="ui-button-secondary"/>
                 </f:facet>
             </p:dialog>
 
