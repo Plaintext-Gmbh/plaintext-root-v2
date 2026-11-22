@@ -147,10 +147,12 @@ public class ModulZugriff {
         }
         ohneRoot.retainAll(rollen.keySet());
         ohneAdmin.retainAll(rollen.keySet());
-        properties.setModuleRoles(new TreeMap<>(rollen));
-        properties.setStrengeModuleRoles(new ArrayList<>());
+        // Review claude2 (Fund B): erst die engere Lage setzen, «strenge» zuletzt leeren - sonst gaebe es ein kurzes
+        // Fenster, in dem ModulRolle.darf (andere Threads) eine Umgehung sieht, die es nach dem Wechsel nicht gibt.
         properties.setOhneRootUmgehung(new ArrayList<>(ohneRoot));
         properties.setOhneAdminUmgehung(new ArrayList<>(ohneAdmin));
+        properties.setModuleRoles(new TreeMap<>(rollen));
+        properties.setStrengeModuleRoles(new ArrayList<>());
         rollenDienst.ifAvailable(ModuleRoleService::neuAufloesen);
         log.info("Modul-Zugriff aus settings: Rollen {}, ohne Root-Umgehung {}, ohne Admin-Umgehung {}", rollen, ohneRoot, ohneAdmin);
     }
@@ -167,8 +169,13 @@ public class ModulZugriff {
         }
     }
 
-    /** Karte 2390: eine Änderung eines Zugriffs-Schlüssels gilt sofort; ins Log mit Benutzer. */
-    @EventListener
+    /**
+     * Karte 2390: eine Änderung eines Zugriffs-Schlüssels gilt sofort; ins Log mit Benutzer. Review claude2 (Fund A):
+     * erst nach dem Commit - bei einem Rollback gälte sonst im Speicher der (vielleicht offenere) neue Zugriff. Ohne
+     * Transaktion (fallbackExecution) sofort.
+     */
+    @org.springframework.transaction.event.TransactionalEventListener(
+            phase = org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void geaendert(EinstellungGeaendert e) {
         if (schreibtVorgaben || e.key() == null || !e.key().contains(TEIL) || !SettingsKeys.MANDAT_GLOBAL.equals(e.mandat())) {
             return;
