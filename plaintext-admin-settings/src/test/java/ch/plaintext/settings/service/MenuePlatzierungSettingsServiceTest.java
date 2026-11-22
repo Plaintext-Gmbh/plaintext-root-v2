@@ -104,6 +104,23 @@ class MenuePlatzierungSettingsServiceTest {
     }
 
     @Test
+    void settingVorRegistrierungWirktBeiNaechsterAnwendung() {
+        global.put("plaintext.menu.platzierung.files.parent", "Marthaler");
+        StaticListableBeanFactory bf = new StaticListableBeanFactory();
+        bf.addBean("settings", settings());
+        org.springframework.context.ApplicationContext ctx = mock(org.springframework.context.ApplicationContext.class);
+        MenuePlatzierungSettingsService d = new MenuePlatzierungSettingsService(ctx,
+                bf.getBeanProvider(ISettingsService.class));
+        java.util.Map<String, MenuItemImpl> items = new java.util.HashMap<>();
+        when(ctx.getBeansOfType(MenuItemImpl.class)).thenAnswer(a -> items);
+
+        d.anwenden(); // vor Registrierung: kein Item
+        items.put("files", item("files")); // Laufzeit-Modul registriert sich
+        d.anwendenPeriodisch(); // naechster Lauf (Cron), kein Ereignis noetig
+        assertThat(items.get("files").getParent()).isEqualTo("Marthaler");
+    }
+
+    @Test
     void ereignisUnterPrefixWendetNeuAn() {
         MenuItemImpl files = item("files");
         MenuePlatzierungSettingsService d = dienst(settings(), Map.of("files", files));

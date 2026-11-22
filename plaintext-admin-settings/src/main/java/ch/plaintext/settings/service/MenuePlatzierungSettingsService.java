@@ -50,6 +50,13 @@ public class MenuePlatzierungSettingsService implements SmartInitializingSinglet
         anwenden();
     }
 
+    /** Fängt Laufzeit-Module auf, die nach dem Start registriert werden (Karte 2469, Review chef):
+     * einmal pro Minute dieselbe Anwendung — wirkt spaetestens danach, kein Neustart noetig. */
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelay = 60_000L)
+    public void anwendenPeriodisch() {
+        anwenden();
+    }
+
     /** Reagiert auf geänderte Platzierungs-Schluessel (Ereignis aus admin-settings). */
     @EventListener
     public void aufEinstellung(EinstellungGeaendert ereignis) {
