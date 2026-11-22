@@ -292,6 +292,14 @@
             <span>#{i18n.t('Sie wurden erfolgreich abgemeldet')}</span>
         </div>
 
+        <!-- Karte 2478: instanzspezifischer Demo-Zugangshinweis (z. B. öffentliche Demo-Zugänge); leer = unsichtbar. -->
+        <h:panelGroup rendered="#{loginSetupBean.demoHinweisActive}">
+            <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 6px; background-color: var(--primary-light); color: var(--text-color); font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="pi pi-info-circle"></i>
+                <span>#{loginSetupBean.demoHinweis}</span>
+            </div>
+        </h:panelGroup>
+
         <h:panelGroup rendered="#{loginSetupBean.passwordManagementActive}">
         <form action="#{request.contextPath}/login" method="post" class="login-form">
             <!-- CSRF Token -->
