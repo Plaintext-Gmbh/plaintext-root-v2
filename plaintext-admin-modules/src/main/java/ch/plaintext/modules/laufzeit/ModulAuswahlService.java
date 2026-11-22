@@ -50,7 +50,8 @@ public class ModulAuswahlService {
     static final String KANAL = "UI";
 
     /** Eine Version eines Moduls im Angebot. */
-    public record Version(String version, String registry, boolean signiert, String passt) implements Serializable {
+    /** {@code sha256} (Karte 2456): gleiche Version mit gleichem Inhalt in zwei Registries zeigt die Seite einmal. */
+    public record Version(String version, String registry, boolean signiert, String passt, String sha256) implements Serializable {
     }
 
     /** Ein waehlbares Modul mit allen Versionen aus allen Registries (neueste zuerst). */
@@ -143,7 +144,7 @@ public class ModulAuswahlService {
             if (z.istModul()) {
                 jeName.computeIfAbsent(z.name(), n -> new ArrayList<>()).add(new Version(z.version(), z.registry(),
                         ModulAuswahl.signaturGueltig(z, schluessel),
-                        huelle == null ? null : ModulAuswahl.rootMinPasst(z.rootMin(), huelle)));
+                        huelle == null ? null : ModulAuswahl.rootMinPasst(z.rootMin(), huelle), z.sha256()));
             }
         }
         gewaehlt.keySet().forEach(n -> jeName.computeIfAbsent(n, x -> new ArrayList<>()));
@@ -161,7 +162,10 @@ public class ModulAuswahlService {
                 registries(registryNamen, angebot, schluessel));
     }
 
-    /** Status je Registry der Quellen: Fehler aus dem Angebot, sonst Anzahl Module und ungueltige Signaturen, sonst leer. */
+    /**
+     * Status je Registry der Quellen: Fehler aus dem Angebot, sonst Anzahl Module und Versionen (Karte 2456: eine Zeile je
+     * Version, nicht je Modul - «1 Modul, 4 Versionen») und ungueltige Signaturen, sonst leer.
+     */
     static List<Registry> registries(List<String> namen, ModulAuswahl.Angebot angebot, List<java.security.PublicKey> schluessel) {
         List<Registry> aus = new ArrayList<>();
         for (String n : namen) {
@@ -172,10 +176,15 @@ public class ModulAuswahlService {
             }
             List<ModulAuswahl.Zeile> z = angebot.zeilen().stream().filter(x -> x.istModul() && n.equals(x.registry())).toList();
             long ungueltig = z.stream().filter(x -> !ModulAuswahl.signaturGueltig(x, schluessel)).count();
-            aus.add(new Registry(n, z.isEmpty() ? "leer" : z.size() + " Modul(e)"
+            long module = z.stream().map(ModulAuswahl.Zeile::name).distinct().count();
+            aus.add(new Registry(n, z.isEmpty() ? "leer" : anzahl(module, "Modul", "Module") + ", " + anzahl(z.size(), "Version", "Versionen")
                     + (ungueltig == 0 ? "" : ", " + ungueltig + " mit ungueltiger Signatur")));
         }
         return List.copyOf(aus);
+    }
+
+    private static String anzahl(long n, String eins, String mehr) {
+        return n + " " + (n == 1 ? eins : mehr);
     }
 
     List<ModulAuswahl.Wahl> auswahl() throws IOException {

@@ -237,7 +237,20 @@ class ModulAuswahlServiceTest {
         assertThat(a.module().get(0).gewaehlt()).isEqualTo("1.0.0");
         assertThat(a.module().get(0).gewaehltRegistry()).isEqualTo("test");
         assertThat(a.registries()).extracting(ModulAuswahlService.Registry::name).containsExactly("test");
-        assertThat(a.registries().get(0).status()).contains("Modul(e)").contains("ungueltiger Signatur");
+        assertThat(a.registries().get(0).status()).containsPattern("^\\d+ Modul(e)?, \\d+ Version(en)?, ").contains("ungueltiger Signatur");
+    }
+
+    /** Karte 2456: «oeffentlich 4 Modul(e)» war ein Modul mit vier Versionen; gezaehlt werden Module und Versionen. */
+    @Test
+    void registryStatusZaehltModuleUndVersionen() {
+        java.util.function.BiFunction<String, String, ModulAuswahl.Zeile> z = (name, version) -> new ModulAuswahl.Zeile("modul", name,
+                version, "3.58.0", "abc", List.of(), List.of(), name + "-" + version + ".jar", "sig", "oeffentlich", null);
+        ModulAuswahl.Angebot angebot = new ModulAuswahl.Angebot(List.of(z.apply("plaintext-modul-files", "1.0.1"),
+                z.apply("plaintext-modul-files", "1.1.0"), z.apply("plaintext-modul-files", "1.2.0"), z.apply("plaintext-modul-files", "1.3.0")),
+                java.util.Map.of("kunde", "antwortet 503"));
+        assertThat(ModulAuswahlService.registries(List.of("oeffentlich", "kunde", "leer"), angebot, List.of()))
+                .extracting(ModulAuswahlService.Registry::status)
+                .containsExactly("1 Modul, 4 Versionen, 4 mit ungueltiger Signatur", "Fehler: antwortet 503", "leer");
     }
 
     // ------------------------------------------------------------------ Karte 2408: Quellen aus der Oberflaeche

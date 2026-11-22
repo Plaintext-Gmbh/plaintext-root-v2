@@ -21,7 +21,7 @@ class ModulAuswahlBackingBeanTest {
         ModulAuswahlService service = mock(ModulAuswahlService.class);
         when(service.ansicht()).thenReturn(new ModulAuswahlService.Ansicht(Map.of(), List.of(
                 new ModulAuswahlService.Modul("plaintext-z-a", List.of(
-                        new ModulAuswahlService.Version("3.0.1", "lokal", false, null)), "3.0.0", null, "3.0.0")),
+                        new ModulAuswahlService.Version("3.0.1", "lokal", false, null, "a1")), "3.0.0", null, "3.0.0")),
                 Map.of("nextcloud", "antwortet 503"), null, List.of(), "2.811.1", true, null, List.of()));
         ModulAuswahlBackingBean bean = new ModulAuswahlBackingBean();
         bean.setService(service);
@@ -33,15 +33,15 @@ class ModulAuswahlBackingBeanTest {
         assertThat(z.getOptionen()).extracting(jakarta.faces.model.SelectItem::getValue).containsExactly("latest", "3.0.1", "3.0.0");
     }
 
-    /** Karte 2377 (ROOT-9): dieselbe Version in zwei Registries -> Wert nennt die Registry; die Wahl traegt sie zurueck. */
+    /** Karte 2377 (ROOT-9): dieselbe Version mit verschiedenem Inhalt in zwei Registries -> Wert nennt die Registry. */
     @Test
     void gleicheVersionInZweiRegistriesNenntDieRegistry() throws Exception {
         ModulAuswahlService service = mock(ModulAuswahlService.class);
         when(service.ansicht()).thenReturn(new ModulAuswahlService.Ansicht(Map.of(), List.of(
                 new ModulAuswahlService.Modul("plaintext-z-a", List.of(
-                        new ModulAuswahlService.Version("3.0.1", "lokal", true, null),
-                        new ModulAuswahlService.Version("3.0.1", "nextcloud", true, null),
-                        new ModulAuswahlService.Version("3.0.0", "nextcloud", true, null)), "3.0.1", "nextcloud", null)),
+                        new ModulAuswahlService.Version("3.0.1", "lokal", true, null, "a1"),
+                        new ModulAuswahlService.Version("3.0.1", "nextcloud", true, null, "b2"),
+                        new ModulAuswahlService.Version("3.0.0", "nextcloud", true, null, "c3")), "3.0.1", "nextcloud", null)),
                 Map.of(), null, List.of(), "2.811.1", true, null,
                 List.of(new ModulAuswahlService.Registry("lokal", "1 Modul(e)"), new ModulAuswahlService.Registry("nextcloud", "2 Modul(e)"))));
         ModulAuswahlBackingBean bean = new ModulAuswahlBackingBean();
@@ -56,5 +56,31 @@ class ModulAuswahlBackingBeanTest {
         assertThat(ModulAuswahlBackingBean.wahl("plaintext-z-a", "3.0.1@nextcloud"))
                 .isEqualTo(new ModulAuswahl.Wahl("plaintext-z-a", "3.0.1", "nextcloud"));
         assertThat(ModulAuswahlBackingBean.wahl("plaintext-z-a", "3.0.0")).isEqualTo(new ModulAuswahl.Wahl("plaintext-z-a", "3.0.0"));
+    }
+
+    /**
+     * Karte 2456 (Test Daniel im Träger): files 1.0.1-1.3.0 liegt gleich in oeffentlich und kunde. Jede Version steht einmal im
+     * Dropdown, ohne Registry; eine gespeicherte Registry zeigt die Seite als diese eine Version; «Verfügbar» ist kurz.
+     */
+    @Test
+    void gleicheKopienInZweiRegistriesStehenEinmal() throws Exception {
+        List<ModulAuswahlService.Version> v = new java.util.ArrayList<>();
+        for (String version : List.of("1.3.0", "1.2.0", "1.1.0", "1.0.1")) {
+            v.add(new ModulAuswahlService.Version(version, "oeffentlich", true, null, "sha-" + version));
+            v.add(new ModulAuswahlService.Version(version, "kunde", true, null, "sha-" + version));
+        }
+        v.add(new ModulAuswahlService.Version("0.9.0", "kunde", false, "root-min 3.70.0", "sha-0.9.0"));
+        ModulAuswahlService service = mock(ModulAuswahlService.class);
+        when(service.ansicht()).thenReturn(new ModulAuswahlService.Ansicht(Map.of(), List.of(
+                new ModulAuswahlService.Modul("plaintext-modul-files", v, "1.3.0", "kunde", "1.3.0")),
+                Map.of(), null, List.of(), "3.68.0", true, null, List.of()));
+        ModulAuswahlBackingBean bean = new ModulAuswahlBackingBean();
+        bean.setService(service);
+        bean.neuLesen();
+        ModulAuswahlBackingBean.Zeile z = bean.getZeilen().get(0);
+        assertThat(z.getOptionen()).extracting(jakarta.faces.model.SelectItem::getValue)
+                .containsExactly("latest", "1.3.0", "1.2.0", "1.1.0", "1.0.1", "0.9.0");
+        assertThat(z.getVersion()).isEqualTo("1.3.0");
+        assertThat(z.getHinweis()).isEqualTo("5 Versionen (oeffentlich, kunde); 0.9.0 (kunde): Signatur ungültig, passt nicht: root-min 3.70.0");
     }
 }

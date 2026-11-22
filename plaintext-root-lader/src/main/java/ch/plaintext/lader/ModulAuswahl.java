@@ -209,8 +209,9 @@ public final class ModulAuswahl {
      * Karte 2408 (Entscheid chef (227), Variante A): haengt die Quellen aus {@code quellen-ui.txt} im Modulverzeichnis
      * an. Deren Zugang liegt im Secret-Store der App, die beim Speichern Index und Jars holt, prueft und unter
      * {@code vorbereitet/<name>/} ablegt; der Lader liest darum nie das Netz, sondern dieses Verzeichnis als
-     * file:-Registry (je Slot in den eigenen Cache, sha256 und Signatur wie bei jeder Registry). Fehlt es (erster
-     * Start, nicht vorgeladen), gilt der bestehende Weg: Meldung in status.txt, letzter guter Stand.
+     * file:-Registry (je Slot in den eigenen Cache, sha256 und Signatur wie bei jeder Registry). Fehlt es (noch kein
+     * Modul dieser Quelle gespeichert), bleibt die Quelle beim Start weg (Karte 2456); nennt die Auswahl sie trotzdem,
+     * scheitert das Aufloesen und es gilt der letzte gute Stand.
      * Bei gleichem Namen gilt {@code module-quellen.txt}.
      */
     public static Quellen mitUiQuellen(Quellen datei, Path auswahlVerzeichnis) throws IOException {
@@ -235,8 +236,15 @@ public final class ModulAuswahl {
                         + QUELLEN + " hat eine gleichnamige");
                 continue;
             }
-            registries.add(new Registry(r.name(),
-                    auswahlVerzeichnis.resolve(VORBEREITET).resolve(r.name()).resolve(EINGEBETTET_INDEX).toUri()));
+            Path index = auswahlVerzeichnis.resolve(VORBEREITET).resolve(r.name()).resolve(EINGEBETTET_INDEX);
+            // Karte 2456: vorgeladen wird erst mit «Auswahl speichern» und einem Modul dieser Quelle; bis dahin ist sie kein
+            // Fehler (sonst meldete jeder Start «Registry-Fehler … vorbereitet/<name>/index.txt»), sondern leer.
+            if (!Files.isRegularFile(index)) {
+                System.out.println("[modul-lader] Quelle '" + r.name() + "' aus " + QUELLEN_UI + " noch nicht vorgeladen"
+                        + " (kein Modul daraus gespeichert) - beim Start uebergangen");
+                continue;
+            }
+            registries.add(new Registry(r.name(), index.toUri()));
         }
         return new Quellen(List.copyOf(schluessel), List.copyOf(registries), datei.eingebettetUeberschreibbar());
     }

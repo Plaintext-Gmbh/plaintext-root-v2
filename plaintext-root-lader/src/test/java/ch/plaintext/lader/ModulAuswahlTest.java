@@ -552,6 +552,10 @@ class ModulAuswahlTest {
 
         Files.writeString(dir.resolve(ModulAuswahl.QUELLEN_UI), "registry test https://x.example/index.txt\n"
                 + "registry kunde https://x.example/index.txt\n");
+        // Karte 2456: noch nicht vorgeladen -> die Quelle fehlt beim Start (kein «Registry-Fehler»)
+        assertThat(ModulAuswahl.mitUiQuellen(datei, dir).registries()).extracting(ModulAuswahl.Registry::name).containsExactly("test");
+        Files.createDirectories(dir.resolve("vorbereitet/kunde"));
+        Files.writeString(dir.resolve("vorbereitet/kunde/index.txt"), "");
         List<ModulAuswahl.Registry> r = ModulAuswahl.mitUiQuellen(datei, dir).registries();
         assertThat(r).extracting(ModulAuswahl.Registry::name).containsExactly("test", "kunde");
         assertThat(r.get(0).url().toString()).isEqualTo(url()); // module-quellen.txt gewinnt
