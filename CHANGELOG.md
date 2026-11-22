@@ -12,6 +12,13 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+- **Modul-Zugriff: MCP-Schreibweg auf ROOT im globalen Mandanten** (Karte 2390, Übergabe chef
+  417): `set_setting`/`delete_setting` verweigern `*.zugriff.*`-Schlüssel im Mandanten `global`,
+  wenn der Aufrufer nicht ROOT ist. Bisher konnte ein globaler Admin-Token den Modul-Zugriff ändern;
+  UI-Wege (settings-Seite, Modulverwaltung) prüften ROOT bereits. Schreiben im eigenen Mandanten
+  bleibt Admin-Sache und wirkt auf den Modul-Zugriff nicht.
+
 ## [3.73.0] - 2026-11-22
 
 ## [3.72.0] - 2026-11-22

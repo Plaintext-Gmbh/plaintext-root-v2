@@ -4,6 +4,7 @@
 package ch.plaintext.settings.mcp;
 
 import ch.plaintext.settings.ISettingsService;
+import ch.plaintext.settings.SettingsKeys;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.mcp.annotation.McpTool;
@@ -132,6 +133,10 @@ public class SettingsMcpTools {
         if (!ERLAUBTE_TYPEN.contains(typ)) {
             return "FEHLER: Unbekannter Typ '" + valueType + "'. Erlaubt: " + String.join(", ", ERLAUBTE_TYPEN) + ".";
         }
+        String schutz = zugriffSchutz(a, key);
+        if (schutz != null) {
+            return schutz;
+        }
         // exists() statt getString(): geschrieben wird IMMER beim eigenen Mandanten, also muss
         // auch "neu oder geaendert" dort gemessen werden. Mit getString haette ein bloss global
         // gesetzter Schluessel als "geaendert" gemeldet, obwohl gerade der erste eigene Eintrag
@@ -158,6 +163,10 @@ public class SettingsMcpTools {
         if (leer(key)) {
             return FEHLER_KEIN_SCHLUESSEL;
         }
+        String schutz = zugriffSchutz(a, key);
+        if (schutz != null) {
+            return schutz;
+        }
         // exists() statt getString(): Der globale Rueckfall aus Karte 1063 haette hier gemeldet,
         // es gebe etwas zu loeschen, waehrend deleteSetting(key, mandat) anschliessend nichts
         // findet — Ergebnis waere ein "OK: geloescht" fuer einen Eintrag, der unveraendert
@@ -174,6 +183,28 @@ public class SettingsMcpTools {
     /** Success reply in the one form all three tools share: {@code OK: '<key>' <was>.} */
     private static String ok(String key, String was) {
         return "OK: '" + key.trim() + "' " + was + ".";
+    }
+
+    /**
+     * Karte 2390 (Übergabe chef 417): {@code <key>.zugriff.*} steuert den Modul-Zugriff je App
+     * und gilt im Mandanten {@code global} — über MCP darf ihn dort nur ROOT schreiben, nicht ein
+     * globaler Admin-Token. Der Restzugang (settings-Seite, Modulverwaltung) prüft ROOT bereits.
+     *
+     * @return Fehlertext, wenn der Schlag greift, sonst {@code null}
+     */
+    private static String zugriffSchutz(Aufrufer a, String key) {
+        if (key != null && key.contains(".zugriff.")
+                && SettingsKeys.MANDAT_GLOBAL.equals(a.mandat()) && !istRoot()) {
+            return "FEHLER: Schlüssel '*.zugriff.*' im globalen Mandanten erfordern die Rolle ROOT.";
+        }
+        return null;
+    }
+
+    private static boolean istRoot() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch("ROLE_ROOT"::equals);
     }
 
     // ── Rechte ──────────────────────────────────────────────────────────────
