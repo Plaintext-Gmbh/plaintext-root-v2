@@ -119,4 +119,17 @@ class LoginSetupBeanTest {
         assertEquals("google", bean.getOidcAutoRedirectRegistrationId());
         assertTrue(bean.isOidcAutoRedirectActive());
     }
+
+    @Test
+    void demoHinweisVorgabeLeerUndUnsichtbar() {
+        assertEquals("", bean.getDemoHinweis());
+        assertFalse(bean.isDemoHinweisActive());
+    }
+
+    @Test
+    void demoHinweisGesetztWirdAngezeigt() {
+        ReflectionTestUtils.setField(bean, "demoHinweis", "  Demo-Zugang: demo/demo · Root: root/root  ");
+        assertEquals("Demo-Zugang: demo/demo · Root: root/root", bean.getDemoHinweis());
+        assertTrue(bean.isDemoHinweisActive());
+    }
 }

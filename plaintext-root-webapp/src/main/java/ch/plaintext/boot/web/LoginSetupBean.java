@@ -38,6 +38,23 @@ public class LoginSetupBean implements Serializable {
     @Value("${plaintext.login.auto-redirect-single-idp:false}")
     private boolean autoRedirectEinzigerIdp;
 
+    /**
+     * Karte 2478: optionaler Hinweis auf der Login-Seite, z. B. die öffentlichen Zugänge einer Demo
+     * ("Demo-Zugang: demo/demo, Root: root/root"). Leer (Vorgabe) = der Hinweis erscheint nirgends;
+     * nur Instanzen setzen ihn bewusst (öffentliche, reset-fähige Demos). Der Text steht absichtlich
+     * AUSSERHALB der i18n-Übersetzungen — er ist instanzspezifisch, nicht sprachabhängig.
+     */
+    @Value("${plaintext.login.demo-hinweis:}")
+    private String demoHinweis;
+
+    public String getDemoHinweis() {
+        return demoHinweis == null ? "" : demoHinweis.trim();
+    }
+
+    public boolean isDemoHinweisActive() {
+        return !getDemoHinweis().isEmpty();
+    }
+
     public boolean isOidcAutoRedirectActive() {
         return getOidcAutoRedirectRegistrationId() != null;
     }
