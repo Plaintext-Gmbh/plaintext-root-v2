@@ -104,4 +104,42 @@ class ModulZugriffTest {
         z.geaendert(new EinstellungGeaendert("wiki.zugriff.root", "mandant-x", "true", "false"));
         assertThat(p.canonicalOhneRootUmgehung()).as("nur Mandant global zaehlt").containsExactly("files");
     }
+
+    @Test
+    void sichtbarUndBearbeitenOhneRollenEintrag() {
+        ModuleRoleProperties p = yml();
+        ModulZugriff z = zugriff(p);
+        z.vorgabenSchreiben();
+        global.put("kalender.zugriff.sichtbar", "false");
+        global.put("kalender.zugriff.bearbeiten", "false");
+        global.put("wiki.zugriff.bearbeiten", "true");
+        z.anwenden();
+        assertThat(p.canonicalNichtSichtbar()).containsExactly("kalender");
+        assertThat(p.canonicalOhneBearbeitung()).containsExactly("kalender");
+        assertThat(p.canonicalModuleRoles()).as("sichtbar/bearbeiten aendern keine Rollen")
+                .containsEntry("wiki", "WIKI").containsEntry("mailbox", "MAIL").containsEntry("files", "FILES");
+        verify(rollenDienst).neuAufloesen();
+    }
+
+    @Test
+    void standardIstSichtbarUndBearbeitbar() {
+        ModuleRoleProperties p = yml();
+        ModulZugriff z = zugriff(p);
+        z.vorgabenSchreiben();
+        z.anwenden();
+        assertThat(p.canonicalNichtSichtbar()).isEmpty();
+        assertThat(p.canonicalOhneBearbeitung()).isEmpty();
+    }
+
+    @Test
+    void unbekannterWertSchliesstFailClosed() {
+        ModuleRoleProperties p = yml();
+        ModulZugriff z = zugriff(p);
+        z.vorgabenSchreiben();
+        global.put("wiki.zugriff.sichtbar", "ja-bitte");
+        global.put("wiki.zugriff.bearbeiten", "0");
+        z.anwenden();
+        assertThat(p.canonicalNichtSichtbar()).containsExactly("wiki");
+        assertThat(p.canonicalOhneBearbeitung()).containsExactly("wiki");
+    }
 }

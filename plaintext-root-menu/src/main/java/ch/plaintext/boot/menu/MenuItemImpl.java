@@ -79,6 +79,17 @@ public class MenuItemImpl extends AbstractMenuItem implements MenuRegistry.MenuI
     private boolean moduleRoleOhneAdmin;
 
     /**
+     * {@code false} hides the item from the rendered menu and the dashboard tiles although the user
+     * may use the module (Karte 2390 Teil 2, {@code <key>.zugriff.sichtbar=false} in the module
+     * administration). Set by the {@link ModuleRoleService}. Deliberately NOT part of
+     * {@link #isOn()}: the page stays reachable by link, like
+     * {@code plaintext.menu.platzierung.<menuId>.sichtbar}.
+     *
+     * @since 3.72.0
+     */
+    private boolean moduleRoleSichtbar = true;
+
+    /**
      * {@code false} keeps the item out of the rendered menu ({@code plaintext.menu.platzierung.<menuId>.sichtbar});
      * {@link #isOn()} and therefore the page access guard are unaffected, the page stays reachable by link.
      *

@@ -122,6 +122,22 @@ class ModulRolleTest {
     }
 
     @Test
+    @DisplayName("Karte 2390 Teil 2: bearbeiten=false ist nur-lesen, auch für ROOT/ADMIN")
+    void darfBearbeiten() {
+        ModuleRoleProperties p = new ModuleRoleProperties();
+        p.setModuleRoles(Map.of("fotos", "fotos", "wiki", "wiki"));
+        p.setOhneBearbeitung(java.util.List.of("fotos"));
+        assertThat(mitProps(p, "ROLE_FOTOS").darfBearbeiten("fotos")).as("mit Rolle").isFalse();
+        assertThat(mitProps(p, "ROLE_ROOT").darfBearbeiten("fotos")).as("Sperre gilt auch fuer ROOT").isFalse();
+        assertThat(mitProps(p, "ROLE_ADMIN").darfBearbeiten("fotos")).as("Sperre gilt auch fuer ADMIN").isFalse();
+        assertThat(mitProps(p, "ROLE_FOTOS").darf("fotos")).as("Nutzung bleibt").isTrue();
+        assertThat(mitProps(p, "ROLE_ROOT").darf("fotos")).as("Nutzung bleibt").isTrue();
+        assertThat(mitProps(p, "ROLE_WIKI").darfBearbeiten("wiki")).as("ohne Schalter wie bisher").isTrue();
+        assertThat(mitProps(p, "ROLE_USER").darfBearbeiten("wiki")).as("Nutzung verweigert: auch keine Bearbeitung").isFalse();
+        assertThat(mitProps(p, "ROLE_USER").darfBearbeiten("kalender")).as("freies Modul").isTrue();
+    }
+
+    @Test
     @DisplayName("Ohne PlaintextSecurity und mit Zuordnung: zu")
     void ohneSecurity() {
         assertThat(modulRolle(Map.of("fotos", "fotos"), (String[]) null).darf("fotos")).isFalse();

@@ -79,6 +79,13 @@ public class ModuleRoleService implements SmartInitializingSingleton {
     private final AtomicReference<Set<String>> ohneAdminLinks = new AtomicReference<>(Set.of());
     private final AtomicReference<Set<String>> ohneAdminMenuTitel = new AtomicReference<>(Set.of());
 
+    /**
+     * Links and menu titles of modules hidden from menu and tiles (Karte 2390 Teil 2,
+     * {@code <key>.zugriff.sichtbar=false}); the pages stay reachable by link.
+     */
+    private final AtomicReference<Set<String>> unsichtbarLinks = new AtomicReference<>(Set.of());
+    private final AtomicReference<Set<String>> unsichtbarTitel = new AtomicReference<>(Set.of());
+
     private volatile boolean resolved;
 
     public ModuleRoleService(ApplicationContext applicationContext, ModuleRoleProperties properties) {
@@ -150,6 +157,27 @@ public class ModuleRoleService implements SmartInitializingSingleton {
             ohneAdmin = ohneAdminMenuTitel.get().contains(menuTitle.trim());
         }
         return holdsAny(required, securityProvider, ohneRoot, ohneAdmin);
+    }
+
+    /**
+     * Karte 2390 Teil 2: is the module of this tile/menu entry hidden from menu and tiles
+     * ({@code <key>.zugriff.sichtbar=false})? Unlike {@link #isAllowedForLink}, this is not a role
+     * check and has no bypass: it applies to ROOT and ADMIN as well, because it only removes the
+     * entry points — the page itself stays reachable by link.
+     *
+     * @param link      canonicalised by this method (e.g. {@code wiki.html})
+     * @param menuTitle menu title, may be empty
+     * @return {@code false} only if the module is explicitly hidden
+     * @since 3.72.0
+     */
+    public boolean isModuleSichtbarForLink(String link, String menuTitle) {
+        ensureResolved();
+        String key = canonicalLink(link);
+        if (unsichtbarLinks.get().contains(key)) {
+            return false;
+        }
+        return menuTitle == null || menuTitle.trim().isEmpty()
+                || !unsichtbarTitel.get().contains(menuTitle.trim());
     }
 
     /**
@@ -307,11 +335,14 @@ public class ModuleRoleService implements SmartInitializingSingleton {
         Map<String, String> configured = properties.canonicalModuleRoles();
         Set<String> ohneRootKeys = properties.canonicalOhneRootUmgehung();
         Set<String> ohneAdminKeys = properties.canonicalOhneAdminUmgehung();
+        Set<String> nichtSichtbarKeys = properties.canonicalNichtSichtbar();
         Map<String, List<MenuItemImpl>> byTitle = indexByTitle(items);
         Set<String> rootLinks = new HashSet<>();
         Set<String> rootTitel = new HashSet<>();
         Set<String> adminLinks = new HashSet<>();
         Set<String> adminTitel = new HashSet<>();
+        Set<String> unsichtbarLinkSet = new HashSet<>();
+        Set<String> unsichtbarTitelSet = new HashSet<>();
 
         Set<String> keys = new TreeSet<>();
         Map<String, List<String>> byLink = new HashMap<>();
@@ -336,11 +367,21 @@ public class ModuleRoleService implements SmartInitializingSingleton {
             item.setModuleRoleOhneAdmin(ohneAdmin);
             merken(item, ohneRoot, rootLinks, rootTitel);
             merken(item, ohneAdmin, adminLinks, adminTitel);
+
+            // Karte 2390 Teil 2: hidden from menu and tiles only, the page stays reachable (like
+            // plaintext.menu.platzierung.<menuId>.sichtbar, but per module through settings).
+            boolean sichtbar = candidates.stream().noneMatch(nichtSichtbarKeys::contains);
+            item.setModuleRoleSichtbar(sichtbar);
+            if (!sichtbar) {
+                merken(item, true, unsichtbarLinkSet, unsichtbarTitelSet);
+            }
         }
         this.ohneRootLinks.set(Set.copyOf(rootLinks));
         this.ohneRootMenuTitel.set(Set.copyOf(rootTitel));
         this.ohneAdminLinks.set(Set.copyOf(adminLinks));
         this.ohneAdminMenuTitel.set(Set.copyOf(adminTitel));
+        this.unsichtbarLinks.set(Set.copyOf(unsichtbarLinkSet));
+        this.unsichtbarTitel.set(Set.copyOf(unsichtbarTitelSet));
 
         this.knownModuleKeys.set(Collections.unmodifiableSet(new TreeSet<>(keys)));
         this.rolesByLink.set(Map.copyOf(byLink));

@@ -12,6 +12,23 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+- **Modul-Zugriff, Teil 2: Sichtbarkeit und Bearbeiten je Modul** (Karte 2390, Entscheid 3):
+  - `<key>.zugriff.sichtbar=false` blendet Menüpunkt und Dashboard-Kachel des Moduls aus — auch
+    für ROOT/ADMIN, denn es ist keine Rollenprüfung: Die Seite bleibt per direktem Link erreichbar,
+    `isOn()` und PageAccessGuard sind unberührt (wie `plaintext.menu.platzierung.<menuId>.sichtbar`,
+    aber je Modul über die Modulverwaltung in settings).
+  - `<key>.zugriff.bearbeiten=false` macht das Modul für alle schreibgeschützt, die es nutzen
+    dürfen — auch für ROOT/ADMIN. Auswertung über `@modulRolle.darfBearbeiten('<key>')`
+    (root-common); zuerst nutzt das files-Modul ihn (eigener PR).
+  - Beide Schalter lesen und anwenden `ModulZugriff` (admin-settings) wie Teil 1: kein yml-Pendant,
+    Standard ist sichtbar/bearbeitbar, nur exakt «true» öffnet, jeder andere Wert schliesst
+    (fail-closed); eine Änderung wirkt nach dem Commit ohne Neustart. Module ohne Rollen-Eintrag
+    können die Schalter ebenfalls bekommen; die Pflege-Oberfläche folgt in Teil 3.
+  - Neu: `ModuleRoleProperties.nichtSichtbar`/`ohneBearbeitung` (canonical),
+    `ModuleRoleService.isModuleSichtbarForLink` (Kacheln), `MenuItemImpl.moduleRoleSichtbar`
+    (Menü-Filter im MenuModelBuilder, bewusst nicht in `isOn()`).
+
 ## [3.70.0] - 2026-11-22
 
 ### Added

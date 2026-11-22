@@ -49,4 +49,26 @@ public class ModulRolle {
         boolean adminUmgehung = !p.canonicalOhneAdminUmgehung().contains(key) && PlaintextRoles.isAdminOnly(s);
         return rootUmgehung || adminUmgehung || PlaintextRoles.hasAny(s, rolle);
     }
+
+    /**
+     * Karte 2390 Teil 2: darf der angemeldete Benutzer das Modul bearbeiten, oder nur lesen?
+     * {@code <key>.zugriff.bearbeiten=false} in der Modulverwaltung macht das Modul fuer alle
+     * schreibgeschuetzt — auch fuer ROOT/ADMIN, die die Nutzungspruefung ({@link #darf}) sonst
+     * umgehen. Ohne Eintrag gilt: wer nutzen darf, darf auch bearbeiten.
+     *
+     * @param modulKey Modul-Key wie in {@code plaintext.menu.module-roles}, z. B. {@code files}
+     * @return true, wenn der angemeldete Benutzer im Modul aendern darf
+     * @since 3.72.0
+     */
+    public boolean darfBearbeiten(String modulKey) {
+        ModuleRoleProperties p = properties.getIfAvailable();
+        if (p == null) {
+            return true;
+        }
+        String key = ModuleRoleProperties.canonicalKey(modulKey);
+        if (p.canonicalOhneBearbeitung().contains(key)) {
+            return false;
+        }
+        return darf(modulKey);
+    }
 }
