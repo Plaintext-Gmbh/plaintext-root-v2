@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.70.0] - 2026-11-22
+
 ### Added
 - **Modul-Zugriff je App in settings** (Karte 2390, Teil 1, Entscheide Daniel 21.11.2026):
   - Wer ein Modul mit Modulrolle nutzen darf, steht in settings (Mandant `global`): `<key>.zugriff.rolle` (leer = frei), `<key>.zugriff.root` und `<key>.zugriff.admin` (`true` = darf ohne die Rolle). Pflege über die settings-Seite (Gruppe des Moduls); die Oberfläche in der Modulverwaltung folgt in Teil 3.
