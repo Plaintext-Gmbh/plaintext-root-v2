@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.75.0] - 2026-11-22
+
 ### Added
 - **Modul-Zugriff: MCP-Schreibweg auf ROOT im globalen Mandanten** (Karte 2390, Übergabe chef
   417): `set_setting`/`delete_setting` verweigern `*.zugriff.*`-Schlüssel im Mandanten `global`,
