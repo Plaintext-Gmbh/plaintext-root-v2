@@ -283,4 +283,52 @@ class ModuleRoleServiceTest {
         assertTrue(service.isAllowedForLink("wiki.html", "Wiki", security(USER)));
         assertTrue(service.isAllowedForLink("was-auch-immer.html", "", null));
     }
+
+    // ---------------------------------------------------------------- Karte 2390: root und admin getrennt
+
+    /** Je Schalter: wer kommt ohne die Rolle hinein (Menue, Seite ueber isOn, Kachel). */
+    @Test
+    void rootUndAdminUmgehungGetrennt() {
+        // ohne-root-umgehung: ADMIN darf weiter, ROOT (nur ROOT) braucht die Rolle
+        for (Object[] f : new Object[][]{
+                {List.of("wiki"), List.of(), ROOT, false}, {List.of("wiki"), List.of(), ADMIN, true},
+                {List.of(), List.of("wiki"), ROOT, true}, {List.of(), List.of("wiki"), ADMIN, false},
+                {List.of(), List.of(), ROOT, true}, {List.of(), List.of(), ADMIN, true},
+                {List.of("wiki"), List.of("wiki"), USER_MIT_WIKI, true}, {List.of("wiki"), List.of("wiki"), USER, false}}) {
+            @SuppressWarnings("unchecked") List<String> ohneRoot = (List<String>) f[0];
+            @SuppressWarnings("unchecked") List<String> ohneAdmin = (List<String>) f[1];
+            @SuppressWarnings("unchecked") Set<String> rollen = (Set<String>) f[2];
+            boolean erwartet = (Boolean) f[3];
+            List<MenuItemImpl> menues = menueBaum(rollen);
+            ModuleRoleProperties properties = new ModuleRoleProperties();
+            properties.setModuleRoles(new LinkedHashMap<>(Map.of("wiki", "wiki")));
+            properties.setOhneRootUmgehung(ohneRoot);
+            properties.setOhneAdminUmgehung(ohneAdmin);
+            ModuleRoleService service = new ModuleRoleService(null, properties);
+            service.resolve(menues);
+            String fall = "ohneRoot=" + ohneRoot + " ohneAdmin=" + ohneAdmin + " rollen=" + rollen;
+            assertEquals(erwartet, finde(menues, "Wiki").isOn(), "Menue/Seite " + fall);
+            assertEquals(erwartet, finde(menues, "Projekte").isOn(), "Kind erbt " + fall);
+            assertEquals(erwartet, service.isAllowedForLink("wiki.html", "Wiki", security(rollen)), "Kachel " + fall);
+            assertTrue(finde(menues, "Kontakte").isOn(), "anderes Modul unveraendert " + fall);
+        }
+    }
+
+    @Test
+    void neuAufloesenWirktOhneNeustart() {
+        List<MenuItemImpl> menues = menueBaum(ADMIN);
+        ModuleRoleProperties properties = new ModuleRoleProperties();
+        properties.setModuleRoles(new LinkedHashMap<>(Map.of("wiki", "wiki")));
+        ModuleRoleService service = new ModuleRoleService(null, properties);
+        service.resolve(menues);
+        assertTrue(finde(menues, "Wiki").isOn(), "vorher: ADMIN umgeht");
+        properties.setOhneAdminUmgehung(List.of("wiki"));
+        service.resolve(menues);
+        assertFalse(finde(menues, "Wiki").isOn(), "nachher: ADMIN braucht die Rolle");
+        properties.setModuleRoles(new LinkedHashMap<>());
+        properties.setOhneAdminUmgehung(List.of());
+        service.resolve(menues);
+        assertTrue(finde(menues, "Wiki").isOn(), "Rolle leer: frei");
+        assertFalse(finde(menues, "Wiki").isModuleRoleStreng());
+    }
 }

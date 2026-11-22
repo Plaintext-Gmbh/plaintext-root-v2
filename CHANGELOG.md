@@ -12,6 +12,14 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+- **Modul-Zugriff je App in settings** (Karte 2390, Teil 1, Entscheide Daniel 21.11.2026):
+  - Wer ein Modul mit Modulrolle nutzen darf, steht in settings (Mandant `global`): `<key>.zugriff.rolle` (leer = frei), `<key>.zugriff.root` und `<key>.zugriff.admin` (`true` = darf ohne die Rolle). Pflege über die settings-Seite (Gruppe des Moduls); die Oberfläche in der Modulverwaltung folgt in Teil 3.
+  - Beim ersten Start schreibt `ModulZugriff` (plaintext-admin-settings) aus `plaintext.menu.module-roles`/`strenge-module-roles` die fehlenden Schlüssel, nie überschreibend: root/admin `true`, bei strengen Modulen `false`. Module ohne Eintrag bekommen nichts (frei bleibt frei). Danach gilt settings; eine Änderung wirkt sofort (Ereignis `EinstellungGeaendert` aus `SettingsServiceImpl`), ohne Neustart, und steht im Log mit Benutzer.
+  - Fehlt ein yml-Modul in settings (Vorgabe nicht geschrieben), gilt für dieses Modul weiter die yml: der Zugriff öffnet sich nie aus Versehen.
+  - Root- und Admin-Umgehung getrennt: `ModuleRoleProperties` kennt neu `ohne-root-umgehung`/`ohne-admin-umgehung` (strenge Module = beides), `ModuleRoleService.holdsAny(..., ohneRoot, ohneAdmin)`, `MenuItemImpl.moduleRoleOhneRoot/OhneAdmin`, Kacheln und `@modulRolle.darf` (REST/MCP) nach derselben Regel. `ModuleRoleService.neuAufloesen()` löst nach einer Änderung neu auf. Hinweis: Ein Root-Benutzer trägt meist auch ADMIN; «root nein, admin ja» lässt ihn über die Admin-Umgehung trotzdem hinein.
+  - Ohne plaintext-admin-settings in einer App bleibt alles wie bisher aus der yml. Keine Migration.
+
 ## [3.69.0] - 2026-11-22
 
 ### Changed

@@ -29,7 +29,8 @@ import java.util.TreeSet;
  *
  * <p>Without the configured role neither a menu item nor a dashboard tile of the module is
  * visible, and the {@code PageAccessGuard} refuses direct calls to the pages. {@code admin} and
- * {@code root} bypass the check, except for the modules listed in {@code strenge-module-roles}. Modules without an entry behave unchanged.</p>
+ * {@code root} bypass the check, except for the modules listed in {@code strenge-module-roles} (neither) or in
+ * {@code ohne-root-umgehung}/{@code ohne-admin-umgehung} (Karte 2390, one of them). Modules without an entry behave unchanged.</p>
  *
  * <p><b>Why here and not in the module code:</b> the same module artifact is bundled by several
  * applications (e.g. {@code plaintext-z-mailbox} runs in app.plaintext.ch AND in app.guild42.ch).
@@ -50,7 +51,8 @@ import java.util.TreeSet;
 public class ModuleRoleProperties {
 
     /** Module key -&gt; role name (without the {@code ROLE_} prefix, case-insensitive). */
-    private Map<String, String> moduleRoles = new LinkedHashMap<>();
+    // Karte 2390: volatile, weil ModulZugriff (admin-settings) die Werte zur Laufzeit ersetzt und Anfrage-Threads lesen.
+    private volatile Map<String, String> moduleRoles = new LinkedHashMap<>();
 
     /**
      * Module keys whose role is checked WITHOUT the admin/root bypass ({@code plaintext.menu.strenge-module-roles},
@@ -59,7 +61,7 @@ public class ModuleRoleProperties {
      *
      * @since 3.59.0
      */
-    private List<String> strengeModuleRoles = new ArrayList<>();
+    private volatile List<String> strengeModuleRoles = new ArrayList<>();
 
     public Map<String, String> getModuleRoles() {
         return moduleRoles;
@@ -78,18 +80,68 @@ public class ModuleRoleProperties {
     }
 
     /**
-     * @return the strict module keys in canonical form, sorted (never {@code null})
-     * @since 3.59.0
+     * Karte 2390: module keys whose role ROOT must hold itself (no root bypass); admin may still bypass unless listed in
+     * {@link #getOhneAdminUmgehung()}. Filled by the root module administration (settings {@code <key>.zugriff.root=false}),
+     * rarely in the yml. A key in {@code strenge-module-roles} counts as listed here.
      */
-    public Set<String> canonicalStrengeModuleRoles() {
+    private volatile List<String> ohneRootUmgehung = new ArrayList<>();
+
+    /** Karte 2390: like {@link #getOhneRootUmgehung()}, for ADMIN ({@code <key>.zugriff.admin=false}). */
+    private volatile List<String> ohneAdminUmgehung = new ArrayList<>();
+
+    public List<String> getOhneRootUmgehung() {
+        return ohneRootUmgehung;
+    }
+
+    public void setOhneRootUmgehung(List<String> ohneRootUmgehung) {
+        this.ohneRootUmgehung = ohneRootUmgehung == null ? new ArrayList<>() : ohneRootUmgehung;
+    }
+
+    public List<String> getOhneAdminUmgehung() {
+        return ohneAdminUmgehung;
+    }
+
+    public void setOhneAdminUmgehung(List<String> ohneAdminUmgehung) {
+        this.ohneAdminUmgehung = ohneAdminUmgehung == null ? new ArrayList<>() : ohneAdminUmgehung;
+    }
+
+    /**
+     * @return module keys without root bypass: {@code strenge-module-roles} plus {@code ohne-root-umgehung}, canonical
+     * @since 3.70.0
+     */
+    public Set<String> canonicalOhneRootUmgehung() {
+        Set<String> ret = canonical(ohneRootUmgehung);
+        ret.addAll(canonicalStrengeModuleRoles());
+        return ret;
+    }
+
+    /**
+     * @return module keys without admin bypass: {@code strenge-module-roles} plus {@code ohne-admin-umgehung}, canonical
+     * @since 3.70.0
+     */
+    public Set<String> canonicalOhneAdminUmgehung() {
+        Set<String> ret = canonical(ohneAdminUmgehung);
+        ret.addAll(canonicalStrengeModuleRoles());
+        return ret;
+    }
+
+    private static Set<String> canonical(List<String> keys) {
         Set<String> ret = new TreeSet<>();
-        for (String key : strengeModuleRoles) {
+        for (String key : keys) {
             String k = canonicalKey(key);
             if (!k.isEmpty()) {
                 ret.add(k);
             }
         }
         return ret;
+    }
+
+    /**
+     * @return the strict module keys in canonical form, sorted (never {@code null})
+     * @since 3.59.0
+     */
+    public Set<String> canonicalStrengeModuleRoles() {
+        return canonical(strengeModuleRoles);
     }
 
     /**
