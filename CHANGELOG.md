@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.69.0] - 2026-11-22
+
 ### Changed
 - **Seite «Laufzeit-Module» übersichtlicher** (Karte 2456, Test Daniel im Träger):
   - Im Dropdown steht jede Version einmal. Die Registry nennt es nur, wenn sich die Kopien einer Version in den Registries unterscheiden (sha256, Signatur oder Passung zur Hülle). Gleiche Kopien lädt der Lader ohne Registry aus der ersten, mit demselben Ergebnis. Eine gespeicherte Registry bei gleichen Kopien zeigt die Seite als diese eine Version.
