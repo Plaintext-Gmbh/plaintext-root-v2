@@ -234,4 +234,56 @@ class SettingsMcpToolsTest {
         assertThat(antwort).isInstanceOf(List.class);
         assertThat(String.valueOf(antwort)).contains("app.ownhost").contains("https://app.plaintext.ch");
     }
+
+    // ── Modul-Zugriff (Karte 2390, Übergabe chef 417) ───────────────────────
+
+    private void alsGlobalerAdmin() {
+        anmelden("SCOPE_ADMIN", "ROLE_ADMIN", "TOKEN_MANDAT_global");
+    }
+
+    private void alsGlobalerRoot() {
+        anmelden("SCOPE_ADMIN", "ROLE_ROOT", "TOKEN_MANDAT_global");
+    }
+
+    @Test
+    @DisplayName("Globaler Admin-Token darf Modul-Zugriffsschlüssel nicht setzen")
+    void globalerAdminDarfZugriffNichtSetzen() {
+        alsGlobalerAdmin();
+
+        assertThat(tools.setSetting("wiki.zugriff.root", "true", "BOOLEAN", null))
+                .contains("erfordern die Rolle ROOT");
+        verify(settingsService, never()).setSetting(anyString(), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("Globaler Admin-Token darf Modul-Zugriffsschlüssel nicht löschen")
+    void globalerAdminDarfZugriffNichtLoeschen() {
+        alsGlobalerAdmin();
+
+        assertThat(tools.deleteSetting("wiki.zugriff.root"))
+                .contains("erfordern die Rolle ROOT");
+        verify(settingsService, never()).deleteSetting(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("Globaler Root darf Modul-Zugriffsschlüssel setzen")
+    void globalerRootDarfZugriffSetzen() {
+        alsGlobalerRoot();
+        when(settingsService.exists("wiki.zugriff.root", "global")).thenReturn(false);
+
+        assertThat(tools.setSetting("wiki.zugriff.root", "true", "BOOLEAN", null))
+                .contains("angelegt");
+        verify(settingsService).setSetting("wiki.zugriff.root", "global", "true", "BOOLEAN", null);
+    }
+
+    @Test
+    @DisplayName("Modul-Zugriffsschlüssel im eigenen Mandanten bleiben Admin-Sache")
+    void zugriffImEigenenMandantenBleibtBeimAdmin() {
+        alsAdmin();
+        when(settingsService.exists("wiki.zugriff.root", "plaintext")).thenReturn(false);
+
+        assertThat(tools.setSetting("wiki.zugriff.root", "true", "BOOLEAN", null))
+                .contains("angelegt");
+        verify(settingsService).setSetting("wiki.zugriff.root", "plaintext", "true", "BOOLEAN", null);
+    }
 }
