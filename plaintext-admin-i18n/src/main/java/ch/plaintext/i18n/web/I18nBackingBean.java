@@ -6,6 +6,9 @@ package ch.plaintext.i18n.web;
 import ch.plaintext.boot.plugins.jsf.FacesMessages;
 import ch.plaintext.MenuRegistry;
 import ch.plaintext.PlaintextSecurity;
+import ch.plaintext.boot.table.TableColumn;
+import ch.plaintext.boot.table.TableSettings;
+import ch.plaintext.boot.table.TableStateStore;
 import ch.plaintext.i18n.entity.I18nTranslation;
 import ch.plaintext.i18n.service.I18nService;
 import jakarta.faces.application.FacesMessage;
@@ -67,6 +70,26 @@ public class I18nBackingBean implements Serializable {
     @Autowired(required = false)
     private transient MenuRegistry menuRegistry;
 
+    /** Karte 2464: Tabelle «Übersetzungen» mit Tabellen-Einstellungen (Spalten, Breiten, Sortierung, Paging). */
+    static final String TABELLE = "i18n-translations";
+    private static final List<TableColumn> SPALTEN = List.of(
+            new TableColumn("defaultLabel", "Default Label", 250),
+            new TableColumn("language", "Sprache", 100),
+            new TableColumn("translation", "Übersetzung", 300),
+            new TableColumn("aktionen", "Aktionen", 80, true, false, false));
+
+    /** Vorbild useradmin (Karte 1904): Sichtbarkeit/Reihenfolge/Breiten/Sortierung je Benutzer und Mandant. */
+    private final TableSettings anzeige = new TableSettings(TABELLE, true, 20);
+
+    /** Optional, wie im Vorbild: ohne Store bleibt der Standard wirksam und nichts wird gespeichert. */
+    @Autowired(required = false)
+    private transient TableStateStore tableStateStore;
+
+    /** @return {@code true}, wenn die Spalte für diesen Benutzer sichtbar ist */
+    public boolean spalteSichtbar(String schluessel) {
+        return anzeige.isVisible(schluessel);
+    }
+
     private List<I18nTranslation> translations;
     private I18nTranslation selected;
     private String filterLanguage;
@@ -93,6 +116,7 @@ public class I18nBackingBean implements Serializable {
             }
             return;
         }
+        anzeige.init(tableStateStore, SPALTEN);
         FacesContext ctx = FacesContext.getCurrentInstance();
         if (ctx != null && ctx.isPostback()) {
             return;

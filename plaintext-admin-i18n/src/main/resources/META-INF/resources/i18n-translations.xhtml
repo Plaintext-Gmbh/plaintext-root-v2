@@ -2,6 +2,7 @@
                 xmlns:ui="http://java.sun.com/jsf/facelets"
                 xmlns:p="http://primefaces.org/ui"
                 xmlns:f="http://xmlns.jcp.org/jsf/core"
+                xmlns:pt="http://plaintext.ch/ui"
                 template="/includes/template.xhtml">
 
     <f:metadata>
@@ -68,28 +69,52 @@
                                      style="margin-left: auto;"/>
                 </div>
 
+                <!-- Karte 2464: Tabellen-Einstellungen wie auf den übrigen Seiten (Vorbild useradmin, Karte 1904) -->
+                <pt:tableSettings anzeige="#{i18nBackingBean.anzeige}" tabelle=":fm:tbl"/>
+
                 <p:dataTable id="tbl" var="obj" value="#{i18nBackingBean.translations}"
                              selectionMode="single" selection="#{i18nBackingBean.selected}"
                              rowKey="#{obj.id}" emptyMessage="Keine Übersetzungen vorhanden"
-                             paginator="true" rows="20">
+                             sortBy="#{i18nBackingBean.anzeige.sortMeta}"
+                             paginator="#{i18nBackingBean.anzeige.paginator}"
+                             paginatorPosition="#{i18nBackingBean.anzeige.paginatorPosition}"
+                             rows="#{i18nBackingBean.anzeige.rows}"
+                             rowsPerPageTemplate="#{i18nBackingBean.anzeige.rowsPerPageTemplate}"
+                             draggableColumns="#{i18nBackingBean.anzeige.verschiebenAktiv}"
+                             resizableColumns="#{i18nBackingBean.anzeige.groesseAendernAktiv}"
+                             resizeMode="expand"
+                             tableStyle="#{i18nBackingBean.anzeige.tabellenBreite}">
 
+                    <p:ajax event="sort" listener="#{i18nBackingBean.anzeige.onSort}"/>
+                    <p:ajax event="page" listener="#{i18nBackingBean.anzeige.onPage}"/>
+                    <p:ajax event="colResize" listener="#{i18nBackingBean.anzeige.onColumnResize}"/>
+                    <p:ajax event="colReorder" listener="#{i18nBackingBean.anzeige.onColReorder(event, ':fm:tbl')}"
+                            update="fm:anz-bereich :fm:tbl"/>
                     <p:ajax event="rowSelect" listener="#{i18nBackingBean.select()}" update="fm"/>
                     <p:ajax event="rowUnselect" listener="#{i18nBackingBean.clearSelection()}" update="fm"/>
 
-                    <p:column headerText="Default Label" sortBy="#{obj.defaultLabel}" filterBy="#{obj.defaultLabel}">
+                    <p:column headerText="Default Label" sortBy="#{obj.defaultLabel}" filterBy="#{obj.defaultLabel}"
+                              visible="#{i18nBackingBean.spalteSichtbar('defaultLabel')}"
+                              width="#{i18nBackingBean.anzeige.breite('defaultLabel')}">
                         <h:outputText value="#{obj.defaultLabel}"/>
                     </p:column>
 
-                    <p:column headerText="#{i18n.t('Sprache')}" sortBy="#{obj.languageCode}" style="width: 100px;">
+                    <p:column headerText="#{i18n.t('Sprache')}" sortBy="#{obj.languageCode}"
+                              visible="#{i18nBackingBean.spalteSichtbar('language')}"
+                              width="#{i18nBackingBean.anzeige.breite('language')}">
                         <h:outputText value="#{obj.languageCode}"/>
                     </p:column>
 
-                    <p:column headerText="#{i18n.t('Übersetzung')}" sortBy="#{obj.translatedText}">
+                    <p:column headerText="#{i18n.t('Übersetzung')}" sortBy="#{obj.translatedText}"
+                              visible="#{i18nBackingBean.spalteSichtbar('translation')}"
+                              width="#{i18nBackingBean.anzeige.breite('translation')}">
                         <h:outputText value="#{obj.translatedText}"
                                       style="#{obj.translatedText.startsWith('X_') ? 'color: #e74c3c; font-weight: bold;' : ''}"/>
                     </p:column>
 
-                    <p:column headerText="#{i18n.t('Aktionen')}" style="width: 80px; text-align: center;">
+                    <p:column headerText="#{i18n.t('Aktionen')}" style="text-align: center;"
+                              visible="#{i18nBackingBean.spalteSichtbar('aktionen')}"
+                              width="#{i18nBackingBean.anzeige.breite('aktionen')}">
                         <p:commandButton icon="pi pi-trash" styleClass="ui-button-danger ui-button-sm"
                                          actionListener="#{i18nBackingBean.delete()}"
                                          update=":fm:tbl" process="@this"
