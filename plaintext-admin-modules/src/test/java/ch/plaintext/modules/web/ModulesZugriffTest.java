@@ -34,22 +34,23 @@ class ModulesZugriffTest {
         return s;
     }
 
-    private static PlaintextSecurity securityMitRoot(boolean root) {
+    private static PlaintextSecurity securityMitRollen(String... rollen) {
+        Set<String> hat = Set.of(rollen);
         PlaintextSecurity s = mock(PlaintextSecurity.class);
-        when(s.ifGranted(anyString())).thenAnswer(a -> root && "ROLE_ROOT".equals(a.getArgument(0, String.class)));
+        when(s.ifGranted(anyString())).thenAnswer(a -> hat.contains(a.getArgument(0, String.class)));
         return s;
     }
 
     private static ModulesBackingBean bean(ISettingsService settings) {
-        return bean(settings, true);
+        return bean(settings, "ROLE_ROOT");
     }
 
-    private static ModulesBackingBean bean(ISettingsService settings, boolean root) {
+    private static ModulesBackingBean bean(ISettingsService settings, String... rollen) {
         StaticListableBeanFactory bf = new StaticListableBeanFactory();
         if (settings != null) {
             bf.addBean("settings", settings);
         }
-        bf.addBean("security", securityMitRoot(root));
+        bf.addBean("security", securityMitRollen(rollen));
         ModulesBackingBean bean = new ModulesBackingBean();
         bean.setSettings(bf.getBeanProvider(ISettingsService.class));
         bean.setSecurity(bf.getBeanProvider(PlaintextSecurity.class));
@@ -108,11 +109,17 @@ class ModulesZugriffTest {
     @Test
     void ohneRootWirdAbgewiesen() {
         ISettingsService settings = settings();
-        ModulesBackingBean bean = bean(settings, false);
-        assertThatThrownBy(() -> bean.zugriffVorbereiten(new ModuleView("wiki", "Wiki", "1.0", true, "x")))
-                .isInstanceOf(SecurityException.class);
-        bean.setZugriffModuleId("wiki");
-        assertThatThrownBy(bean::zugriffSpeichern).isInstanceOf(SecurityException.class);
+        ModulesBackingBean admin = bean(settings, "ROLE_ADMIN");
+        assertThatThrownBy(() -> admin.zugriffVorbereiten(new ModuleView("wiki", "Wiki", "1.0", true, "x")))
+                .as("ADMIN").isInstanceOf(SecurityException.class);
+        admin.setZugriffModuleId("wiki");
+        assertThatThrownBy(admin::zugriffSpeichern).as("ADMIN speichern").isInstanceOf(SecurityException.class);
+
+        ModulesBackingBean benutzer = bean(settings, "ROLE_USER");
+        assertThatThrownBy(() -> benutzer.zugriffVorbereiten(new ModuleView("wiki", "Wiki", "1.0", true, "x")))
+                .as("normaler Benutzer").isInstanceOf(SecurityException.class);
+        benutzer.setZugriffModuleId("wiki");
+        assertThatThrownBy(benutzer::zugriffSpeichern).as("Benutzer speichern").isInstanceOf(SecurityException.class);
         verify(settings, never()).setSetting(anyString(), anyString(), anyString(), anyString(), anyString());
     }
 
