@@ -42,10 +42,11 @@ public class ModulRolle {
             return true;
         }
         PlaintextSecurity s = security.getIfAvailable();
-        // Karte 2377 ROOT-3: strict modules (plaintext.menu.strenge-module-roles) without the admin/root bypass.
-        if (p.canonicalStrengeModuleRoles().contains(ModuleRoleProperties.canonicalKey(modulKey))) {
-            return PlaintextRoles.hasAny(s, rolle);
-        }
-        return PlaintextRoles.isAdmin(s) || PlaintextRoles.hasAny(s, rolle);
+        String key = ModuleRoleProperties.canonicalKey(modulKey);
+        // Karte 2377 ROOT-3 (strict = neither) and Karte 2390 (root and admin separately): same rule as the menu
+        // (ModuleRoleService.holdsAny), so REST/MCP and the pages never disagree.
+        boolean rootUmgehung = !p.canonicalOhneRootUmgehung().contains(key) && PlaintextRoles.isRoot(s);
+        boolean adminUmgehung = !p.canonicalOhneAdminUmgehung().contains(key) && PlaintextRoles.isAdminOnly(s);
+        return rootUmgehung || adminUmgehung || PlaintextRoles.hasAny(s, rolle);
     }
 }

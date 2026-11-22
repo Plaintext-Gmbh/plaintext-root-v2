@@ -39,6 +39,20 @@ public class SettingsServiceImpl implements ISettingsService {
         this.security = security;
     }
 
+    /** Karte 2390: Aenderungen melden ({@link EinstellungGeaendert}), z. B. fuer den Modul-Zugriff ohne Neustart. */
+    private org.springframework.context.ApplicationEventPublisher ereignisse;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setEreignisse(org.springframework.context.ApplicationEventPublisher ereignisse) {
+        this.ereignisse = ereignisse;
+    }
+
+    private void melden(String key, String mandat, String alt, String neu) {
+        if (ereignisse != null) {
+            ereignisse.publishEvent(new EinstellungGeaendert(key, mandat, alt, neu));
+        }
+    }
+
     /**
      * {@inheritDoc}
      *
@@ -156,6 +170,7 @@ public class SettingsServiceImpl implements ISettingsService {
 
         Setting setting = repository.findByKeyAndMandat(key, mandat)
                 .orElse(new Setting());
+        String alt = setting.getValue();
 
         setting.setKey(key);
         setting.setMandat(mandat);
@@ -165,6 +180,7 @@ public class SettingsServiceImpl implements ISettingsService {
 
         repository.save(setting);
         log.info("Saved setting: key={}, mandat={}", key, mandat);
+        melden(key, mandat, alt, value);
     }
 
     @Override
@@ -176,8 +192,10 @@ public class SettingsServiceImpl implements ISettingsService {
     @Override
     @Transactional
     public void deleteSetting(String key, String mandat) {
+        String alt = repository.findByKeyAndMandat(key, mandat).map(Setting::getValue).orElse(null);
         repository.deleteByKeyAndMandat(key, mandat);
         log.info("Deleted setting: key={}, mandat={}", key, mandat);
+        melden(key, mandat, alt, null);
     }
 
     @Override

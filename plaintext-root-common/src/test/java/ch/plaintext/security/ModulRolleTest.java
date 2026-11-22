@@ -73,6 +73,36 @@ class ModulRolleTest {
         assertThat(strengeModulRolle(Map.of("fotos", "fotos"), "ROLE_ADMIN").darf("fotos")).as("nicht gelistet: Umgehung bleibt").isTrue();
     }
 
+    @Test
+    @DisplayName("Karte 2390: Root- und Admin-Umgehung getrennt, gleiche Regel wie das Menue")
+    void rootUndAdminGetrennt() {
+        ModuleRoleProperties p = new ModuleRoleProperties();
+        p.setModuleRoles(Map.of("fotos", "fotos"));
+        p.setOhneRootUmgehung(java.util.List.of("fotos"));
+        assertThat(mitProps(p, "ROLE_ROOT").darf("fotos")).as("ohne Root-Umgehung: ROOT allein nicht").isFalse();
+        assertThat(mitProps(p, "ROLE_ADMIN").darf("fotos")).as("ohne Root-Umgehung: ADMIN weiter").isTrue();
+        assertThat(mitProps(p, "ROLE_ROOT", "ROLE_FOTOS").darf("fotos")).isTrue();
+        ModuleRoleProperties q = new ModuleRoleProperties();
+        q.setModuleRoles(Map.of("fotos", "fotos"));
+        q.setOhneAdminUmgehung(java.util.List.of("fotos"));
+        assertThat(mitProps(q, "ROLE_ADMIN").darf("fotos")).as("ohne Admin-Umgehung: ADMIN allein nicht").isFalse();
+        assertThat(mitProps(q, "ROLE_ROOT").darf("fotos")).as("ohne Admin-Umgehung: ROOT weiter").isTrue();
+        assertThat(modulRolle(Map.of("fotos", "fotos"), "ROLE_ADMIN").darf("fotos")).as("ohne Schalter wie bisher").isTrue();
+    }
+
+    private static ModulRolle mitProps(ModuleRoleProperties p, String... rollen) {
+        StaticListableBeanFactory bf = new StaticListableBeanFactory();
+        bf.addBean("props", p);
+        Set<String> hat = Set.of(rollen);
+        PlaintextSecurity s = mock(PlaintextSecurity.class);
+        when(s.ifGranted(anyString())).thenAnswer(a -> {
+            String r = a.getArgument(0, String.class).toUpperCase();
+            return hat.contains(r.startsWith("ROLE_") ? r : "ROLE_" + r);
+        });
+        bf.addBean("security", s);
+        return new ModulRolle(bf.getBeanProvider(ModuleRoleProperties.class), bf.getBeanProvider(PlaintextSecurity.class));
+    }
+
     private static ModulRolle strengeModulRolle(Map<String, String> zuordnung, String... rollen) {
         return modulRolle(zuordnung, java.util.List.of("terminal"), rollen);
     }

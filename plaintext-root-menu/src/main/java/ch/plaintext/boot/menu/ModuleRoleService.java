@@ -70,9 +70,14 @@ public class ModuleRoleService implements SmartInitializingSingleton {
     /** All module keys detected on the classpath (for the startup report and doc hint). */
     private final AtomicReference<Set<String>> knownModuleKeys = new AtomicReference<>(Set.of());
 
-    /** Links and menu titles of strict modules (Karte 2377 ROOT-3), for the tile check. */
-    private final AtomicReference<Set<String>> strengeLinks = new AtomicReference<>(Set.of());
-    private final AtomicReference<Set<String>> strengeMenuTitel = new AtomicReference<>(Set.of());
+    /**
+     * Links and menu titles of modules without root resp. admin bypass (Karte 2377 ROOT-3 strict = both,
+     * Karte 2390 one of them), for the tile check.
+     */
+    private final AtomicReference<Set<String>> ohneRootLinks = new AtomicReference<>(Set.of());
+    private final AtomicReference<Set<String>> ohneRootMenuTitel = new AtomicReference<>(Set.of());
+    private final AtomicReference<Set<String>> ohneAdminLinks = new AtomicReference<>(Set.of());
+    private final AtomicReference<Set<String>> ohneAdminMenuTitel = new AtomicReference<>(Set.of());
 
     private volatile boolean resolved;
 
@@ -137,12 +142,14 @@ public class ModuleRoleService implements SmartInitializingSingleton {
         ensureResolved();
         String key = canonicalLink(link);
         List<String> required = rolesByLink.get().get(key);
-        boolean streng = strengeLinks.get().contains(key);
+        boolean ohneRoot = ohneRootLinks.get().contains(key);
+        boolean ohneAdmin = ohneAdminLinks.get().contains(key);
         if (required == null && menuTitle != null && !menuTitle.trim().isEmpty()) {
             required = rolesByMenuTitle.get().get(menuTitle.trim());
-            streng = strengeMenuTitel.get().contains(menuTitle.trim());
+            ohneRoot = ohneRootMenuTitel.get().contains(menuTitle.trim());
+            ohneAdmin = ohneAdminMenuTitel.get().contains(menuTitle.trim());
         }
-        return holdsAny(required, securityProvider, streng);
+        return holdsAny(required, securityProvider, ohneRoot, ohneAdmin);
     }
 
     /**
@@ -179,14 +186,30 @@ public class ModuleRoleService implements SmartInitializingSingleton {
      * @since 3.59.0
      */
     public static boolean holdsAny(List<String> required, SecurityProvider securityProvider, boolean streng) {
+        return holdsAny(required, securityProvider, streng, streng);
+    }
+
+    /**
+     * Karte 2390: the bypass separately for root and admin ({@code <key>.zugriff.root} / {@code .admin} in the module
+     * administration). Note: a root user usually also holds ADMIN, so "root no, admin yes" still lets them in through
+     * the admin bypass.
+     *
+     * @param required         required roles (UPPERCASE, without prefix), may be empty/{@code null}
+     * @param securityProvider role lookup, may be {@code null}
+     * @param ohneRoot         {@code true}: ROOT does not bypass, it needs the role
+     * @param ohneAdmin        {@code true}: ADMIN does not bypass, it needs the role
+     * @return {@code true} if access is allowed
+     * @since 3.70.0
+     */
+    public static boolean holdsAny(List<String> required, SecurityProvider securityProvider, boolean ohneRoot,
+                                   boolean ohneAdmin) {
         if (required == null || required.isEmpty()) {
             return true;
         }
         if (securityProvider == null) {
             return true;
         }
-        // admin and root keep access, except for strict modules.
-        if (!streng && (hasRole(securityProvider, "ROOT") || hasRole(securityProvider, "ADMIN"))) {
+        if (!ohneRoot && hasRole(securityProvider, "ROOT") || !ohneAdmin && hasRole(securityProvider, "ADMIN")) {
             return true;
         }
         for (String role : required) {
@@ -282,10 +305,13 @@ public class ModuleRoleService implements SmartInitializingSingleton {
      */
     public void resolve(Collection<MenuItemImpl> items) {
         Map<String, String> configured = properties.canonicalModuleRoles();
-        Set<String> strengeKeys = properties.canonicalStrengeModuleRoles();
+        Set<String> ohneRootKeys = properties.canonicalOhneRootUmgehung();
+        Set<String> ohneAdminKeys = properties.canonicalOhneAdminUmgehung();
         Map<String, List<MenuItemImpl>> byTitle = indexByTitle(items);
-        Set<String> strengLinks = new HashSet<>();
-        Set<String> strengTitel = new HashSet<>();
+        Set<String> rootLinks = new HashSet<>();
+        Set<String> rootTitel = new HashSet<>();
+        Set<String> adminLinks = new HashSet<>();
+        Set<String> adminTitel = new HashSet<>();
 
         Set<String> keys = new TreeSet<>();
         Map<String, List<String>> byLink = new HashMap<>();
@@ -304,25 +330,47 @@ public class ModuleRoleService implements SmartInitializingSingleton {
             item.setModuleRoles(required);
             indexRequiredRoles(item, required, byLink, byMenuTitle);
 
-            boolean streng = candidates.stream().anyMatch(strengeKeys::contains);
-            item.setModuleRoleStreng(streng);
-            if (streng) {
-                String link = canonicalLink(item.getCommand());
-                if (!link.isEmpty()) {
-                    strengLinks.add(link);
-                }
-                if (item.getTitle() != null && !item.getTitle().isBlank()) {
-                    strengTitel.add(item.getTitle().trim());
-                }
-            }
+            boolean ohneRoot = candidates.stream().anyMatch(ohneRootKeys::contains);
+            boolean ohneAdmin = candidates.stream().anyMatch(ohneAdminKeys::contains);
+            item.setModuleRoleOhneRoot(ohneRoot);
+            item.setModuleRoleOhneAdmin(ohneAdmin);
+            merken(item, ohneRoot, rootLinks, rootTitel);
+            merken(item, ohneAdmin, adminLinks, adminTitel);
         }
-        this.strengeLinks.set(Set.copyOf(strengLinks));
-        this.strengeMenuTitel.set(Set.copyOf(strengTitel));
+        this.ohneRootLinks.set(Set.copyOf(rootLinks));
+        this.ohneRootMenuTitel.set(Set.copyOf(rootTitel));
+        this.ohneAdminLinks.set(Set.copyOf(adminLinks));
+        this.ohneAdminMenuTitel.set(Set.copyOf(adminTitel));
 
         this.knownModuleKeys.set(Collections.unmodifiableSet(new TreeSet<>(keys)));
         this.rolesByLink.set(Map.copyOf(byLink));
         this.rolesByMenuTitle.set(Map.copyOf(byMenuTitle));
         this.resolved = true;
+    }
+
+    private static void merken(MenuItemImpl item, boolean an, Set<String> links, Set<String> titel) {
+        if (!an) {
+            return;
+        }
+        String link = canonicalLink(item.getCommand());
+        if (!link.isEmpty()) {
+            links.add(link);
+        }
+        if (item.getTitle() != null && !item.getTitle().isBlank()) {
+            titel.add(item.getTitle().trim());
+        }
+    }
+
+    /**
+     * Karte 2390: resolves again after the module roles changed at runtime (root module administration via settings),
+     * so that menu, tiles and page access follow without a restart.
+     *
+     * @since 3.70.0
+     */
+    public void neuAufloesen() {
+        synchronized (this) {
+            resolve(loadMenuItems());
+        }
     }
 
     /**

@@ -68,12 +68,15 @@ public class MenuItemImpl extends AbstractMenuItem implements MenuRegistry.MenuI
     private List<String> moduleKeys = new ArrayList<>();
 
     /**
-     * {@code true} if one of the {@link #moduleKeys} is listed in {@code plaintext.menu.strenge-module-roles}:
-     * the module role then applies to admin and root as well. Set once by the {@link ModuleRoleService}.
+     * {@code true} if ROOT does not bypass the module role of this item ({@code strenge-module-roles} or, Karte 2390,
+     * {@code <key>.zugriff.root=false} in the module administration). Set by the {@link ModuleRoleService}.
      *
-     * @since 3.59.0
+     * @since 3.70.0
      */
-    private boolean moduleRoleStreng;
+    private boolean moduleRoleOhneRoot;
+
+    /** Like {@link #moduleRoleOhneRoot}, for ADMIN ({@code <key>.zugriff.admin=false}). @since 3.70.0 */
+    private boolean moduleRoleOhneAdmin;
 
     /**
      * {@code false} keeps the item out of the rendered menu ({@code plaintext.menu.platzierung.<menuId>.sichtbar});
@@ -188,12 +191,24 @@ public class MenuItemImpl extends AbstractMenuItem implements MenuRegistry.MenuI
     }
 
     /**
+     * {@code true} if neither root nor admin bypass the module role (strict module, Karte 2377 ROOT-3); for the
+     * menu diagnostics.
+     *
+     * @return both bypasses off
+     * @since 3.59.0
+     */
+    public boolean isModuleRoleStreng() {
+        return moduleRoleOhneRoot && moduleRoleOhneAdmin;
+    }
+
+    /**
      * Configurable module role ({@code plaintext.menu.module-roles.<key>=<rolle>}): switches a
      * whole module on or off per application. Applies under both access policies and — because the
      * {@code PageAccessGuard} goes through {@link #isOn()} — to direct page access as well.
      * {@code admin}/{@code root} bypass the check (in the {@link ModuleRoleService}), except for strict modules
      * ({@code plaintext.menu.strenge-module-roles}): there {@link #isOn()} is {@code false} without the role even
-     * for root, because it requires this check AND the role check.
+     * for root, because it requires this check AND the role check. Karte 2390: root and admin bypass separately
+     * ({@link #moduleRoleOhneRoot}, {@link #moduleRoleOhneAdmin}).
      *
      * <p>Public so that the diagnostics view can query the four filters <i>individually</i>
      * without rebuilding the logic — a second copy would drift away from {@link #isOn()}.</p>
@@ -203,7 +218,7 @@ public class MenuItemImpl extends AbstractMenuItem implements MenuRegistry.MenuI
      */
     public boolean isModuleRoleVisible() {
         ensureModuleMetadataResolved();
-        boolean visible = ModuleRoleService.holdsAny(moduleRoles, securityProvider, moduleRoleStreng);
+        boolean visible = ModuleRoleService.holdsAny(moduleRoles, securityProvider, moduleRoleOhneRoot, moduleRoleOhneAdmin);
         if (!visible) {
             log.debug("Modul-Rolle {} fehlt - Menuepunkt '{}' ausgeblendet", moduleRoles, title);
         }
