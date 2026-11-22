@@ -123,6 +123,14 @@
              Nicht abwaehlbar und warum je einzeln: docs/OPTIONAL_MODULES.md,
              Begruendung des Wegs: docs/adr/0007-admin-module-abwaehlbar-per-exclusions.md. -->
         <dependency>
+            <!-- Karte 2450: liefert die Huelle mit, damit Apps es als provided einbinden können
+                 (loest den registry.sh-Classifier-Fund bei app, Karte 2459). -->
+            <groupId>ch.plaintext.v2</groupId>
+            <artifactId>plaintext-admin-requirements</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
             <groupId>ch.plaintext.v2</groupId>
             <artifactId>plaintext-admin-sessions</artifactId>
             <version>${project.version}</version>
