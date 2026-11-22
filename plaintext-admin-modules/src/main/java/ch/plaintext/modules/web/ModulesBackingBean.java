@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.modules.web;
 
+import ch.plaintext.PlaintextRoles;
+import ch.plaintext.PlaintextSecurity;
 import ch.plaintext.boot.plugins.jsf.FacesMessages;
 import ch.plaintext.boot.menu.ModuleRoleProperties;
 import ch.plaintext.modules.ModuleDangerZoneService;
@@ -85,6 +87,10 @@ public class ModulesBackingBean implements Serializable {
     @Autowired
     private transient ObjectProvider<ISettingsService> settings;
 
+    /** Karte 2390 Teil 3 (Review kimi1): serverseitiger ROOT-Schutz — «rendered» schützt nur die Anzeige. */
+    @Autowired
+    private transient ObjectProvider<PlaintextSecurity> security;
+
     private List<ModuleView> module = new ArrayList<>();
 
     // ── Schnittstellen (Karte 1422) ─────────────────────────
@@ -128,8 +134,16 @@ public class ModulesBackingBean implements Serializable {
         return settings.getIfAvailable() != null;
     }
 
+    /** Serverseitiger Schutz der Zugriffs-Pflege (Review kimi1): nur ROOT, ohne Kontext gar nichts. */
+    private void nurRoot() {
+        if (!PlaintextRoles.isRoot(security.getIfAvailable())) {
+            throw new SecurityException("Der Modul-Zugriff ist nur für ROOT.");
+        }
+    }
+
     /** Öffnet den Zugriffs-Dialog: liest die fünf {@code <key>.zugriff.*}-Schlüssel (Standard: frei/alle ja). */
     public void zugriffVorbereiten(ModuleView m) {
+        nurRoot();
         ISettingsService s = settings.getIfAvailable();
         zugriffModuleId = ModuleRoleProperties.canonicalKey(m.getModuleId());
         zugriffModuleDisplayName = m.getDisplayName();
@@ -154,6 +168,7 @@ public class ModulesBackingBean implements Serializable {
      * (kein admin-settings) bricht ab, bevor etwas geschrieben wird.
      */
     public void zugriffSpeichern() {
+        nurRoot();
         ISettingsService s = settings.getIfAvailable();
         if (s == null || zugriffModuleId == null || zugriffModuleId.isBlank()) {
             return;

@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 package ch.plaintext.modules.web;
 
+import ch.plaintext.PlaintextSecurity;
 import ch.plaintext.modules.ModuleView;
 import ch.plaintext.settings.ISettingsService;
 import ch.plaintext.settings.SettingsKeys;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -32,13 +34,25 @@ class ModulesZugriffTest {
         return s;
     }
 
+    private static PlaintextSecurity securityMitRoot(boolean root) {
+        PlaintextSecurity s = mock(PlaintextSecurity.class);
+        when(s.ifGranted(anyString())).thenAnswer(a -> root && "ROLE_ROOT".equals(a.getArgument(0, String.class)));
+        return s;
+    }
+
     private static ModulesBackingBean bean(ISettingsService settings) {
+        return bean(settings, true);
+    }
+
+    private static ModulesBackingBean bean(ISettingsService settings, boolean root) {
         StaticListableBeanFactory bf = new StaticListableBeanFactory();
         if (settings != null) {
             bf.addBean("settings", settings);
         }
+        bf.addBean("security", securityMitRoot(root));
         ModulesBackingBean bean = new ModulesBackingBean();
         bean.setSettings(bf.getBeanProvider(ISettingsService.class));
+        bean.setSecurity(bf.getBeanProvider(PlaintextSecurity.class));
         return bean;
     }
 
@@ -89,6 +103,17 @@ class ModulesZugriffTest {
                 eq("BOOLEAN"), anyString());
         verify(settings).setSetting(eq("wiki.zugriff.bearbeiten"), eq(SettingsKeys.MANDAT_GLOBAL), eq("true"),
                 eq("BOOLEAN"), anyString());
+    }
+
+    @Test
+    void ohneRootWirdAbgewiesen() {
+        ISettingsService settings = settings();
+        ModulesBackingBean bean = bean(settings, false);
+        assertThatThrownBy(() -> bean.zugriffVorbereiten(new ModuleView("wiki", "Wiki", "1.0", true, "x")))
+                .isInstanceOf(SecurityException.class);
+        bean.setZugriffModuleId("wiki");
+        assertThatThrownBy(bean::zugriffSpeichern).isInstanceOf(SecurityException.class);
+        verify(settings, never()).setSetting(anyString(), anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
