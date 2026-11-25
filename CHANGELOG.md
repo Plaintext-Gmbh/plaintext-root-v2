@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.79.0] - 2026-11-25
+
 ### Changed
 - **Mehr Abstand in Formularen** (Karte 2425, Test Daniel im Träger): `plaintext-layout/css/layout.css`
   gibt dem Seiteninhalt mehr Abstand zum oberen Rand (2.25rem statt 1.5rem), Fieldsets und Dialoginhalten
