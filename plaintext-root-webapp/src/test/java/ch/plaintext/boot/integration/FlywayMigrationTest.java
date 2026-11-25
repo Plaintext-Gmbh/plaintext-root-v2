@@ -84,4 +84,14 @@ class FlywayMigrationTest {
             }
         }
     }
+
+    /** Karte 2517: das Rollen-Set (XStream) wird mit vielen Modulrollen laenger als 255 Zeichen. */
+    @Test
+    void rollenSpalteFasstLangesRollenSet() throws Exception {
+        try (Connection conn = dataSource.getConnection();
+             ResultSet rs = conn.getMetaData().getColumns(null, null, "my_user_entity", "roles")) {
+            assertTrue(rs.next(), "Spalte my_user_entity.roles fehlt");
+            assertTrue(rs.getInt("COLUMN_SIZE") >= 4000, "roles zu kurz: " + rs.getInt("COLUMN_SIZE"));
+        }
+    }
 }
