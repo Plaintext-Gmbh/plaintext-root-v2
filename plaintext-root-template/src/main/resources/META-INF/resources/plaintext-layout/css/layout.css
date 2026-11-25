@@ -308,3 +308,44 @@ html[data-theme="dark"] {
         text-align: left;
     }
 }
+
+/* Karte 2425 (Daniel 25.11.2026, Test im Träger): Formulare in root wirkten gedrängt - die Seiten (z. B. Secrets)
+   klebten am oberen Rand, Dropdown-Suche und Tabellen-Suche hatten keinen Abstand. Zentral hier statt je Seite;
+   layout.css kommt nach layout-light/-dark.css und gewinnt darum bei gleicher Spezifität. */
+.layout-content {
+    padding-top: 2.25rem;
+}
+
+.layout-content .ui-fieldset {
+    margin-top: .5rem;
+}
+
+.layout-content .ui-fieldset .ui-fieldset-content {
+    padding-top: 1rem;
+}
+
+.ui-dialog .ui-dialog-content {
+    padding-top: 1.25rem;
+}
+
+/* Suche im Dropdown (selectOneMenu filter="true", selectCheckboxMenu) und Autocomplete */
+.ui-selectonemenu-panel .ui-selectonemenu-filter-container,
+.ui-selectcheckboxmenu-panel .ui-selectcheckboxmenu-header {
+    padding: .6rem .75rem;
+}
+
+.ui-selectonemenu-panel .ui-selectonemenu-items,
+.ui-selectcheckboxmenu-panel .ui-selectcheckboxmenu-items,
+.ui-autocomplete-panel .ui-autocomplete-items {
+    padding-top: .35rem;
+    padding-bottom: .35rem;
+}
+
+/* Suche und Filter in Tabellen */
+.ui-datatable > .ui-datatable-header {
+    padding: .75rem 1rem;
+}
+
+.ui-datatable .ui-column-filter {
+    margin-top: .4rem;
+}

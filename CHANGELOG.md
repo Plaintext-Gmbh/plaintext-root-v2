@@ -12,6 +12,12 @@ exhaustive.
 
 ## [Unreleased]
 
+### Changed
+- **Mehr Abstand in Formularen** (Karte 2425, Test Daniel im Träger): `plaintext-layout/css/layout.css`
+  gibt dem Seiteninhalt mehr Abstand zum oberen Rand (2.25rem statt 1.5rem), Fieldsets und Dialoginhalten
+  mehr Luft oben, der Suche in Dropdowns (`selectOneMenu`/`selectCheckboxMenu`) und Autocomplete Polster sowie
+  Tabellen-Kopf und Spaltenfiltern Abstand. Wirkt in allen Apps, keine Seite muss angepasst werden.
+
 ### Fixed
 
 - **`my_user_entity.roles` auf `VARCHAR(4000)`** (Karte 2517): Das Rollen-Set wird mit vielen Modulrollen
