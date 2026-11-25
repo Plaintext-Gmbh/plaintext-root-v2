@@ -12,6 +12,13 @@ exhaustive.
 
 ## [Unreleased]
 
+### Changed
+
+- **`plaintext-root-lader`: Framework-Module von root dürfen sich in den Spring-Start einhängen** (Karte 2514,
+  Entscheid Daniel 25.11.2026). Ein nachgeladenes `plaintext-root-*`/`plaintext-admin-*` darf
+  `META-INF/spring/*.imports` bzw. `spring.factories` mitbringen: In der Hülle wirkt es so wie heute, weil die Hülle
+  `ch.plaintext` scannt und Überschreiben erlaubt. Für alle anderen Module bleibt die Regel.
+
 ## [3.78.0] - 2026-11-23
 
 ## [3.77.0] - 2026-11-22
