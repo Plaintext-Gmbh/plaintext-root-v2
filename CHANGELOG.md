@@ -22,6 +22,10 @@ exhaustive.
   und der Zahl der Benutzer, nie Namen), gesammelt von `RollenBedarfService` (`plaintext-root-role-assignment`);
   den Bestand liefert `RollenBestandQuelle`, in root aus `my_user_entity.roles`. OIDC-Gruppen sind nicht gezählt
   (Entscheid ENT-5 = A).
+- **`GET /api/root/rollen[?modul=…]` und MCP `list_roles`** (Karte 2377, ROOT-6): die Rollenliste aus
+  `RollenBedarfService` als JSON (`RollenBedarf`), nur Sitzung ADMIN/ROOT bzw. Token (`SCOPE_READ`) eines ADMIN/ROOT
+  (Entscheid ENT-4 = A, kein neuer Scope); Header `X-Plaintext-Hinweis: OIDC-Gruppen nicht gezaehlt`. Für Tokens
+  den Pfad in `plaintext.mcp.bearer-filter.url-patterns` aufnehmen (Vorgabe nur `/mcp/*`).
 - **`ohneUmgehung` macht das Modul streng** (ROOT-5): Deklariert ein Modul eine Rolle mit `.modul(x).ohneUmgehung(true)`,
   gilt `x` in der Vorgabe als `strenge-module-roles` (ROOT und ADMIN brauchen die Rolle). Wie jede yml-Vorgabe
   schreibt Root › Module das einmal nach settings («root/admin = false»), danach gilt settings.

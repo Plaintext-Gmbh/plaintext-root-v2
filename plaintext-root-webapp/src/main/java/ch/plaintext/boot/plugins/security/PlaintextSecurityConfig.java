@@ -334,6 +334,9 @@ public class PlaintextSecurityConfig {
                             // (RootSuperMenu roles={"ROOT"}) and would otherwise lose its export link
                             // if a root user has no admin role.
                             .requestMatchers("/api/i18n/**").hasAnyRole("ADMIN", "ROOT")
+                            // Karte 2377 ROOT-6 (ENT-4 = A): the role list names every role of the instance;
+                            // session ADMIN/ROOT, token = SCOPE_READ (always) plus the owner's real roles.
+                            .requestMatchers("/api/root/rollen").hasAnyRole("ADMIN", "ROOT")
                             .requestMatchers("/api/branding/logo").authenticated()
                             .requestMatchers("/api/preferences/**").authenticated()
                             // SECURITY (card 314, item 5): the four /debug/* endpoints used to lie

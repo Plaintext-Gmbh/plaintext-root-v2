@@ -43,6 +43,13 @@
             <groupId>org.joinfaces</groupId>
             <artifactId>primefaces-spring-boot-starter</artifactId>
         </dependency>
+        <!-- Karte 2377 ROOT-6: MCP list_roles nur in Apps mit eigenem MCP-Server (@ConditionalOnClass), nicht transitiv -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
+            <version>2.0.2</version>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
