@@ -111,7 +111,7 @@ class ModulAuswahlTest {
                                     String bibliotheken, KeyPair k) throws Exception {
         String datei = "jars/" + name + "-" + version + ".jar";
         dateien.put("/reg/" + datei, jar);
-        ModulAuswahl.Zeile z = new ModulAuswahl.Zeile(art, name, version, rootMin, sha(jar),
+        ModulAuswahl.Zeile z = new ModulAuswahl.Zeile(art, name, version, rootMin, sha(jar), null,
                 braucht.isEmpty() ? List.of() : List.of(braucht.split(",")),
                 bibliotheken.isEmpty() ? List.of() : List.of(bibliotheken.split(",")), datei, "x", "test", null);
         Signature s = Signature.getInstance("Ed25519");
@@ -684,7 +684,7 @@ class ModulAuswahlTest {
     // ------------------------------------------------------------------ Karte 1610: Entwicklungsmodus (./traeger)
 
     private static ModulAuswahl.Zeile unsigniert(String index) {
-        return new ModulAuswahl.Zeile("modul", "plaintext-z-a", "1.0.0", "1.770.0", "0".repeat(64), List.of(), List.of(),
+        return new ModulAuswahl.Zeile("modul", "plaintext-z-a", "1.0.0", "1.770.0", "0".repeat(64), null, List.of(), List.of(),
                 "a.jar", ModulAuswahl.UNSIGNIERT, "lokal", java.net.URI.create(index));
     }
 
@@ -722,7 +722,7 @@ class ModulAuswahlTest {
     @Test
     void falscheSignaturBleibtImEntwicklungsmodusUngueltig() {
         ModulAuswahl.Zeile z = unsigniert("file:/tmp/reg/index.txt");
-        ModulAuswahl.Zeile kaputt = new ModulAuswahl.Zeile(z.art(), z.name(), z.version(), z.rootMin(), z.sha256(), z.braucht(),
+        ModulAuswahl.Zeile kaputt = new ModulAuswahl.Zeile(z.art(), z.name(), z.version(), z.rootMin(), z.sha256(), z.quellen(), z.braucht(),
                 z.bibliotheken(), z.datei(), "AAAA", z.registry(), z.index());
         assertThatThrownBy(() -> ModulAuswahl.signaturPruefen(kaputt, List.of(schluessel.getPublic()), DEV, null))
                 .hasMessageContaining("Signatur ungueltig");
@@ -748,7 +748,7 @@ class ModulAuswahlTest {
         byte[] b = TestJars.zip("ch/plaintext/a/A.class", "anders");
         Path reg = Files.createDirectories(huellenDir.resolve("zweit"));
         Files.write(reg.resolve("a.jar"), b);
-        ModulAuswahl.Zeile z = new ModulAuswahl.Zeile("modul", "plaintext-z-a", "1.0.0", "1.770.0", sha(b), List.of(), List.of(),
+        ModulAuswahl.Zeile z = new ModulAuswahl.Zeile("modul", "plaintext-z-a", "1.0.0", "1.770.0", sha(b), null, List.of(), List.of(),
                 "a.jar", "x", "zweit", null);
         Signature sig = Signature.getInstance("Ed25519");
         sig.initSign(schluessel.getPrivate());

@@ -17,6 +17,10 @@ import java.nio.file.Path;
  * Bindet die persönliche Dateiablage (Karte 1559) in jede Anwendung ein, die das Modul auf dem Klassenpfad hat.
  * Die Freigabe-Links gehen über den {@link ch.plaintext.linktoken.LinkTokenStore} (Standard in
  * {@code plaintext-root-freigabe}).
+ *
+ * <p><b>Veraltet</b> (Karte 2377, ROOT-11): Nachfolger ist {@code ch.plaintext:plaintext-modul-files}. Beide zusammen
+ * auf dem Klassenpfad gehen nicht (gleiche Bean-Namen, gleiche Adressen {@code /nosec/files/}, {@code /files/api},
+ * gleiche MCP-Werkzeuge); {@link FilesNachfolgerPruefung} bricht dann den Start ab, bevor Spring die Beans einliest.
  */
 @AutoConfiguration
 @EnableConfigurationProperties(FilesProperties.class)
