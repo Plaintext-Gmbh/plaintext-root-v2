@@ -198,4 +198,53 @@ class PlaintextRoleRegistryTest {
             assertThrows(IllegalArgumentException.class, () -> new PlaintextRole(null, "x"));
         }
     }
+
+    /** Karte 2377 ROOT-5: neue Angaben an PlaintextRole, alte Provider unverändert. */
+    @Nested
+    class RollenAngaben {
+
+        @Test
+        void zweiArgKonstruktorGibtVorgaben() {
+            PlaintextRole r = new PlaintextRole("files", "Dateien");
+            assertEquals("", r.modul());
+            assertEquals(ch.plaintext.rollen.RollenArt.ZUGANG, r.art());
+            assertFalse(r.ohneUmgehung());
+        }
+
+        @Test
+        void withersSetzenModulArtUndUmgehung() {
+            PlaintextRole r = new PlaintextRole("terminal", "T").modul(" Terminal ")
+                    .art(ch.plaintext.rollen.RollenArt.ADMIN).ohneUmgehung(true);
+            assertEquals("terminal", r.modul());
+            assertEquals(ch.plaintext.rollen.RollenArt.ADMIN, r.art());
+            assertTrue(r.ohneUmgehung());
+            assertEquals("ROLE_TERMINAL", r.authorityName());
+        }
+
+        @Test
+        void dublettenWerdenFeldweiseVereinigt() {
+            PlaintextRoleProvider a = provider(new PlaintextRole("terminal", ""));
+            PlaintextRoleProvider b = provider(new PlaintextRole("TERMINAL", "Terminal bedienen").modul("terminal")
+                    .ohneUmgehung(true));
+            PlaintextRoleRegistry reg = new PlaintextRoleRegistry(List.of(a, b));
+            PlaintextRole r = reg.getDeclaredRoles().getFirst();
+            assertEquals("Terminal bedienen", r.description());
+            assertEquals("terminal", r.modul());
+            assertTrue(r.ohneUmgehung());
+            assertEquals(java.util.Map.of("terminal", "terminal"), reg.getOhneUmgehungModule());
+        }
+
+        @Test
+        void ohneModulKeineStrengeKopplung() {
+            PlaintextRoleRegistry reg = new PlaintextRoleRegistry(List.of(provider(
+                    new PlaintextRole("x", "").ohneUmgehung(true))));
+            assertTrue(reg.getOhneUmgehungModule().isEmpty());
+        }
+
+        private PlaintextRoleProvider provider(PlaintextRole... rollen) {
+            PlaintextRoleProvider p = mock(PlaintextRoleProvider.class);
+            when(p.getDeclaredRoles()).thenReturn(Set.of(rollen));
+            return p;
+        }
+    }
 }

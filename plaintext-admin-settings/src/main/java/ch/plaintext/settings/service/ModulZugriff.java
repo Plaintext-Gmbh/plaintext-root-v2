@@ -6,15 +6,19 @@ package ch.plaintext.settings.service;
 import ch.plaintext.PlaintextSecurity;
 import ch.plaintext.boot.menu.ModuleRoleProperties;
 import ch.plaintext.boot.menu.ModuleRoleService;
+import ch.plaintext.framework.PlaintextRoleRegistry;
 import ch.plaintext.settings.ISettingsService;
 import ch.plaintext.settings.SettingsKeys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -70,6 +74,21 @@ public class ModulZugriff {
 
     public ModulZugriff(ModuleRoleProperties properties, ObjectProvider<ModuleRoleService> rollenDienst,
                         ISettingsService settings, ObjectProvider<PlaintextSecurity> security) {
+        this(properties, rollenDienst, settings, security, null);
+    }
+
+    /**
+     * @param registry Karte 2377 ROOT-5: eine mit {@code ohneUmgehung} deklarierte Rolle macht ihr Modul in der
+     *                 yml-Vorgabe streng (vor dem Kopieren der yml, damit die Vorgabe in settings «false» schreibt);
+     *                 {@code null} = keine Kopplung
+     */
+    @Autowired
+    public ModulZugriff(ModuleRoleProperties properties, ObjectProvider<ModuleRoleService> rollenDienst,
+                        ISettingsService settings, ObjectProvider<PlaintextSecurity> security,
+                        ObjectProvider<PlaintextRoleRegistry> registry) {
+        if (registry != null) {
+            registry.ifAvailable(r -> ohneUmgehungStreng(properties, r.getOhneUmgehungModule()));
+        }
         this.properties = properties;
         this.rollenDienst = rollenDienst;
         this.settings = settings;
@@ -77,6 +96,32 @@ public class ModulZugriff {
         this.ymlRollen = Map.copyOf(properties.canonicalModuleRoles());
         this.ymlOhneRoot = Set.copyOf(properties.canonicalOhneRootUmgehung());
         this.ymlOhneAdmin = Set.copyOf(properties.canonicalOhneAdminUmgehung());
+    }
+
+    /**
+     * Ergänzt {@code strenge-module-roles} (und, falls das Modul keine Zuordnung hat, {@code module-roles}) um die
+     * Module mit {@code ohneUmgehung}-Rolle. Eine ausdrückliche Zuordnung in der yml bleibt.
+     */
+    static void ohneUmgehungStreng(ModuleRoleProperties properties, Map<String, String> modulZuRolle) {
+        if (modulZuRolle.isEmpty()) {
+            return;
+        }
+        Set<String> streng = properties.canonicalStrengeModuleRoles();
+        Map<String, String> zuordnung = properties.canonicalModuleRoles();
+        List<String> neuStreng = new ArrayList<>(properties.getStrengeModuleRoles());
+        Map<String, String> neuRollen = new LinkedHashMap<>(properties.getModuleRoles());
+        modulZuRolle.forEach((modul, rolle) -> {
+            String k = ModuleRoleProperties.canonicalKey(modul);
+            if (!streng.contains(k)) {
+                neuStreng.add(k);
+            }
+            if (!zuordnung.containsKey(k)) {
+                neuRollen.put(k, rolle);
+            }
+        });
+        properties.setModuleRoles(neuRollen);
+        properties.setStrengeModuleRoles(neuStreng);
+        log.info("Modul-Zugriff: Module mit ohneUmgehung-Rolle in der Vorgabe streng: {}", modulZuRolle);
     }
 
     @EventListener(ApplicationReadyEvent.class)

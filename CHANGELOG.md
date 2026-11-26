@@ -12,6 +12,26 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+
+- **Rollenbedarf von aussen lesbar, Teil 1: Modell und Sammlung** (Karte 2377, ROOT-5). `PlaintextRole` kennt
+  zusätzlich `modul`, `art` (neu `ch.plaintext.rollen.RollenArt`: ZUGANG, BEARBEITEN, ADMIN, TECHNISCH) und
+  `ohneUmgehung`; der 2-Arg-Konstruktor bleibt, bestehende Provider kompilieren unverändert
+  (`new PlaintextRole("terminal", "…").modul("terminal").ohneUmgehung(true)`). Neu `ch.plaintext.rollen.RollenBedarf`
+  (eine Rolle mit Quelle `deklariert`, `module-roles`, `menu-auto` nur unter `STRICT`, `menu-annotation`, `bestand`
+  und der Zahl der Benutzer, nie Namen), gesammelt von `RollenBedarfService` (`plaintext-root-role-assignment`);
+  den Bestand liefert `RollenBestandQuelle`, in root aus `my_user_entity.roles`. OIDC-Gruppen sind nicht gezählt
+  (Entscheid ENT-5 = A).
+- **`ohneUmgehung` macht das Modul streng** (ROOT-5): Deklariert ein Modul eine Rolle mit `.modul(x).ohneUmgehung(true)`,
+  gilt `x` in der Vorgabe als `strenge-module-roles` (ROOT und ADMIN brauchen die Rolle). Wie jede yml-Vorgabe
+  schreibt Root › Module das einmal nach settings («root/admin = false»), danach gilt settings.
+
+### Changed
+
+- **`PlaintextRole` hat drei Komponenten mehr** (ROOT-5): `equals`/`hashCode` vergleichen sie mit. Wer Rollen mit
+  `equals` vergleicht statt über `normalizedName()`, prüft das; doppelte Deklarationen vereinigt die Registry jetzt
+  feldweise (erste nicht leere Beschreibung und Modul, `ohneUmgehung` wenn eine es verlangt).
+
 ## [3.83.0] - 2026-11-26
 
 ### Fixed

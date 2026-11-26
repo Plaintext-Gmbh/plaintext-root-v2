@@ -87,9 +87,37 @@ public class PlaintextRoleRegistry {
             if (role == null) {
                 continue;
             }
-            byName.merge(role.normalizedName(), role, (existing, candidate) ->
-                    existing.description().isEmpty() && !candidate.description().isEmpty() ? candidate : existing);
+            byName.merge(role.normalizedName(), role, PlaintextRoleRegistry::vereinige);
         }
+    }
+
+    /**
+     * Several declarations of the same role: the first non-empty value wins per field, {@code ohneUmgehung} if any
+     * declaration asks for it (the stricter reading), the kind of the first declaration naming one other than
+     * {@link ch.plaintext.rollen.RollenArt#ZUGANG}.
+     */
+    static PlaintextRole vereinige(PlaintextRole a, PlaintextRole b) {
+        return new PlaintextRole(a.name(),
+                a.description().isEmpty() ? b.description() : a.description(),
+                a.modul().isEmpty() ? b.modul() : a.modul(),
+                a.art() == ch.plaintext.rollen.RollenArt.ZUGANG ? b.art() : a.art(),
+                a.ohneUmgehung() || b.ohneUmgehung());
+    }
+
+    /**
+     * Modules whose role is declared with {@link PlaintextRole#ohneUmgehung()} (Karte 2377, ROOT-5): root treats
+     * them as {@code plaintext.menu.strenge-module-roles} by default.
+     *
+     * @return module key to the stored role name, sorted by module key
+     */
+    public Map<String, String> getOhneUmgehungModule() {
+        Map<String, String> ret = new java.util.TreeMap<>();
+        for (PlaintextRole role : getDeclaredRoles()) {
+            if (role.ohneUmgehung() && !role.modul().isEmpty()) {
+                ret.putIfAbsent(role.modul(), role.normalizedName());
+            }
+        }
+        return ret;
     }
 
     /**

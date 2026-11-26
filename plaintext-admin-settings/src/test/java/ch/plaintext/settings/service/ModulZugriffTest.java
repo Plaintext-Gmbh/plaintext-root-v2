@@ -6,6 +6,9 @@ package ch.plaintext.settings.service;
 import ch.plaintext.PlaintextSecurity;
 import ch.plaintext.boot.menu.ModuleRoleProperties;
 import ch.plaintext.boot.menu.ModuleRoleService;
+import ch.plaintext.framework.PlaintextRole;
+import ch.plaintext.framework.PlaintextRoleProvider;
+import ch.plaintext.framework.PlaintextRoleRegistry;
 import ch.plaintext.settings.ISettingsService;
 import ch.plaintext.settings.SettingsKeys;
 import org.junit.jupiter.api.Test;
@@ -15,6 +18,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -141,5 +145,35 @@ class ModulZugriffTest {
         z.anwenden();
         assertThat(p.canonicalNichtSichtbar()).containsExactly("wiki");
         assertThat(p.canonicalOhneBearbeitung()).containsExactly("wiki");
+    }
+
+    /** Karte 2377 ROOT-5: eine ohneUmgehung-Rolle macht ihr Modul in der Vorgabe streng; die yml-Zuordnung bleibt. */
+    @Test
+    void ohneUmgehungRolleMachtDasModulInDerVorgabeStreng() {
+        PlaintextRoleProvider terminal = new PlaintextRoleProvider() {
+            @Override
+            public Set<String> getRoles() {
+                return Set.of("terminal");
+            }
+
+            @Override
+            public Set<PlaintextRole> getDeclaredRoles() {
+                return Set.of(new PlaintextRole("terminal", "Terminal").modul("terminal").ohneUmgehung(true),
+                        new PlaintextRole("wiki-x", "").modul("wiki").ohneUmgehung(true));
+            }
+        };
+        StaticListableBeanFactory bf = new StaticListableBeanFactory();
+        bf.addBean("rollen", rollenDienst);
+        bf.addBean("registry", new PlaintextRoleRegistry(List.of(terminal)));
+        ModuleRoleProperties p = yml();
+        ModulZugriff z = new ModulZugriff(p, bf.getBeanProvider(ModuleRoleService.class), settings(),
+                bf.getBeanProvider(PlaintextSecurity.class), bf.getBeanProvider(PlaintextRoleRegistry.class));
+
+        assertThat(p.canonicalStrengeModuleRoles()).containsExactlyInAnyOrder("files", "terminal", "wiki");
+        assertThat(p.canonicalModuleRoles()).containsEntry("terminal", "TERMINAL")
+                .as("ausdrückliche yml-Zuordnung bleibt").containsEntry("wiki", "WIKI");
+        z.vorgabenSchreiben();
+        assertThat(global).containsEntry("terminal.zugriff.rolle", "terminal")
+                .containsEntry("terminal.zugriff.root", "false").containsEntry("terminal.zugriff.admin", "false");
     }
 }
