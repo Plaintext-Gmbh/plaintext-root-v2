@@ -1,0 +1,24 @@
+# Erzeugt von ModulManifestTest (plaintext-root-testsupport), Karte 2377 ROOT-7.
+# Nicht von Hand aendern: -Dplaintext.manifest.schreiben=true schreibt die Datei neu.
+modul: files
+rollen:
+  - name: files
+    authority: ROLE_FILES
+    beschreibung: "Persönliche Dateiablage (Misc > Files): eigene Dateien hochladen, teilen und löschen"
+    art: ZUGANG
+    ohneUmgehung: false
+menue:
+  - menuId: files
+    parent: "Misc"
+    order: 65
+    title: "Files"
+    link: "files/ablage.html"
+    rollen: [FILES, ADMIN, ROOT]
+  - menuId: misc
+    parent: ""
+    order: 60
+    title: "Misc"
+    link: "index.html"
+    rollen: [FILES, ADMIN, ROOT]
+properties:
+  - plaintext.files

@@ -76,6 +76,13 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- Karte 2377 ROOT-7: FilesModulManifestTest -->
+        <dependency>
+            <groupId>ch.plaintext.v2</groupId>
+            <artifactId>plaintext-root-testsupport</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

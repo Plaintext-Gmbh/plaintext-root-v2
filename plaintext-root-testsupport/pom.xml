@@ -45,6 +45,24 @@
             <groupId>org.springframework</groupId>
             <artifactId>spring-test</artifactId>
         </dependency>
+        <!-- ModulManifestTest (Karte 2377 ROOT-7): Rollen-Provider, Menue-Scanner, Manifest-Format des Laders -->
+        <dependency>
+            <groupId>ch.plaintext.v2</groupId>
+            <artifactId>plaintext-root-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ch.plaintext.v2</groupId>
+            <artifactId>plaintext-root-menu</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ch.plaintext.v2</groupId>
+            <artifactId>plaintext-root-lader</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+        </dependency>
         <!-- PathMatchingResourcePatternResolver (Seitenliste) -->
         <dependency>
             <groupId>org.springframework</groupId>
