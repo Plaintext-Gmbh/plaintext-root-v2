@@ -190,6 +190,16 @@ class ModulAuswahlTest {
     }
 
     @Test
+    void v2RootMinPasstZurHuelleNachDemSchnitt() {
+        // Karte 2512: Module, die noch gegen den Parent 2.815.1 gebaut sind (Ablage modules.plaintext.ch), auf Huelle 3.x
+        ModulLader.Huelle v3 = new ModulLader.Huelle("3.82.0", "1.767.0", null);
+        assertThat(ModulAuswahl.rootMinPasst("2.815.1", v3)).isNull();
+        assertThat(ModulAuswahl.rootMinPasst("3.69.0", v3)).isNull();
+        assertThat(ModulAuswahl.rootMinPasst("3.83.0", v3)).contains("> Huelle");
+        assertThat(ModulAuswahl.rootMinPasst("1.805.0", v3)).contains("keiner Linie");
+    }
+
+    @Test
     void manipulierteSignaturWirdAbgelehntUndDerLetzteGuteStandStartet() throws Exception {
         modul("plaintext-z-a", "1.0.0", "1.770.0", A1);
         auswahl("plaintext-z-a", "1.0.0");

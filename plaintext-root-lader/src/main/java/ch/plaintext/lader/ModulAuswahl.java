@@ -746,7 +746,8 @@ public final class ModulAuswahl {
 
     /**
      * null = passt, sonst der Grund. Regel aus 1598: Eine v2-Huelle 2.M.m beruht auf v1 1.M.0; ein 1.x-root-min
-     * muss darum &lt;= 1.M.0 sein. Dazu &gt;= Kompatibel-Ab.
+     * muss darum &lt;= 1.M.0 sein. Karte 2512: 3.0.0 ist nur der Versionsschnitt der v2-Linie (Karte 1621), ein
+     * 2.x-root-min passt darum zu jeder 3.x-Huelle. Dazu &gt;= Kompatibel-Ab.
      */
     public static String rootMinPasst(String rootMin, ModulLader.Huelle huelle) {
         int[] r = zahlen(rootMin);
@@ -755,6 +756,8 @@ public final class ModulAuswahl {
             if (ModulKonfig.vergleiche(rootMin, "1." + h[1] + ".0") > 0) {
                 return SCHLUESSEL_ROOT_MIN + " " + rootMin + " > v1-Basis 1." + h[1] + ".0 der Huelle " + huelle.version();
             }
+        } else if (r[0] == 2 && h[0] == 3) {
+            // Karte 2512: 2.x und 3.x sind dieselbe Linie (Schnitt 3.0.0), jedes 2.x liegt unter jeder 3.x-Huelle
         } else if (r[0] == h[0]) {
             if (ModulKonfig.vergleiche(rootMin, huelle.version()) > 0) {
                 return SCHLUESSEL_ROOT_MIN + " " + rootMin + " > Huelle " + huelle.version();
