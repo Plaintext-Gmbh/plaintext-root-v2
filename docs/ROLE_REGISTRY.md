@@ -242,6 +242,7 @@ Header `X-Plaintext-Hinweis: OIDC-Gruppen nicht gezaehlt`.
 Every module jar can carry `META-INF/plaintext/modul.yaml` (ROOT-7, ENT-3 = test instead of a Maven plugin):
 
 ```yaml
+format: 1
 modul: files
 rollen:
   - name: files
