@@ -507,19 +507,20 @@ class RootPagesPlaywrightIT {
         // Karte 1504: IApiErrorResponse geloescht, MailAccountRef und MailAttachment mit dem MailSender-Vertrag dazu;
         // Karte 1525: PaperlessDokument mit IPaperlessAblage dazu; Karte 1560: ClaudeAnfrage und ClaudeAntwort;
         // Karte 1559: LinkToken und LinkTokenAntrag mit dem LinkTokenStore, das Enum LinkRecht fuehrt der Katalog nicht;
-        // DateiEintrag mit dem DateiSpeicher)
+        // DateiEintrag mit dem DateiSpeicher; Karte 2377 ROOT-5: RollenBedarf, das Enum RollenArt fuehrt der Katalog nicht)
         page.locator("#fm\\:schnittstellenSuche").fill("");
         page.locator("#fm\\:schnittstellenSuche").press("End");
         page.waitForFunction("() => document.querySelectorAll('[id=\"fm:schnittstellen_data\"] > tr').length >= 20");
         ruhig();
         page.locator("#fm\\:schnittstellenArt").getByText("DTOs").click();
-        page.waitForFunction("() => document.querySelectorAll('[id=\"fm:schnittstellen_data\"] > tr').length === 11");
+        page.waitForFunction("() => document.querySelectorAll('[id=\"fm:schnittstellen_data\"] > tr').length === 12");
         ruhig();
         String dtos = tabelle.innerText();
         assertTrue(dtos.contains("MailAccountRef") && dtos.contains("MailAttachment") && dtos.contains("ITokenValidationOutcome")
                 && dtos.contains("FreigabeZugriff") && dtos.contains("FreigabeInhalt") && dtos.contains("PaperlessDokument")
                 && dtos.contains("ClaudeAnfrage") && dtos.contains("ClaudeAntwort")
-                && dtos.contains("LinkToken") && dtos.contains("LinkTokenAntrag") && dtos.contains("DateiEintrag"),
+                && dtos.contains("LinkToken") && dtos.contains("LinkTokenAntrag") && dtos.contains("DateiEintrag")
+                && dtos.contains("RollenBedarf"),
                 "DTO-Filter: " + dtos);
         // Gegenprobe: ein Suchbegriff ohne Treffer leert die Liste
         page.locator("#fm\\:schnittstellenSuche").fill("gibtesnirgends");

@@ -4,6 +4,9 @@
 package ch.plaintext.framework;
 
 import ch.plaintext.arch.StabileApi;
+import ch.plaintext.rollen.RollenArt;
+
+
 import java.io.Serializable;
 import java.util.Locale;
 
@@ -23,11 +26,15 @@ import java.util.Locale;
  *
  * @param name        technical role name (declared with or without the {@code ROLE_} prefix)
  * @param description human-readable description for selection UIs; never {@code null} (possibly empty)
+ * @param modul        module key the role opens, empty when not tied to one module (since 3.85.0)
+ * @param art          what the role grants, {@link RollenArt#ZUGANG} by default (since 3.85.0)
+ * @param ohneUmgehung ROOT/ADMIN do not get {@code modul} without this role (since 3.85.0, Karte 2377 ROOT-5)
  * @author info@plaintext.ch
  * @since 1.600.0
  */
 @StabileApi("Rollen-SPI: Modul deklariert seine Rollen")
-public record PlaintextRole(String name, String description) implements Serializable {
+public record PlaintextRole(String name, String description, String modul, RollenArt art, boolean ohneUmgehung)
+        implements Serializable {
 
     /** Spring Security prefix of the authority spelling. */
     private static final String ROLE_PREFIX = "ROLE_";
@@ -38,6 +45,49 @@ public record PlaintextRole(String name, String description) implements Serializ
         }
         name = name.trim();
         description = description == null ? "" : description.trim();
+        modul = modul == null ? "" : modul.trim().toLowerCase(Locale.ROOT);
+        art = art == null ? RollenArt.ZUGANG : art;
+    }
+
+    /**
+     * Role without module, kind {@link RollenArt#ZUGANG}, with the ROOT/ADMIN bypass — what every provider declared
+     * before Karte 2377 (ROOT-5); existing providers keep compiling unchanged.
+     *
+     * @param name        technical role name
+     * @param description description for the role selection
+     */
+    public PlaintextRole(String name, String description) {
+        this(name, description, "", RollenArt.ZUGANG, false);
+    }
+
+    /**
+     * @param modul module key the role opens ({@code plaintext.menu.module-roles} key), e.g. {@code terminal}
+     * @return a copy naming the module
+     * @since 3.85.0
+     */
+    public PlaintextRole modul(String modul) {
+        return new PlaintextRole(name, description, modul, art, ohneUmgehung);
+    }
+
+    /**
+     * @param art what the role grants
+     * @return a copy with this kind
+     * @since 3.85.0
+     */
+    public PlaintextRole art(RollenArt art) {
+        return new PlaintextRole(name, description, modul, art, ohneUmgehung);
+    }
+
+    /**
+     * {@code true}: ROOT and ADMIN do not get the {@linkplain #modul() module} without this role — root makes the
+     * module strict ({@code plaintext.menu.strenge-module-roles}) as long as Root › Module does not say otherwise.
+     *
+     * @param ohneUmgehung whether the ROOT/ADMIN bypass is off
+     * @return a copy with this setting
+     * @since 3.85.0
+     */
+    public PlaintextRole ohneUmgehung(boolean ohneUmgehung) {
+        return new PlaintextRole(name, description, modul, art, ohneUmgehung);
     }
 
     /**
