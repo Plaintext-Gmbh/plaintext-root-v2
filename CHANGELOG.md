@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.83.0] - 2026-11-26
+
 ### Fixed
 
 - **`my_user_entity.roles` auf `VARCHAR(4000)`** (Karte 2517): Das Rollen-Set wird mit vielen Modulrollen
