@@ -27,7 +27,9 @@ import java.util.zip.ZipInputStream;
  *       {@code bootstrap*}) mitbringen: sie verdraengt die der Huelle ganz (Schatten-Probe 1503).</li>
  *   <li>Ein Modul (nicht: Bibliothek) darf sich nicht per {@code META-INF/spring/*.imports} oder
  *       {@code META-INF/spring.factories} in den Spring-Start einhaengen; Module werden per Component-Scan
- *       gefunden. Fremd-Bibliotheken (z.B. Starter) duerfen das.</li>
+ *       gefunden. Fremd-Bibliotheken (z.B. Starter) duerfen das, ebenso die Framework-Module von root selbst
+ *       ({@code plaintext-root-*}, {@code plaintext-admin-*}, Karte 2514): sie registrieren sich fuer Anwendungen,
+ *       die {@code ch.plaintext} nicht scannen, und wirken nachgeladen genau wie in der Huelle.</li>
  *   <li>Keine Klasse darf in zwei geladenen Jars oder in einem geladenen Jar und in der Huelle
  *       ({@code BOOT-INF/classes}, {@code BOOT-INF/lib}) liegen: sonst gewinnt still das Modul.</li>
  * </ul>
@@ -38,6 +40,7 @@ final class ModulPruefung {
             "(config/)?(application|bootstrap)(-[^/]*)?\\.(yml|yaml|properties)");
     private static final Pattern SPRING_EINHAENGEN = Pattern.compile(
             "META-INF/spring/[^/]+\\.imports|META-INF/spring\\.factories");
+    private static final Pattern RAHMEN = Pattern.compile("plaintext-(root|admin)-[a-z0-9]+(-[a-z0-9]+)*");
     private static final int MAX_MELDUNGEN = 5;
 
     private ModulPruefung() {
@@ -54,7 +57,7 @@ final class ModulPruefung {
                     String n = eintraege.nextElement().getName();
                     if (KONFIG.matcher(n).matches()) {
                         fehler.add(e.dateiname() + " enthaelt " + n + " (wuerde die Konfig der Huelle verdraengen)");
-                    } else if (!e.bibliothek() && SPRING_EINHAENGEN.matcher(n).matches()) {
+                    } else if (!e.bibliothek() && !RAHMEN.matcher(e.name()).matches() && SPRING_EINHAENGEN.matcher(n).matches()) {
                         fehler.add(e.dateiname() + " enthaelt " + n + " (Module haengen sich nicht in den Spring-Start)");
                     } else if (istKlasse(n)) {
                         String vorher = klasseZuJar.putIfAbsent(n, e.dateiname());
