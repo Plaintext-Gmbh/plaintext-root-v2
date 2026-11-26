@@ -48,6 +48,19 @@ exhaustive.
   `equals` vergleicht statt über `normalizedName()`, prüft das; doppelte Deklarationen vereinigt die Registry jetzt
   feldweise (erste nicht leere Beschreibung und Modul, `ohneUmgehung` wenn eine es verlangt).
 
+### Deprecated
+
+- **`plaintext-root-files` ist veraltet, Nachfolger `ch.plaintext:plaintext-modul-files`** (Karte 2377, ROOT-11).
+  Umstieg: die Abhängigkeit `plaintext-root-files` durch `plaintext-modul-files` ersetzen (bzw. das Modul über die
+  Laufzeit-Module laden). Freigabe-Links in `freigabe_link` (Art `files`, `files-inline`, Adresse
+  `/nosec/files/{token}`, Objekt `<benutzer>/<pfad>`) liest der Nachfolger ohne Migration weiter, ebenso die Dateien im
+  Layout `files/<benutzer>/…` unter `plaintext.files.verzeichnis` – **solange** keine Speicher-Ablage gilt: Ist unter
+  Root › Sidecars genau eine Speicher-Ablage eingerichtet oder die Einstellung `files.verzeichnis` gesetzt, liest der
+  Nachfolger dort (README plaintext-modul-files). Die Rolle heisst in beiden `files`, aber **Admin und Root sehen im
+  Nachfolger keine fremden Ablagen mehr** (in root-files sahen sie alle). Sind beide Module geladen, bricht der Start
+  jetzt vor dem Einlesen der Beans mit einer Meldung ab (sonst Namenskonflikt `filesService` u. a. ohne Hinweis);
+  allein geladen meldet root-files beim Start «veraltet». Das Modul fällt in einem späteren Release weg.
+
 ### Security
 
 - **Sonar-Wochenarbeit KW48** (Karte 2483). `plaintext-root-lader`: `ModulPruefung` weist ein Archiv mit mehr als
