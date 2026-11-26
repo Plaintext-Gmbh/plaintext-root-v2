@@ -10,7 +10,7 @@ import ch.plaintext.modules.ModulApi;
  * entry role from an administrative one (Karte 2377, ROOT-5).
  *
  * @author info@plaintext.ch
- * @since 3.84.0
+ * @since 3.85.0
  */
 @ModulApi(art = ModulApi.Art.DTO, stabilitaet = ModulApi.Stabilitaet.STABIL)
 public enum RollenArt {

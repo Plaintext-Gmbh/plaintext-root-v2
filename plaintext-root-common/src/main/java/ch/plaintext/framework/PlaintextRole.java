@@ -26,9 +26,9 @@ import java.util.Locale;
  *
  * @param name        technical role name (declared with or without the {@code ROLE_} prefix)
  * @param description human-readable description for selection UIs; never {@code null} (possibly empty)
- * @param modul        module key the role opens, empty when not tied to one module (since 3.84.0)
- * @param art          what the role grants, {@link RollenArt#ZUGANG} by default (since 3.84.0)
- * @param ohneUmgehung ROOT/ADMIN do not get {@code modul} without this role (since 3.84.0, Karte 2377 ROOT-5)
+ * @param modul        module key the role opens, empty when not tied to one module (since 3.85.0)
+ * @param art          what the role grants, {@link RollenArt#ZUGANG} by default (since 3.85.0)
+ * @param ohneUmgehung ROOT/ADMIN do not get {@code modul} without this role (since 3.85.0, Karte 2377 ROOT-5)
  * @author info@plaintext.ch
  * @since 1.600.0
  */
@@ -63,7 +63,7 @@ public record PlaintextRole(String name, String description, String modul, Rolle
     /**
      * @param modul module key the role opens ({@code plaintext.menu.module-roles} key), e.g. {@code terminal}
      * @return a copy naming the module
-     * @since 3.84.0
+     * @since 3.85.0
      */
     public PlaintextRole modul(String modul) {
         return new PlaintextRole(name, description, modul, art, ohneUmgehung);
@@ -72,7 +72,7 @@ public record PlaintextRole(String name, String description, String modul, Rolle
     /**
      * @param art what the role grants
      * @return a copy with this kind
-     * @since 3.84.0
+     * @since 3.85.0
      */
     public PlaintextRole art(RollenArt art) {
         return new PlaintextRole(name, description, modul, art, ohneUmgehung);
@@ -84,7 +84,7 @@ public record PlaintextRole(String name, String description, String modul, Rolle
      *
      * @param ohneUmgehung whether the ROOT/ADMIN bypass is off
      * @return a copy with this setting
-     * @since 3.84.0
+     * @since 3.85.0
      */
     public PlaintextRole ohneUmgehung(boolean ohneUmgehung) {
         return new PlaintextRole(name, description, modul, art, ohneUmgehung);
