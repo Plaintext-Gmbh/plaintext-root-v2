@@ -78,8 +78,10 @@ public final class ModulAuswahl {
     static final String SCHLUESSEL_ROOT_MIN = "root-min";
     static final String SCHLUESSEL_SHA256 = "sha256";
     static final String SCHLUESSEL_SIGNATUR = "signatur";
+    /** Karte 2406: sha256 des zugehoerigen {@code -sources.jar}, wenn die Ablage es mithochgeladen hat. */
+    static final String SCHLUESSEL_QUELLEN = "quellen";
     private static final Set<String> ZEILEN_SCHLUESSEL = Set.of(SCHLUESSEL_ROOT_MIN, SCHLUESSEL_SHA256,
-            "braucht", "bibliotheken", "datei", SCHLUESSEL_SIGNATUR);
+            "braucht", "bibliotheken", "datei", SCHLUESSEL_SIGNATUR, SCHLUESSEL_QUELLEN);
     private static final Pattern BIBLIOTHEK = Pattern.compile("([a-z][a-z0-9_-]*(?:\\.[a-z0-9_-]+)*):([A-Za-z0-9][A-Za-z0-9_.-]*):([0-9][A-Za-z0-9_.-]*)@([0-9a-f]{64})");
     private static final Pattern BASE64 = Pattern.compile("[A-Za-z0-9+/=]+");
 
@@ -100,13 +102,19 @@ public final class ModulAuswahl {
      * Eine Zeile eines Registry-Index. {@code registry}/{@code index} sagen, woher sie kam.
      * Art {@code bib}: Ort einer Fremd-Bibliothek ({@code name} = gruppe:artifact), ohne eigene Signatur; ihr sha256
      * steht in der signierten Liste {@code bibliotheken} des Moduls ({@code gruppe:artifact:version@sha256}).
+     *
+     * <p>{@code quellen} (Karte 2406): sha256 des zugehoerigen {@code -sources.jar} oder {@code null}, wenn die
+     * Ablage keine Quellen mithochgeladen hat. Gehoert zum signierten Inhalt; beim Parsieren alter Indexe
+     * fehlt es einfach — ohne {@code quellen} bleibt {@link #nachricht()} byte-identisch zum Bestand.
      */
-    public record Zeile(String art, String name, String version, String rootMin, String sha256, List<String> braucht,
+    public record Zeile(String art, String name, String version, String rootMin, String sha256, String quellen,
+                        List<String> braucht,
                         List<String> bibliotheken, String datei, String signatur, String registry, URI index) {
 
-        /** Der signierte Text (Inhalt, Name, Version, root-min, braucht und die Bibliotheken samt sha256). */
+        /** Der signierte Text (Inhalt, Name, Version, root-min, sha256, [quellen,] braucht und die Bibliotheken samt sha256). */
         public String nachricht() {
             return SIGNATUR_KOPF + "\n" + art + "\n" + name + "\n" + version + "\n" + rootMin + "\n" + sha256 + "\n"
+                    + (quellen == null ? "" : quellen + "\n")
                     + String.join(",", braucht) + "\n" + String.join(",", bibliotheken) + "\n";
         }
 
@@ -124,6 +132,7 @@ public final class ModulAuswahl {
                 return "bib " + name + " " + version + " datei=" + datei;
             }
             return art + " " + name + " " + version + " root-min=" + rootMin + " sha256=" + sha256
+                    + (quellen == null ? "" : " quellen=" + quellen)
                     + (braucht.isEmpty() ? "" : " braucht=" + String.join(",", braucht))
                     + (bibliotheken.isEmpty() ? "" : " bibliotheken=" + String.join(",", bibliotheken))
                     + " datei=" + datei + " signatur=" + signatur;
@@ -445,7 +454,7 @@ public final class ModulAuswahl {
         if (w.size() != 1 || !BIBLIOTHEK.matcher(t[1] + ":" + version + "@" + "0".repeat(64)).matches()) {
             throw new IllegalArgumentException(wo + ": erwartet 'bib <gruppe:artifact> <version> datei=<relativ>'");
         }
-        return new Zeile("bib", t[1], version, null, null, List.of(), List.of(), datei, null, registry, index);
+        return new Zeile("bib", t[1], version, null, null, null, List.of(), List.of(), datei, null, registry, index);
     }
 
     private static Zeile modulZeile(String[] t, Map<String, String> w, String version, String datei, String wo,
@@ -453,10 +462,14 @@ public final class ModulAuswahl {
         String name = pruefe(t[1], ModulKonfig.NAME, "Name", wo);
         String rootMin = pruefe(w.get(SCHLUESSEL_ROOT_MIN), ModulKonfig.ROOT_VERSION, SCHLUESSEL_ROOT_MIN, wo);
         String sha = pruefe(w.get(SCHLUESSEL_SHA256), ModulKonfig.SHA256, SCHLUESSEL_SHA256, wo);
+        String quellen = w.get(SCHLUESSEL_QUELLEN);
+        if (quellen != null) {
+            quellen = pruefe(quellen, ModulKonfig.SHA256, SCHLUESSEL_QUELLEN, wo);
+        }
         String sig = pruefe(w.get(SCHLUESSEL_SIGNATUR), BASE64, SCHLUESSEL_SIGNATUR, wo);
         List<String> bibs = bibliothekenWerte(w.getOrDefault("bibliotheken", ""), wo);
         List<String> braucht = brauchtWerte(w.getOrDefault("braucht", ""), wo);
-        return new Zeile(t[0], name, version, rootMin, sha, List.copyOf(braucht), List.copyOf(bibs), datei, sig,
+        return new Zeile(t[0], name, version, rootMin, sha, quellen, List.copyOf(braucht), List.copyOf(bibs), datei, sig,
                 registry, index);
     }
 
@@ -675,7 +688,7 @@ public final class ModulAuswahl {
                                 && z.version().equals(x.group(3)) && z.registry().equals(m.registry())).findFirst()
                         .orElseThrow(() -> new IllegalStateException("'" + m.name() + "' braucht Bibliothek " + ga + ":"
                                 + x.group(3) + ", Registry '" + m.registry() + "' hat dafuer keine 'bib'-Zeile"));
-                je.put(ga, new Zeile("bib", ga, x.group(3), null, x.group(4), List.of(), List.of(), ort.datei(), null,
+                je.put(ga, new Zeile("bib", ga, x.group(3), null, x.group(4), null, List.of(), List.of(), ort.datei(), null,
                         ort.registry(), ort.index()));
                 von.put(ga, m.name());
             }
