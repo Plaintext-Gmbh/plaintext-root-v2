@@ -12,6 +12,16 @@ exhaustive.
 
 ## [Unreleased]
 
+### Deprecated
+
+- **`plaintext-root-files` ist veraltet, Nachfolger `ch.plaintext:plaintext-modul-files`** (Karte 2377, ROOT-11).
+  Umstieg: die Abhängigkeit `plaintext-root-files` durch `plaintext-modul-files` ersetzen (bzw. das Modul über die
+  Laufzeit-Module laden). Dateien unter `plaintext.files.verzeichnis` (Layout `files/<benutzer>/…`) und die
+  Freigabe-Links in `freigabe_link` (Art `files`, `files-inline`, Adresse `/nosec/files/{token}`) liest der Nachfolger
+  ohne Migration weiter; die Rolle heisst in beiden `files`. Sind beide Module geladen, bricht der Start jetzt mit
+  einer Meldung ab (gleiche Bean-Namen, Adressen und MCP-Werkzeuge); allein geladen meldet root-files beim Start
+  «veraltet». Das Modul fällt in einem späteren Release weg.
+
 ## [3.83.0] - 2026-11-26
 
 ### Fixed
