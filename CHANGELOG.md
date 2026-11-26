@@ -38,6 +38,9 @@ exhaustive.
   listet die Rollen aus den Manifesten als Tabelle (Tab-getrennt), je Jar ohne Manifest eine Hinweiszeile `#`; Exit 0,
   1 bei einem unlesbaren Jar oder kaputten Manifest. Beim Hüllenstart loggt der Lader je geladenem Modul
   `[modul-lader] <modul> <version>: Rollen …` (fehlendes Manifest = Hinweis, kein Fehler).
+- **Doku und ADRs zum Backport Phase A** (Karte 2377, ROOT-10): `docs/MENU_SYSTEM.md` «Placement from outside»,
+  `docs/ROLE_REGISTRY.md` «Strict module roles», «Reading roles from outside», «Manifest»; ADR 0009
+  (Menüplatz von aussen), ADR 0010 (Rollenbedarf lesbar).
 - **`ohneUmgehung` macht das Modul streng** (ROOT-5): Deklariert ein Modul eine Rolle mit `.modul(x).ohneUmgehung(true)`,
   gilt `x` in der Vorgabe als `strenge-module-roles` (ROOT und ADMIN brauchen die Rolle). Wie jede yml-Vorgabe
   schreibt Root › Module das einmal nach settings («root/admin = false»), danach gilt settings.

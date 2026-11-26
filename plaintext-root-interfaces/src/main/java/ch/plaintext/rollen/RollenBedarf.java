@@ -24,7 +24,7 @@ import java.util.List;
  * @param vergeben     number of users holding the role; {@code null} when the stock is unknown. Names are never
  *                     part of the model
  * @author info@plaintext.ch
- * @since 3.85.0
+ * @since 3.86.0
  */
 @ModulApi(art = ModulApi.Art.DTO, stabilitaet = ModulApi.Stabilitaet.STABIL)
 public record RollenBedarf(String authority, String name, String beschreibung, String quelle, String modul,

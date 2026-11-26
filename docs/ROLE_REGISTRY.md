@@ -165,6 +165,111 @@ example), that provider's more detailed description wins.
 
 ---
 
+## Strict module roles (no ROOT/ADMIN bypass)
+
+*since root 3.59.0 (ROOT-3), split into ROOT and ADMIN bypass in 3.70.0 (Karte 2390)*
+
+```yaml
+plaintext:
+  menu:
+    module-roles:
+      terminal: terminal
+    strenge-module-roles:     # = ohne-root-umgehung + ohne-admin-umgehung
+      - terminal
+    ohne-root-umgehung: []    # ROOT has no bypass, ADMIN keeps it
+    ohne-admin-umgehung: []   # ADMIN has no bypass, ROOT keeps it
+```
+
+* For a listed module **ROOT and ADMIN need the module role too** — in the menu, for tiles, in the page guard
+  and in `@modulRolle.darf`. Modules that are not listed behave as before.
+* A strict module **without** a `module-roles` entry requires the role of the same name (closed, not open).
+* Since 3.70.0 the yml is only the default: at the first start Root › Module writes it once to settings
+  (`<key>.zugriff.rolle|root|admin`), afterwards settings decide.
+* A role declared with `.modul(x).ohneUmgehung(true)` makes module `x` strict by default (ROOT-5).
+* **Order before switching a module to strict:** create the role in the user administration and grant it to the
+  people who need it (the operator's own account included) — otherwise the module is closed for everyone, ROOT as well, and
+  only configuration opens it again.
+
+## Reading roles from outside
+
+*since root 3.86.0 (Karte 2377, ROOT-5/6/7/8; ADR [0010](adr/0010-rollenbedarf-lesbar.md))*
+
+A module declares more than the role name:
+
+```java
+new PlaintextRole("terminal", "Terminal-Sitzungen im Browser bedienen")
+        .modul("terminal")
+        .art(RollenArt.ZUGANG)        // ZUGANG | BEARBEITEN | ADMIN | TECHNISCH
+        .ohneUmgehung(true);          // ROOT/ADMIN do not get the module without it
+```
+
+The two-argument constructor stays; existing providers compile unchanged.
+
+`RollenBedarfService` (`plaintext-root-role-assignment`) collects every role the instance knows of as
+`ch.plaintext.rollen.RollenBedarf`, with `quelle`:
+
+| `quelle` | meaning |
+|---|---|
+| `deklariert` | declared by a `PlaintextRoleProvider` |
+| `module-roles` | required by `plaintext.menu.module-roles` / Root › Module, not declared |
+| `menu-auto` | `ROLE_MENU_<menuId>` of an entry under `access-policy: STRICT` |
+| `menu-annotation` | named in `@MenuAnnotation(roles)` but not declared |
+| `bestand` | held by users, required by nothing loaded — candidate for cleaning up |
+
+`vergeben` is the number of users holding the role (from `my_user_entity.roles`, via `RollenBestandQuelle`);
+names are never returned. **OIDC groups are not counted** (ENT-5).
+
+**REST** `GET /api/root/rollen[?modul=terminal]` — session with ADMIN or ROOT; API token (always `SCOPE_READ`)
+whose owner is ADMIN or ROOT (ENT-4). For tokens add the path to `plaintext.mcp.bearer-filter.url-patterns`.
+Header `X-Plaintext-Hinweis: OIDC-Gruppen nicht gezaehlt`.
+
+```json
+[
+  { "authority": "ROLE_TERMINAL", "name": "terminal", "beschreibung": "Terminal bedienen",
+    "quelle": "deklariert", "modul": "terminal", "art": "ZUGANG", "ohneUmgehung": true,
+    "menuId": "", "module": ["terminal"], "vergeben": 3 },
+  { "authority": "ROLE_FILES", "name": "files", "beschreibung": "", "quelle": "module-roles",
+    "modul": "", "art": "ZUGANG", "ohneUmgehung": false, "menuId": "", "module": ["files"], "vergeben": 0 },
+  { "authority": "ROLE_ALT", "name": "alt", "beschreibung": "", "quelle": "bestand",
+    "modul": "", "art": "ZUGANG", "ohneUmgehung": false, "menuId": "", "module": [], "vergeben": 1 }
+]
+```
+
+**MCP** `list_roles` (optional `modul`), same rules, one line per role.
+
+## Manifest
+
+Every module jar can carry `META-INF/plaintext/modul.yaml` (ROOT-7, ENT-3 = test instead of a Maven plugin):
+
+```yaml
+format: 1
+modul: files
+rollen:
+  - name: files
+    authority: ROLE_FILES
+    beschreibung: "Persönliche Dateiablage (Misc > Files): eigene Dateien hochladen, teilen und löschen"
+    art: ZUGANG
+    ohneUmgehung: false
+menue:
+  - menuId: files
+    parent: "Misc"
+    order: 65
+    title: "Files"
+    link: "files/ablage.html"
+    rollen: [FILES, ADMIN, ROOT]
+properties:
+  - plaintext.files
+```
+
+* Written and checked by a test: `class MyModulManifestTest extends ch.plaintext.testsupport.ModulManifestTest`
+  with `modul()` and `paket()`. Red when a role, menu default or properties prefix changed;
+  `mvn test -Dplaintext.manifest.schreiben=true` rewrites the file. Role providers need a no-arg constructor,
+  otherwise override `rollenProvider()`.
+* The version is not in the file; `ModulManifest.lesen(jar)` takes it from the jar's `pom.properties`.
+* Reading without Spring: `ch.plaintext.lader.ModulManifest` (JDK only). The loader logs the roles of every loaded
+  module at startup and lists them on demand:
+  `java -jar plaintext-root-lader.jar --rollen a.jar b.jar` (tab table; `#` line for a jar without manifest).
+
 # Rule of responsibility: root says WHICH, admin says WHO
 
 *since root 1.608.0*
