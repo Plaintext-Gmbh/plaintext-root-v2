@@ -18,6 +18,7 @@ geschuetzt    /actuator/metrics
 geschuetzt    /actuator/prometheus
 geschuetzt    /api/preferences/save
 geschuetzt    /api/i18n/export
+geschuetzt    /api/root/rollen
 geschuetzt    /debug/menu-scan
 geschuetzt    /carddav/beispiel/addressbooks/default/
 geschuetzt    /.well-known/acme-challenge/token
