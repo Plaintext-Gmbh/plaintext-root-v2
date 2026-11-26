@@ -108,7 +108,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: Plaintext-Gmbh/plaintext-scripts
-          ref: 7fc66bed9dadbc602b9adf40a6bdff0761e27dcf
+          ref: 37e557a6fe2f314c40ba0e751b8ba6265b3f47fc
           path: werkzeuge
           token: ${{ secrets.MVN_DEPLOY_TOKEN }}
 
