@@ -34,6 +34,10 @@ exhaustive.
   oder Properties vom Manifest abweichen, `mvn test -Dplaintext.manifest.schreiben=true` schreibt es neu.
   `plaintext-root-testsupport` hängt dafür an root-common, root-menu und root-lader. `plaintext-root-files` trägt sein
   Manifest als erstes.
+- **Lader zeigt die Rollen der Module** (Karte 2377, ROOT-8): `java -jar plaintext-root-lader.jar --rollen a.jar b.jar`
+  listet die Rollen aus den Manifesten als Tabelle (Tab-getrennt), je Jar ohne Manifest eine Hinweiszeile `#`; Exit 0,
+  1 nur bei einem unlesbaren Jar. Beim Hüllenstart loggt der Lader je geladenem Modul
+  `[modul-lader] <modul> <version>: Rollen …` (fehlendes Manifest = Hinweis, kein Fehler).
 - **`ohneUmgehung` macht das Modul streng** (ROOT-5): Deklariert ein Modul eine Rolle mit `.modul(x).ohneUmgehung(true)`,
   gilt `x` in der Vorgabe als `strenge-module-roles` (ROOT und ADMIN brauchen die Rolle). Wie jede yml-Vorgabe
   schreibt Root › Module das einmal nach settings («root/admin = false»), danach gilt settings.

@@ -23,4 +23,21 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <!-- Karte 2377 ROOT-8: java -jar plaintext-root-lader.jar, Option rollen -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>ch.plaintext.lader.ModulLader</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

@@ -97,6 +97,23 @@ public final class ModulLader {
     }
 
     public static void main(String[] args) throws Throwable {
+        if (args.length > 0 && "--rollen".equals(args[0])) {
+            if (args.length < 2) {
+                System.err.println("Aufruf: java -jar plaintext-root-lader.jar --rollen <modul.jar>...");
+                System.exit(2);
+            }
+            List<Path> jars = new ArrayList<>();
+            for (int i = 1; i < args.length; i++) {
+                jars.add(Path.of(args[i]));
+            }
+            boolean ok = true;
+            for (String zeile : rollenTabelle(jars)) {
+                System.out.println(zeile);
+                ok &= !zeile.startsWith(UNLESBAR);
+            }
+            System.exit(ok ? 0 : 1);
+            return;
+        }
         if (args.length > 0 && "--einbetten".equals(args[0])) {
             if (args.length != 4) {
                 System.err.println("Aufruf: java -cp app.jar:lader.jar " + ModulLader.class.getName()
@@ -130,7 +147,61 @@ public final class ModulLader {
             System.exit(1);
             return;
         }
+        rollenLog(jars).forEach(ModulLader::log);
         starten(jars, args);
+    }
+
+    private static final String UNLESBAR = "# UNLESBAR ";
+
+    /**
+     * Karte 2377 ROOT-8: welche Rollen die geprüften Jars mitbringen, eine Zeile je Jar. Ein fehlendes oder kaputtes
+     * Manifest ist nur ein Hinweis, kein Fehler: der Start hängt nicht daran.
+     */
+    static List<String> rollenLog(List<Path> jars) {
+        List<String> ret = new ArrayList<>();
+        for (Path jar : jars) {
+            try {
+                var m = ModulManifest.lesen(jar);
+                if (m.isEmpty()) {
+                    ret.add(jar.getFileName() + ": kein Modul-Manifest (" + ModulManifest.PFAD + "), Rollen unbekannt");
+                    continue;
+                }
+                ModulManifest mm = m.get();
+                ret.add(mm.modul() + " " + (mm.version() == null ? "?" : mm.version()) + ": Rollen "
+                        + (mm.rollen().isEmpty() ? "keine" : mm.rollen().stream()
+                        .map(r -> r.name() + " (" + r.art() + (r.ohneUmgehung() ? ", ohne Umgehung" : "") + ")")
+                        .collect(Collectors.joining(", "))));
+            } catch (RuntimeException ex) {
+                ret.add(jar.getFileName() + ": Modul-Manifest unlesbar (" + ex.getMessage() + ")");
+            }
+        }
+        return ret;
+    }
+
+    /**
+     * Karte 2377 ROOT-8, {@code --rollen}: die Vereinigung der Rollen als Tabelle (Tab-getrennt), je Jar ohne Manifest
+     * eine Hinweiszeile mit {@code #}; ein unlesbares Jar beginnt mit {@value #UNLESBAR}.
+     */
+    static List<String> rollenTabelle(List<Path> jars) {
+        List<String> ret = new ArrayList<>();
+        ret.add("modul\tversion\tauthority\tart\tohneUmgehung\tbeschreibung");
+        for (Path jar : jars) {
+            try {
+                var m = ModulManifest.lesen(jar);
+                if (m.isEmpty()) {
+                    ret.add("# " + jar.getFileName() + ": kein Modul-Manifest (" + ModulManifest.PFAD + ")");
+                    continue;
+                }
+                ModulManifest mm = m.get();
+                for (ModulManifest.Rolle r : mm.rollen()) {
+                    ret.add(mm.modul() + "\t" + (mm.version() == null ? "" : mm.version()) + "\t" + r.authority() + "\t"
+                            + r.art() + "\t" + r.ohneUmgehung() + "\t" + r.beschreibung().replace('\t', ' ').replace('\n', ' '));
+                }
+            } catch (RuntimeException ex) {
+                ret.add(UNLESBAR + jar + ": " + ex.getMessage());
+            }
+        }
+        return ret;
     }
 
     /**
