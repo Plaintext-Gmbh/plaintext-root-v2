@@ -12,6 +12,10 @@ exhaustive.
 
 ## [Unreleased]
 
+3.86.0 ist nur teilweise veröffentlicht: Release-Lauf 413 hing nach dem Kontextstart in
+`ErrorDispatchChainTest` und wurde nach dem Timeout abgebrochen; ab `plaintext-root-webapp` fehlen die Artefakte.
+Dieselben Änderungen erscheinen vollständig als 3.87.0. 3.86.0 nicht verwenden.
+
 ### Added
 
 - **Rollenbedarf von aussen lesbar, Teil 1: Modell und Sammlung** (Karte 2377, ROOT-5). `PlaintextRole` kennt
