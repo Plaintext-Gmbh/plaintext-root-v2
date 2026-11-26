@@ -26,6 +26,14 @@ exhaustive.
   `RollenBedarfService` als JSON (`RollenBedarf`), nur Sitzung ADMIN/ROOT bzw. Token (`SCOPE_READ`) eines ADMIN/ROOT
   (Entscheid ENT-4 = A, kein neuer Scope); Header `X-Plaintext-Hinweis: OIDC-Gruppen nicht gezaehlt`. Für Tokens
   den Pfad in `plaintext.mcp.bearer-filter.url-patterns` aufnehmen (Vorgabe nur `/mcp/*`).
+- **Modul-Manifest `META-INF/plaintext/modul.yaml`** (Karte 2377, ROOT-7; ENT-3 = A: Test statt Maven-Plugin).
+  `ch.plaintext.lader.ModulManifest` (nur JDK) schreibt und liest das Manifest (modul, rollen, menue mit Vorgabe,
+  properties); `ModulManifest.lesen(jar)` liest es ohne Spring und nimmt die Version aus `pom.properties` des Jars
+  (in der Datei stünde sie nach jedem Release-Bump falsch). Basisklasse `ch.plaintext.testsupport.ModulManifestTest`:
+  ein Modul legt eine Unterklasse mit `modul()` und `paket()` an; der Test vergleicht und wird rot, wenn Rolle, Menü
+  oder Properties vom Manifest abweichen, `mvn test -Dplaintext.manifest.schreiben=true` schreibt es neu.
+  `plaintext-root-testsupport` hängt dafür an root-common, root-menu und root-lader. `plaintext-root-files` trägt sein
+  Manifest als erstes.
 - **`ohneUmgehung` macht das Modul streng** (ROOT-5): Deklariert ein Modul eine Rolle mit `.modul(x).ohneUmgehung(true)`,
   gilt `x` in der Vorgabe als `strenge-module-roles` (ROOT und ADMIN brauchen die Rolle). Wie jede yml-Vorgabe
   schreibt Root › Module das einmal nach settings («root/admin = false»), danach gilt settings.
