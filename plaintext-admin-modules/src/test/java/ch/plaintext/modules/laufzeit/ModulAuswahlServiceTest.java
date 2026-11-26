@@ -91,7 +91,7 @@ class ModulAuswahlServiceTest {
     }
 
     private void zeile(String name, String version, KeyPair k) throws Exception {
-        ModulAuswahl.Zeile z = new ModulAuswahl.Zeile("modul", name, version, "1.770.0", "a".repeat(64), List.of(), List.of(),
+        ModulAuswahl.Zeile z = new ModulAuswahl.Zeile("modul", name, version, "1.770.0", "a".repeat(64), null, List.of(), List.of(),
                 "x.jar", "x", "test", null);
         Signature s = Signature.getInstance("Ed25519");
         s.initSign(k.getPrivate());
@@ -244,7 +244,7 @@ class ModulAuswahlServiceTest {
     @Test
     void registryStatusZaehltModuleUndVersionen() {
         java.util.function.BiFunction<String, String, ModulAuswahl.Zeile> z = (name, version) -> new ModulAuswahl.Zeile("modul", name,
-                version, "3.58.0", "abc", List.of(), List.of(), name + "-" + version + ".jar", "sig", "oeffentlich", null);
+                version, "3.58.0", "abc", null, List.of(), List.of(), name + "-" + version + ".jar", "sig", "oeffentlich", null);
         ModulAuswahl.Angebot angebot = new ModulAuswahl.Angebot(List.of(z.apply("plaintext-modul-files", "1.0.1"),
                 z.apply("plaintext-modul-files", "1.1.0"), z.apply("plaintext-modul-files", "1.2.0"), z.apply("plaintext-modul-files", "1.3.0")),
                 java.util.Map.of("kunde", "antwortet 503"));
@@ -260,7 +260,7 @@ class ModulAuswahlServiceTest {
     /** Zweite Registry unter /ui/, nur mit HTTP Basic k-1:pw (wie /nosec/k/ auf modules). */
     private String uiRegistry() throws Exception {
         String sha = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(JAR_C));
-        ModulAuswahl.Zeile z = new ModulAuswahl.Zeile("modul", "plaintext-z-c", "1.0.0", "1.770.0", sha, List.of(), List.of(),
+        ModulAuswahl.Zeile z = new ModulAuswahl.Zeile("modul", "plaintext-z-c", "1.0.0", "1.770.0", sha, null, List.of(), List.of(),
                 "jars/plaintext-z-c-1.0.0.jar", "x", "kunde", null);
         Signature s = Signature.getInstance("Ed25519");
         s.initSign(schluessel.getPrivate());
