@@ -50,6 +50,9 @@ exhaustive.
 - **`PlaintextRole` hat drei Komponenten mehr** (ROOT-5): `equals`/`hashCode` vergleichen sie mit. Wer Rollen mit
   `equals` vergleicht statt über `normalizedName()`, prüft das; doppelte Deklarationen vereinigt die Registry jetzt
   feldweise (erste nicht leere Beschreibung und Modul, `ohneUmgehung` wenn eine es verlangt).
+- Ohne Verhaltensänderung zerlegt (S3776/S1192): `ModulKonfig.parsen`/`stueckliste`, `ModulPruefung.pruefen`,
+  `TableKomponenten.kinderOrdnen`, `MyUserBackingBean.save`, `McpBearerTokenFilter.doFilter`,
+  `BenutzerMcpTools.importBenutzer`, `RateLimitFilter.doFilter`.
 
 ### Deprecated
 
@@ -70,12 +73,6 @@ exhaustive.
   200 000 Einträgen ab (Sonar S5042; vorher unbegrenzt, gelesen werden weiterhin nur Namen). Linter in
   `plaintext-root-common`: `InlineJsLinter` (Tag-Ausdruck) und `JsfViewLinter` (`onchange="submit()"`) mit
   possessiven Quantoren, damit lange offene Tags nicht mehr polynomiell zurücksetzen (S5852); Treffer unverändert.
-
-### Changed
-
-- Ohne Verhaltensänderung zerlegt (S3776/S1192): `ModulKonfig.parsen`/`stueckliste`, `ModulPruefung.pruefen`,
-  `TableKomponenten.kinderOrdnen`, `MyUserBackingBean.save`, `McpBearerTokenFilter.doFilter`,
-  `BenutzerMcpTools.importBenutzer`, `RateLimitFilter.doFilter`.
 
 ## [3.83.0] - 2026-11-26
 
