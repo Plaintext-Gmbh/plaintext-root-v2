@@ -16,11 +16,14 @@ exhaustive.
 
 - **`plaintext-root-files` ist veraltet, Nachfolger `ch.plaintext:plaintext-modul-files`** (Karte 2377, ROOT-11).
   Umstieg: die Abhängigkeit `plaintext-root-files` durch `plaintext-modul-files` ersetzen (bzw. das Modul über die
-  Laufzeit-Module laden). Dateien unter `plaintext.files.verzeichnis` (Layout `files/<benutzer>/…`) und die
-  Freigabe-Links in `freigabe_link` (Art `files`, `files-inline`, Adresse `/nosec/files/{token}`) liest der Nachfolger
-  ohne Migration weiter; die Rolle heisst in beiden `files`. Sind beide Module geladen, bricht der Start jetzt mit
-  einer Meldung ab (gleiche Bean-Namen, Adressen und MCP-Werkzeuge); allein geladen meldet root-files beim Start
-  «veraltet». Das Modul fällt in einem späteren Release weg.
+  Laufzeit-Module laden). Freigabe-Links in `freigabe_link` (Art `files`, `files-inline`, Adresse
+  `/nosec/files/{token}`, Objekt `<benutzer>/<pfad>`) liest der Nachfolger ohne Migration weiter, ebenso die Dateien im
+  Layout `files/<benutzer>/…` unter `plaintext.files.verzeichnis` – **solange** keine Speicher-Ablage gilt: Ist unter
+  Root › Sidecars genau eine Speicher-Ablage eingerichtet oder die Einstellung `files.verzeichnis` gesetzt, liest der
+  Nachfolger dort (README plaintext-modul-files). Die Rolle heisst in beiden `files`, aber **Admin und Root sehen im
+  Nachfolger keine fremden Ablagen mehr** (in root-files sahen sie alle). Sind beide Module geladen, bricht der Start
+  jetzt vor dem Einlesen der Beans mit einer Meldung ab (sonst Namenskonflikt `filesService` u. a. ohne Hinweis);
+  allein geladen meldet root-files beim Start «veraltet». Das Modul fällt in einem späteren Release weg.
 
 ## [3.83.0] - 2026-11-26
 
