@@ -152,4 +152,11 @@ class ModulPruefungTest {
                 .isEqualTo(Path.of("/app/app.jar"));
         assertThat(ModulLader.archivVon(URI.create("file:/x/META-INF/MANIFEST.MF").toURL())).isNull();
     }
+
+    @Test
+    void archivMitZuVielenEintraegenWirdAbgewiesen() {
+        ModulPruefung.mengePruefen(ModulPruefung.MAX_EINTRAEGE, "ok.jar");
+        assertThatThrownBy(() -> ModulPruefung.mengePruefen(ModulPruefung.MAX_EINTRAEGE + 1, "bombe.jar"))
+                .hasMessageContaining("bombe.jar hat mehr als");
+    }
 }

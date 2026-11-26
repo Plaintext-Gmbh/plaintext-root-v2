@@ -13,7 +13,7 @@ import java.util.Map;
  * from an OIDC provider are not counted.
  *
  * @author info@plaintext.ch
- * @since 3.84.0
+ * @since 3.85.0
  */
 @ModulApi(art = ModulApi.Art.SCHNITTSTELLE, stabilitaet = ModulApi.Stabilitaet.NEU)
 public interface RollenBestandQuelle {

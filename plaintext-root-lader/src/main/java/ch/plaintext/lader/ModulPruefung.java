@@ -42,6 +42,8 @@ final class ModulPruefung {
             "META-INF/spring/[^/]+\\.imports|META-INF/spring\\.factories");
     private static final Pattern RAHMEN = Pattern.compile("plaintext-(root|admin)-[a-z0-9]+(-[a-z0-9]+)*");
     private static final int MAX_MELDUNGEN = 5;
+    /** Obergrenze je Archiv; die groessten Jars der Huelle haben einige zehntausend Eintraege. */
+    static final int MAX_EINTRAEGE = 200_000;
 
     private ModulPruefung() {
     }
@@ -50,23 +52,7 @@ final class ModulPruefung {
         List<String> fehler = new ArrayList<>();
         Map<String, String> klasseZuJar = new HashMap<>();
         for (int i = 0; i < soll.size(); i++) {
-            ModulKonfig.Eintrag e = soll.get(i);
-            try (ZipFile zip = new ZipFile(jars.get(i).toFile())) {
-                Enumeration<? extends ZipEntry> eintraege = zip.entries();
-                while (eintraege.hasMoreElements()) {
-                    String n = eintraege.nextElement().getName();
-                    if (KONFIG.matcher(n).matches()) {
-                        fehler.add(e.dateiname() + " enthaelt " + n + " (wuerde die Konfig der Huelle verdraengen)");
-                    } else if (!e.bibliothek() && !RAHMEN.matcher(e.name()).matches() && SPRING_EINHAENGEN.matcher(n).matches()) {
-                        fehler.add(e.dateiname() + " enthaelt " + n + " (Module haengen sich nicht in den Spring-Start)");
-                    } else if (istKlasse(n)) {
-                        String vorher = klasseZuJar.putIfAbsent(n, e.dateiname());
-                        if (vorher != null) {
-                            fehler.add("Klasse " + klassenname(n) + " doppelt: " + vorher + " und " + e.dateiname());
-                        }
-                    }
-                }
-            }
+            jarPruefen(soll.get(i), jars.get(i), klasseZuJar, fehler);
         }
         if (fehler.isEmpty()) {
             if (huelle == null) {
@@ -83,10 +69,45 @@ final class ModulPruefung {
         }
     }
 
+    /** Liest nur das Inhaltsverzeichnis des Jars (nichts wird entpackt), hoechstens {@link #MAX_EINTRAEGE} Namen. */
+    private static void jarPruefen(ModulKonfig.Eintrag e, Path jar, Map<String, String> klasseZuJar,
+                                   List<String> fehler) throws IOException {
+        try (ZipFile zip = new ZipFile(jar.toFile())) {
+            mengePruefen(zip.size(), e.dateiname());
+            Enumeration<? extends ZipEntry> eintraege = zip.entries();
+            while (eintraege.hasMoreElements()) {
+                eintragPruefen(e, eintraege.nextElement().getName(), klasseZuJar, fehler);
+            }
+        }
+    }
+
+    private static void eintragPruefen(ModulKonfig.Eintrag e, String n, Map<String, String> klasseZuJar,
+                                       List<String> fehler) {
+        if (KONFIG.matcher(n).matches()) {
+            fehler.add(e.dateiname() + " enthaelt " + n + " (wuerde die Konfig der Huelle verdraengen)");
+        } else if (!e.bibliothek() && !RAHMEN.matcher(e.name()).matches() && SPRING_EINHAENGEN.matcher(n).matches()) {
+            fehler.add(e.dateiname() + " enthaelt " + n + " (Module haengen sich nicht in den Spring-Start)");
+        } else if (istKlasse(n)) {
+            String vorher = klasseZuJar.putIfAbsent(n, e.dateiname());
+            if (vorher != null) {
+                fehler.add("Klasse " + klassenname(n) + " doppelt: " + vorher + " und " + e.dateiname());
+            }
+        }
+    }
+
+    /** Karte 2483 (Sonar S5042): ein Archiv mit unplausibel vielen Eintraegen ist kein Jar, sondern ein Angriff. */
+    static void mengePruefen(int anzahl, String archiv) {
+        if (anzahl > MAX_EINTRAEGE) {
+            throw new IllegalStateException("Modul-Pruefung: " + archiv + " hat mehr als " + MAX_EINTRAEGE
+                    + " Eintraege, keine Module geladen");
+        }
+    }
+
     private static void huelleVergleichen(Path huelle, Map<String, String> klasseZuJar, List<String> fehler)
             throws IOException {
         Set<String> gesehen = new HashSet<>();
         try (ZipFile zip = new ZipFile(huelle.toFile())) {
+            mengePruefen(zip.size(), huelle.getFileName().toString());
             Enumeration<? extends ZipEntry> eintraege = zip.entries();
             while (eintraege.hasMoreElements()) {
                 ZipEntry z = eintraege.nextElement();
@@ -94,14 +115,22 @@ final class ModulPruefung {
                 if (n.startsWith("BOOT-INF/classes/")) {
                     treffer(n.substring("BOOT-INF/classes/".length()), "BOOT-INF/classes", klasseZuJar, gesehen, fehler);
                 } else if (n.startsWith("BOOT-INF/lib/") && n.endsWith(".jar")) {
-                    String lib = n.substring("BOOT-INF/lib/".length());
-                    try (InputStream rein = zip.getInputStream(z); ZipInputStream inner = new ZipInputStream(rein)) {
-                        ZipEntry k;
-                        while ((k = inner.getNextEntry()) != null) {
-                            treffer(k.getName(), lib, klasseZuJar, gesehen, fehler);
-                        }
-                    }
+                    innenVergleichen(zip, z, klasseZuJar, gesehen, fehler);
                 }
+            }
+        }
+    }
+
+    /** Ein Jar in {@code BOOT-INF/lib}: nur die Namen, hoechstens {@link #MAX_EINTRAEGE}; Inhalte werden ueberlesen, nie gespeichert. */
+    private static void innenVergleichen(ZipFile zip, ZipEntry z, Map<String, String> klasseZuJar, Set<String> gesehen,
+                                         List<String> fehler) throws IOException {
+        String lib = z.getName().substring("BOOT-INF/lib/".length());
+        int anzahl = 0;
+        try (InputStream rein = zip.getInputStream(z); ZipInputStream inner = new ZipInputStream(rein)) {
+            ZipEntry k;
+            while ((k = inner.getNextEntry()) != null) {
+                mengePruefen(++anzahl, lib);
+                treffer(k.getName(), lib, klasseZuJar, gesehen, fehler);
             }
         }
     }
