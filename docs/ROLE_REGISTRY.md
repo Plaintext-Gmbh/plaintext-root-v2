@@ -192,7 +192,7 @@ plaintext:
 
 ## Reading roles from outside
 
-*since root 3.85.0 (Karte 2377, ROOT-5/6/7/8; ADR [0010](adr/0010-rollenbedarf-lesbar.md))*
+*since root 3.86.0 (Karte 2377, ROOT-5/6/7/8; ADR [0010](adr/0010-rollenbedarf-lesbar.md))*
 
 A module declares more than the role name:
 
