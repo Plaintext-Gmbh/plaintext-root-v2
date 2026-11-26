@@ -12,6 +12,12 @@ exhaustive.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`my_user_entity.roles` auf `VARCHAR(4000)`** (Karte 2517): Das Rollen-Set wird mit vielen Modulrollen
+  länger als 255 Zeichen; Speichern unter Rollenzuteilung scheiterte mit «Value too long». Migration
+  `V1795639075__benutzer_rollen_spalte_breiter.sql`, nur Verbreitern.
+
 ## [3.82.0] - 2026-11-26
 
 ### Changed
