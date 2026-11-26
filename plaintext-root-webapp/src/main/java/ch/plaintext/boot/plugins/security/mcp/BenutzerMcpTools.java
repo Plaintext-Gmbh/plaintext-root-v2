@@ -252,30 +252,10 @@ public class BenutzerMcpTools {
         List<MyUserEntity> zuSpeichern = new ArrayList<>();
 
         for (Satz s : saetze) {
-            b.gelesen++;
-            String login = s.getUsername() == null ? "" : s.getUsername().trim().toLowerCase(Locale.ROOT);
-            if (!EMAIL.matcher(login).matches()) {
-                b.ungueltig++;
-                continue;
+            MyUserEntity e = satzEinlesen(s, zielMandat, b);
+            if (e != null) {
+                zuSpeichern.add(e);
             }
-            MyUserEntity vorhanden = userRepository.findByUsername(login);
-            if (vorhanden != null) {
-                // Card 1449 S-13: the login lookup is global; an account of another tenant is not
-                // the caller's to complete. Counted as unchanged; a new account cannot be created anyway.
-                if (!gehoertZumMandanten(vorhanden, zielMandat)) {
-                    b.unveraendert++;
-                    continue;
-                }
-                if (ergaenzeNamen(vorhanden, s, b)) {
-                    zuSpeichern.add(vorhanden);
-                    b.aktualisiert++;
-                } else {
-                    b.unveraendert++;
-                }
-                continue;
-            }
-            zuSpeichern.add(neuerBenutzer(login, s, zielMandat, b));
-            b.angelegt++;
         }
         userRepository.saveAll(zuSpeichern);
         log.info("MCP: import_benutzer nach {}: {} gelesen, {} angelegt, {} aktualisiert, {} unveraendert,"
@@ -283,6 +263,29 @@ public class BenutzerMcpTools {
                 zielMandat, b.gelesen, b.angelegt, b.aktualisiert, b.unveraendert, b.ungueltig,
                 b.verworfeneRollen);
         return b.alsText();
+    }
+
+    /** Ein Satz der Datei: der zu speichernde Benutzer oder {@code null}; zaehlt in {@code b}. */
+    private MyUserEntity satzEinlesen(Satz s, String zielMandat, Bericht b) {
+        b.gelesen++;
+        String login = s.getUsername() == null ? "" : s.getUsername().trim().toLowerCase(Locale.ROOT);
+        if (!EMAIL.matcher(login).matches()) {
+            b.ungueltig++;
+            return null;
+        }
+        MyUserEntity vorhanden = userRepository.findByUsername(login);
+        if (vorhanden == null) {
+            b.angelegt++;
+            return neuerBenutzer(login, s, zielMandat, b);
+        }
+        // Card 1449 S-13: the login lookup is global; an account of another tenant is not
+        // the caller's to complete. Counted as unchanged; a new account cannot be created anyway.
+        if (gehoertZumMandanten(vorhanden, zielMandat) && ergaenzeNamen(vorhanden, s, b)) {
+            b.aktualisiert++;
+            return vorhanden;
+        }
+        b.unveraendert++;
+        return null;
     }
 
     // ── Mapping ───────────────────────────────────────────────────────────────────────────────

@@ -172,11 +172,9 @@ final class TableKomponenten {
         Map<String, UIComponent> spalten = new HashMap<>();
         Set<String> zielKeys = new LinkedHashSet<>(order);
         for (UIComponent kind : kinder) {
-            if (kind instanceof UIColumn) {
-                String key = keyFromHeader.apply(((UIColumn) kind).getHeaderText());
-                if (key != null && zielKeys.contains(key)) {
-                    spalten.put(key, kind);
-                }
+            String key = zielKey(kind, keyFromHeader, zielKeys);
+            if (key != null) {
+                spalten.put(key, kind);
             }
         }
         if (spalten.size() < 2) {
@@ -186,15 +184,20 @@ final class TableKomponenten {
         List<UIComponent> gemischt = new ArrayList<>(kinder);
         java.util.Iterator<String> it = ziel.iterator();
         for (int i = 0; i < gemischt.size() && it.hasNext(); i++) {
-            UIComponent kind = gemischt.get(i);
-            if (kind instanceof UIColumn) {
-                String key = keyFromHeader.apply(((UIColumn) kind).getHeaderText());
-                if (key != null && zielKeys.contains(key)) {
-                    gemischt.set(i, spalten.get(it.next()));
-                }
+            if (zielKey(gemischt.get(i), keyFromHeader, zielKeys) != null) {
+                gemischt.set(i, spalten.get(it.next()));
             }
         }
         kinder.clear();
         kinder.addAll(gemischt);
+    }
+
+    /** Schluessel einer Spalte aus ihrem Kopftext, sofern er in {@code order} vorkommt, sonst {@code null}. */
+    private static String zielKey(UIComponent kind, UnaryOperator<String> keyFromHeader, Set<String> zielKeys) {
+        if (!(kind instanceof UIColumn spalte)) {
+            return null;
+        }
+        String key = keyFromHeader.apply(spalte.getHeaderText());
+        return key != null && zielKeys.contains(key) ? key : null;
     }
 }
