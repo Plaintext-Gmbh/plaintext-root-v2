@@ -19,10 +19,10 @@ import java.util.TreeMap;
  * {@code PROPERTY_MANDAT_*} are not roles and are skipped; OIDC groups never reach this table and are not counted.
  */
 @Component
-@ModulApiUmsetzung(beschreibung = "Zählt je gespeicherter Rolle die Benutzer in my_user_entity.roles.",
+@ModulApiUmsetzung(beschreibung = "Counts the users per stored role in my_user_entity.roles.",
         seiteneffekte = ModulApiUmsetzung.Seiteneffekte.KEINE,
-        hinweise = {"Liest alle Benutzer (wenige hundert), nur auf Anfrage", "PROPERTY_MANDAT_* zählt nicht",
-                "OIDC-Gruppen sind nicht enthalten"},
+        hinweise = {"Reads every user (a few hundred), only on request", "PROPERTY_MANDAT_* markers are skipped",
+                "OIDC groups are not included"},
         beispiele = {"vergebeneRollen() -> {admin=2, files=5, user=17}"})
 public class MyUserRollenBestand implements RollenBestandQuelle {
 

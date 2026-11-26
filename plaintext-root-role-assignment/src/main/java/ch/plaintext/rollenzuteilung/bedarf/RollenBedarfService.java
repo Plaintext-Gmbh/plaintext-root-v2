@@ -70,7 +70,7 @@ public class RollenBedarfService {
 
     /**
      * @param modul module key or name; empty = all
-     * @return the roles naming this module (declaration, module-roles key or menu item of the module)
+     * @return the roles naming this module (declaration or module-roles key)
      */
     public List<RollenBedarf> bedarf(String modul) {
         if (modul == null || modul.isBlank()) {
