@@ -256,22 +256,7 @@ public class McpBearerTokenFilter implements Filter {
         }
 
         ValidatedToken validation = result.get();
-        // SECURITY (card 1257): a browser credential is not an API credential. The watch phone
-        // link is a signed token in a URL; whoever gets the link holds it. Its scope cannot say
-        // "watch pages only" — the ladder knows READ/EINTRAGEN/ADMIN, and an unknown value falls
-        // back to READ, which HERE is read access to the whole application with the owner's
-        // roles. The name prefix says it instead, and this is where it is enforced: such a token
-        // is worth nothing at the API, no matter what its scope claims.
-        if (istNurFuerDieOberflaeche(validation.tokenName()) && !uiTokenErlaubt(httpRequest)) {
-            log.warn("MCP request rejected: token '{}' (userId={}, mandat={}) is a UI credential ('{}')",
-                    validation.tokenName(), validation.userId(), validation.mandat(),
-                    IApiTokenService.UI_TOKEN_NAME_PREFIX);
-            unauthorized(httpResponse);
-            return;
-        }
-        if (validation.jti() != null && revocationChecker.isRevoked(validation.jti())) {
-            log.warn("MCP request rejected: token jti={} (userId={}, mandat={}) is revoked",
-                    validation.jti(), validation.userId(), validation.mandat());
+        if (gesperrt(httpRequest, validation)) {
             unauthorized(httpResponse);
             return;
         }
@@ -299,21 +284,7 @@ public class McpBearerTokenFilter implements Filter {
                     validation.userId(), validation.tokenName(), claim, gedeckelt.get());
         }
 
-        Set<GrantedAuthority> authorities = new LinkedHashSet<>();
-        authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
-        authorities.add(new SimpleGrantedAuthority("PROPERTY_MYUSERID_" + validation.userId()));
-        authorities.add(new SimpleGrantedAuthority("PROPERTY_MANDAT_" + validation.mandat()));
-        // Unambiguous second copy of the same value — see TOKEN_MANDAT_PREFIX. It is the only
-        // tenant authority that is guaranteed to occur exactly once.
-        authorities.add(new SimpleGrantedAuthority(TOKEN_MANDAT_PREFIX + validation.mandat()));
-        addScopeAuthorities(authorities, gedeckelt.get());
-        // Real roles of the user (ROOT/ADMIN/PROPERTY_MANDAT_* etc.) — so that getAllowedMandate() is correct.
-        for (String role : userRoles) {
-            GrantedAuthority a = rollenAuthority(role, validation.userId());
-            if (a != null) {
-                authorities.add(a);
-            }
-        }
+        Set<GrantedAuthority> authorities = authorities(validation, gedeckelt.get(), userRoles);
         var auth = new UsernamePasswordAuthenticationToken(validation.email(), null, authorities);
 
         // IMPORTANT: do NOT mutate the existing SecurityContext object (session context protection,
@@ -368,6 +339,47 @@ public class McpBearerTokenFilter implements Filter {
         } finally {
             SecurityContextHolder.setContext(previous);
         }
+    }
+
+    /** UI-Ausweis an der API oder widerrufener Token: beides ist hier nichts wert (401). */
+    private boolean gesperrt(HttpServletRequest httpRequest, ValidatedToken validation) {
+        // SECURITY (card 1257): a browser credential is not an API credential. The watch phone
+        // link is a signed token in a URL; whoever gets the link holds it. Its scope cannot say
+        // "watch pages only" — the ladder knows READ/EINTRAGEN/ADMIN, and an unknown value falls
+        // back to READ, which HERE is read access to the whole application with the owner's
+        // roles. The name prefix says it instead, and this is where it is enforced: such a token
+        // is worth nothing at the API, no matter what its scope claims.
+        if (istNurFuerDieOberflaeche(validation.tokenName()) && !uiTokenErlaubt(httpRequest)) {
+            log.warn("MCP request rejected: token '{}' (userId={}, mandat={}) is a UI credential ('{}')",
+                    validation.tokenName(), validation.userId(), validation.mandat(),
+                    IApiTokenService.UI_TOKEN_NAME_PREFIX);
+            return true;
+        }
+        if (validation.jti() != null && revocationChecker.isRevoked(validation.jti())) {
+            log.warn("MCP request rejected: token jti={} (userId={}, mandat={}) is revoked",
+                    validation.jti(), validation.userId(), validation.mandat());
+            return true;
+        }
+        return false;
+    }
+
+    private Set<GrantedAuthority> authorities(ValidatedToken validation, String scope, Set<String> userRoles) {
+        Set<GrantedAuthority> authorities = new LinkedHashSet<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+        authorities.add(new SimpleGrantedAuthority("PROPERTY_MYUSERID_" + validation.userId()));
+        authorities.add(new SimpleGrantedAuthority("PROPERTY_MANDAT_" + validation.mandat()));
+        // Unambiguous second copy of the same value — see TOKEN_MANDAT_PREFIX. It is the only
+        // tenant authority that is guaranteed to occur exactly once.
+        authorities.add(new SimpleGrantedAuthority(TOKEN_MANDAT_PREFIX + validation.mandat()));
+        addScopeAuthorities(authorities, scope);
+        // Real roles of the user (ROOT/ADMIN/PROPERTY_MANDAT_* etc.) — so that getAllowedMandate() is correct.
+        for (String role : userRoles) {
+            GrantedAuthority a = rollenAuthority(role, validation.userId());
+            if (a != null) {
+                authorities.add(a);
+            }
+        }
+        return authorities;
     }
 
     /**

@@ -383,80 +383,15 @@ public class MyUserBackingBean implements Serializable {
 
     public void save() {
         FacesContext context = FacesContext.getCurrentInstance();
-
-        // Validate the e-mail format
-        if (selected.getUsername() == null || selected.getUsername().trim().isEmpty()) {
-            FacesMessages.error(FacesMessages.TITEL_FEHLER, "Benutzername darf nicht leer sein.");
-            context.validationFailed();
-            return;
-        }
-
-        if (!EMAIL_PATTERN.matcher(selected.getUsername()).matches()) {
-            FacesMessages.error(FacesMessages.TITEL_FEHLER, "Benutzername muss eine gültige E-Mail-Adresse sein.");
-            context.validationFailed();
-            return;
-        }
-
-        // Card 1331: a start page that does not exist here must not be saved - it sent the user
-        // into a redirect loop after the login (Index.html instead of index.html).
-        // Only a CHANGED value is checked: an unchanged legacy value (schuetu-prod has three users on
-        // "dashboard.htm", which the resolver already ignores by its form) must not block editing
-        // anything else of that user.
-        String startseitenFehler = startseiteGeaendert()
-                ? StartpageResolver.rejectionReason(selected.getStartpage(), servletContext(context))
-                : null;
-        if (startseitenFehler != null) {
-            FacesMessages.error("Fehler", startseitenFehler);
-            context.validationFailed();
-            return;
-        }
-        if (selected.getStartpage() != null) {
-            selected.setStartpage(selected.getStartpage().trim());
-        }
-
-        // Check whether the user name already exists (only for new users or on a change)
-        MyUserEntity existingUser = repo.findByUsername(selected.getUsername());
-        if (existingUser != null && !existingUser.getId().equals(selected.getId())) {
-            FacesMessages.error(FacesMessages.TITEL_FEHLER, "Ein Benutzer mit dieser E-Mail-Adresse existiert bereits.");
-            context.validationFailed();
+        if (!eingabenGueltig(context)) {
             return;
         }
 
         // SECURITY (card 307, K1): snapshot of the PERSISTED roles (freshly fetched by ID from the DB, not the
         // `selected` that may already have been overwritten by the JSF model update) — the basis for the role allowlist,
         // so that existing data stays editable while a non-ROOT cannot grant a privileged role ANEW.
-        Set<String> persistedRoles = new HashSet<>();
-        String persistedUsername = null;
-        Boolean persistedPasswordless = null;
-        if (selected.getId() != null) {
-            MyUserEntity persisted = repo.findById(selected.getId()).orElse(null);
-            if (persisted != null && persisted.getRoles() != null) {
-                persistedRoles = new HashSet<>(persisted.getRoles());
-            }
-            if (persisted != null) {
-                persistedUsername = persisted.getUsername();
-                persistedPasswordless = persisted.isPasswordless();
-            }
-        }
-
-        // SECURITY (card 1451, S-1): a root account is administered by ROOT only. The role allowlist
-        // below guards the roles, not the account: an ADMIN could set the password of a root account
-        // of their tenant (or untick "Ohne Passwort" on an OIDC root) and then log in as ROOT.
-        if (!isRoot() && istRootKonto(persistedRoles)) {
-            log.warn("SECURITY (Karte 1451, S-1): Nicht-ROOT-Akteur '{}' versuchte, das ROOT-Konto '{}' "
-                    + "zu aendern — abgelehnt.", Log.mail(handelnderBenutzer()), Log.mail(persistedUsername));
-            FacesMessages.error(FacesMessages.TITEL_FEHLER, ROOT_KONTO_NUR_ROOT);
-            context.validationFailed();
-            return;
-        }
-        // SECURITY (card 1460, N-1): same for an account with an additional tenant outside the actor's
-        // tenant: with its password the ADMIN would switch into that tenant. The new login counts too,
-        // because user_mandate is keyed by login (rename onto a login that still has rows).
-        if (!isRoot() && (hatFremdesZusatzmandat(persistedUsername) || hatFremdesZusatzmandat(selected.getUsername()))) {
-            log.warn("SECURITY (Karte 1460, N-1): Nicht-ROOT-Akteur '{}' versuchte, das Mehrmandanten-Konto '{}' "
-                    + "zu aendern — abgelehnt.", Log.mail(handelnderBenutzer()), Log.mail(selected.getUsername()));
-            FacesMessages.error(FacesMessages.TITEL_FEHLER, MEHRMANDANTEN_KONTO_NUR_ROOT);
-            context.validationFailed();
+        Gespeichert alt = gespeichert();
+        if (!kontoAenderbar(context, alt)) {
             return;
         }
 
@@ -484,13 +419,117 @@ public class MyUserBackingBean implements Serializable {
         // Module roles are explicitly NOT privileged — granting them is the admin's job.
         // Roles already present on the persisted record stay permitted (existing data editable). The
         // server-side check is the actual fix; the free-text chips in the UI are only convenience.
+        if (!rollenZulaessig(context, alt.rollen())) {
+            return;
+        }
+
+        passwortUndMandatSetzen();
+        repo.save(selected);
+        // Card 1495 (S-5): a password set by the admin ends the account's remember-me logins and sessions.
+        if (passwordChanged && alt.username() != null && anmeldedatenWiderruf != null) {
+            anmeldedatenWiderruf.widerrufe(alt.username());
+        }
+        // TRACEABILITY (forensics 23.08.2026): log only after the write has succeeded —
+        // otherwise the log claims a change that may never have happened.
+        protokolliereRollenaenderung(alt.rollen(), selected.getRoles());
+        protokolliereAnmeldedatenAenderung(alt.username(), alt.passwordless(), passwordChanged);
+        saveZusatzMandate();
+        selected = null;
+        resetRollenEntzug();
+        init();
+        FacesMessages.info(FacesMessages.TITEL_ERFOLG, "Benutzer erfolgreich gespeichert.");
+    }
+
+    /** Formularwerte: Login als E-Mail, Startseite, Login nicht schon vergeben. */
+    private boolean eingabenGueltig(FacesContext context) {
+        if (selected.getUsername() == null || selected.getUsername().trim().isEmpty()) {
+            FacesMessages.error(FacesMessages.TITEL_FEHLER, "Benutzername darf nicht leer sein.");
+            context.validationFailed();
+            return false;
+        }
+
+        if (!EMAIL_PATTERN.matcher(selected.getUsername()).matches()) {
+            FacesMessages.error(FacesMessages.TITEL_FEHLER, "Benutzername muss eine gültige E-Mail-Adresse sein.");
+            context.validationFailed();
+            return false;
+        }
+
+        // Card 1331: a start page that does not exist here must not be saved - it sent the user
+        // into a redirect loop after the login (Index.html instead of index.html).
+        // Only a CHANGED value is checked: an unchanged legacy value (schuetu-prod has three users on
+        // "dashboard.htm", which the resolver already ignores by its form) must not block editing
+        // anything else of that user.
+        String startseitenFehler = startseiteGeaendert()
+                ? StartpageResolver.rejectionReason(selected.getStartpage(), servletContext(context))
+                : null;
+        if (startseitenFehler != null) {
+            FacesMessages.error("Fehler", startseitenFehler);
+            context.validationFailed();
+            return false;
+        }
+        if (selected.getStartpage() != null) {
+            selected.setStartpage(selected.getStartpage().trim());
+        }
+
+        // Check whether the user name already exists (only for new users or on a change)
+        MyUserEntity existingUser = repo.findByUsername(selected.getUsername());
+        if (existingUser != null && !existingUser.getId().equals(selected.getId())) {
+            FacesMessages.error(FacesMessages.TITEL_FEHLER, "Ein Benutzer mit dieser E-Mail-Adresse existiert bereits.");
+            context.validationFailed();
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Snapshot des gespeicherten Datensatzes (Karte 307, K1); leer fuer einen neuen Benutzer. */
+    private record Gespeichert(Set<String> rollen, String username, Boolean passwordless) {
+    }
+
+    private Gespeichert gespeichert() {
+        MyUserEntity persisted = selected.getId() == null ? null : repo.findById(selected.getId()).orElse(null);
+        if (persisted == null) {
+            return new Gespeichert(new HashSet<>(), null, null);
+        }
+        Set<String> rollen = persisted.getRoles() == null ? new HashSet<>() : new HashSet<>(persisted.getRoles());
+        return new Gespeichert(rollen, persisted.getUsername(), persisted.isPasswordless());
+    }
+
+    /** Root- und Mehrmandanten-Konten aendert nur ROOT (Karten 1451, 1460). */
+    private boolean kontoAenderbar(FacesContext context, Gespeichert alt) {
+        // SECURITY (card 1451, S-1): a root account is administered by ROOT only. The role allowlist
+        // below guards the roles, not the account: an ADMIN could set the password of a root account
+        // of their tenant (or untick "Ohne Passwort" on an OIDC root) and then log in as ROOT.
+        if (!isRoot() && istRootKonto(alt.rollen())) {
+            log.warn("SECURITY (Karte 1451, S-1): Nicht-ROOT-Akteur '{}' versuchte, das ROOT-Konto '{}' "
+                    + "zu aendern — abgelehnt.", Log.mail(handelnderBenutzer()), Log.mail(alt.username()));
+            FacesMessages.error(FacesMessages.TITEL_FEHLER, ROOT_KONTO_NUR_ROOT);
+            context.validationFailed();
+            return false;
+        }
+        // SECURITY (card 1460, N-1): same for an account with an additional tenant outside the actor's
+        // tenant: with its password the ADMIN would switch into that tenant. The new login counts too,
+        // because user_mandate is keyed by login (rename onto a login that still has rows).
+        if (!isRoot() && (hatFremdesZusatzmandat(alt.username()) || hatFremdesZusatzmandat(selected.getUsername()))) {
+            log.warn("SECURITY (Karte 1460, N-1): Nicht-ROOT-Akteur '{}' versuchte, das Mehrmandanten-Konto '{}' "
+                    + "zu aendern — abgelehnt.", Log.mail(handelnderBenutzer()), Log.mail(selected.getUsername()));
+            FacesMessages.error(FacesMessages.TITEL_FEHLER, MEHRMANDANTEN_KONTO_NUR_ROOT);
+            context.validationFailed();
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Neu vergebene und entzogene Rollen (Karten 307, 1863, Forensik 23.08.2026). */
+    private boolean rollenZulaessig(FacesContext context, Set<String> persistedRoles) {
         if (selected.getRoles().stream().anyMatch(PrivilegedRoleRules::isNieVergebbar)) {
             FacesMessages.error(FacesMessages.TITEL_FEHLER, "Die Rolle 'system' ist die Maschinenrolle und nie vergebbar (Karte 1863).");
             context.validationFailed();
-            return;
+            return false;
         }
         if (!isRoot() && !pruefeRollenAllowlist(context, persistedRoles)) {
-            return;
+            return false;
         }
 
         // SECURITY (forensics 23.08.2026, K1): the REVOCATION side. pruefeRollenAllowlist() only sees what
@@ -501,10 +540,10 @@ public class MyUserBackingBean implements Serializable {
         Set<String> neueRollen = selected.getRoles() == null
                 ? new HashSet<>() : new HashSet<>(selected.getRoles());
         Set<String> entzogenePrivilegierte = entzogenePrivilegierteRollen(persistedRoles, neueRollen);
-        if (!entzogenePrivilegierte.isEmpty() && !pruefeRollenEntzug(context, entzogenePrivilegierte)) {
-            return;
-        }
+        return entzogenePrivilegierte.isEmpty() || pruefeRollenEntzug(context, entzogenePrivilegierte);
+    }
 
+    private void passwortUndMandatSetzen() {
         // Set default mandate if none is specified
         if (selected.getMandat() == null || selected.getMandat().trim().isEmpty()) {
             selected.setMandat("default");
@@ -516,20 +555,6 @@ public class MyUserBackingBean implements Serializable {
         } else {
             selected.setPassword(myUserPw);
         }
-        repo.save(selected);
-        // Card 1495 (S-5): a password set by the admin ends the account's remember-me logins and sessions.
-        if (passwordChanged && persistedUsername != null && anmeldedatenWiderruf != null) {
-            anmeldedatenWiderruf.widerrufe(persistedUsername);
-        }
-        // TRACEABILITY (forensics 23.08.2026): log only after the write has succeeded —
-        // otherwise the log claims a change that may never have happened.
-        protokolliereRollenaenderung(persistedRoles, selected.getRoles());
-        protokolliereAnmeldedatenAenderung(persistedUsername, persistedPasswordless, passwordChanged);
-        saveZusatzMandate();
-        selected = null;
-        resetRollenEntzug();
-        init();
-        FacesMessages.info(FacesMessages.TITEL_ERFOLG, "Benutzer erfolgreich gespeichert.");
     }
 
     /**

@@ -49,7 +49,9 @@ final class ModulKonfig {
     static final Pattern VERSION = Pattern.compile("[0-9][A-Za-z0-9_-]*(\\.[A-Za-z0-9_-]+)*");
     static final Pattern ROOT_VERSION = Pattern.compile("[0-9]+\\.[0-9]+\\.[0-9]+");
     static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
-    private static final Set<String> SCHLUESSEL = Set.of("name", "version", "sha256", "root-min", "gruppe", "bibliotheken");
+    private static final String K_ROOT_MIN = "root-min";
+    private static final String K_GRUPPE = "gruppe";
+    private static final Set<String> SCHLUESSEL = Set.of("name", "version", "sha256", K_ROOT_MIN, K_GRUPPE, "bibliotheken");
     private static final Pattern KOORDINATE = Pattern.compile("([^:]+):([^:]+):([^:]+)");
 
     /**
@@ -85,61 +87,29 @@ final class ModulKonfig {
     }
 
     static List<Eintrag> parsen(String text, String quelle) {
-        List<Map<String, String>> roh = new ArrayList<>();
-        Map<String, String> aktuell = null;
-        boolean kopf = false;
-        int nr = 0;
-        for (String zeile : text.split("\r?\n", -1)) {
-            nr++;
-            String ohneKommentar = ohneKommentar(zeile);
-            if (ohneKommentar.isBlank()) {
-                continue;
-            }
-            if (!kopf) {
-                String k = ohneKommentar.strip();
-                if (k.equals("module: []")) {
-                    kopf = true;
-                    aktuell = null;
-                    roh = null;
-                    continue;
-                }
-                if (!ohneKommentar.equals("module:")) {
-                    throw fehler(quelle, nr, "erwartet 'module:' als erste Zeile");
-                }
-                kopf = true;
-                continue;
-            }
-            if (roh == null) {
-                throw fehler(quelle, nr, "nach 'module: []' folgt nichts mehr");
-            }
-            String rest;
-            if (ohneKommentar.startsWith("  - ")) {
-                aktuell = new LinkedHashMap<>();
-                roh.add(aktuell);
-                rest = ohneKommentar.substring(4);
-            } else if (ohneKommentar.startsWith("    ") && !ohneKommentar.startsWith("     ") && aktuell != null) {
-                rest = ohneKommentar.substring(4);
-            } else {
-                throw fehler(quelle, nr, "Einrueckung passt nicht (erwartet '  - schluessel: wert' bzw. '    schluessel: wert')");
-            }
-            int doppelpunkt = rest.indexOf(':');
-            if (doppelpunkt <= 0) {
-                throw fehler(quelle, nr, "erwartet 'schluessel: wert'");
-            }
-            String schluessel = rest.substring(0, doppelpunkt).strip();
-            String wert = ohneAnfuehrung(rest.substring(doppelpunkt + 1).strip());
-            if (!SCHLUESSEL.contains(schluessel)) {
-                throw fehler(quelle, nr, "unbekannter Schluessel '" + schluessel + "' (erlaubt: " + SCHLUESSEL + ")");
-            }
-            if (aktuell.put(schluessel, wert) != null) {
-                throw fehler(quelle, nr, "Schluessel '" + schluessel + "' doppelt");
-            }
-        }
-        if (!kopf) {
+        String[] zeilen = text.split("\r?\n", -1);
+        int kopf = ersteZeile(zeilen, 0);
+        if (kopf < 0) {
             throw new IllegalArgumentException(quelle + ": leer, erwartet 'module:'");
         }
-        if (roh == null) {
+        String kopfZeile = ohneKommentar(zeilen[kopf]);
+        if (kopfZeile.strip().equals("module: []")) {
+            int danach = ersteZeile(zeilen, kopf + 1);
+            if (danach >= 0) {
+                throw fehler(quelle, danach + 1, "nach 'module: []' folgt nichts mehr");
+            }
             return List.of();
+        }
+        if (!kopfZeile.equals("module:")) {
+            throw fehler(quelle, kopf + 1, "erwartet 'module:' als erste Zeile");
+        }
+        List<Map<String, String>> roh = new ArrayList<>();
+        Map<String, String> aktuell = null;
+        for (int i = kopf + 1; i < zeilen.length; i++) {
+            String z = ohneKommentar(zeilen[i]);
+            if (!z.isBlank()) {
+                aktuell = zeileLesen(z, aktuell, roh, quelle, i + 1);
+            }
         }
         List<Eintrag> eintraege = new ArrayList<>();
         Set<String> namen = new HashSet<>();
@@ -153,6 +123,42 @@ final class ModulKonfig {
         return stueckliste(eintraege, quelle);
     }
 
+    /** Index der ersten Zeile ab {@code ab}, die ohne Kommentar nicht leer ist, sonst -1. */
+    private static int ersteZeile(String[] zeilen, int ab) {
+        for (int i = ab; i < zeilen.length; i++) {
+            if (!ohneKommentar(zeilen[i]).isBlank()) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** Eine Zeile nach dem Kopf: {@code '  - k: v'} beginnt einen Eintrag, {@code '    k: v'} ergaenzt ihn. */
+    private static Map<String, String> zeileLesen(String z, Map<String, String> aktuell,
+                                                  List<Map<String, String>> roh, String quelle, int nr) {
+        Map<String, String> ziel = aktuell;
+        if (z.startsWith("  - ")) {
+            ziel = new LinkedHashMap<>();
+            roh.add(ziel);
+        } else if (!z.startsWith("    ") || z.startsWith("     ") || aktuell == null) {
+            throw fehler(quelle, nr, "Einrueckung passt nicht (erwartet '  - schluessel: wert' bzw. '    schluessel: wert')");
+        }
+        String rest = z.substring(4);
+        int doppelpunkt = rest.indexOf(':');
+        if (doppelpunkt <= 0) {
+            throw fehler(quelle, nr, "erwartet 'schluessel: wert'");
+        }
+        String schluessel = rest.substring(0, doppelpunkt).strip();
+        String wert = ohneAnfuehrung(rest.substring(doppelpunkt + 1).strip());
+        if (!SCHLUESSEL.contains(schluessel)) {
+            throw fehler(quelle, nr, "unbekannter Schluessel '" + schluessel + "' (erlaubt: " + SCHLUESSEL + ")");
+        }
+        if (ziel.put(schluessel, wert) != null) {
+            throw fehler(quelle, nr, "Schluessel '" + schluessel + "' doppelt");
+        }
+        return ziel;
+    }
+
     /** Karte 1514: Stueckliste aufloesen und pruefen; markiert die Bibliotheken. */
     private static List<Eintrag> stueckliste(List<Eintrag> eintraege, String quelle) {
         Map<String, Eintrag> jeName = new LinkedHashMap<>();
@@ -160,25 +166,7 @@ final class ModulKonfig {
         Set<String> genannt = new HashSet<>();
         for (Eintrag e : eintraege) {
             for (String k : e.bibliotheken()) {
-                java.util.regex.Matcher m = KOORDINATE.matcher(k);
-                if (!m.matches()) {
-                    throw new IllegalArgumentException(quelle + ": Modul '" + e.name()
-                            + "', Bibliothek '" + k + "' ist nicht gruppe:name:version");
-                }
-                Eintrag b = jeName.get(m.group(2));
-                if (b == null) {
-                    throw new IllegalArgumentException(quelle + ": Stueckliste von '" + e.name() + "' nennt " + k
-                            + ", dazu fehlt ein Eintrag mit Hash");
-                }
-                if (!b.koordinate().equals(k)) {
-                    throw new IllegalArgumentException(quelle + ": Stueckliste von '" + e.name() + "' nennt " + k
-                            + ", eingetragen ist " + b.koordinate());
-                }
-                if (!b.bibliotheken().isEmpty()) {
-                    throw new IllegalArgumentException(quelle + ": Bibliothek '" + b.name()
-                            + "' hat selbst eine Stueckliste (die Liste ist flach, je Modul vollstaendig)");
-                }
-                genannt.add(b.name());
+                genannt.add(bibliothek(e, k, jeName, quelle).name());
             }
         }
         List<Eintrag> ergebnis = new ArrayList<>();
@@ -196,6 +184,29 @@ final class ModulKonfig {
         return List.copyOf(ergebnis);
     }
 
+    /** Der Eintrag zur Koordinate {@code k} aus der Stueckliste von {@code e}, genau so eingetragen und flach. */
+    private static Eintrag bibliothek(Eintrag e, String k, Map<String, Eintrag> jeName, String quelle) {
+        java.util.regex.Matcher m = KOORDINATE.matcher(k);
+        if (!m.matches()) {
+            throw new IllegalArgumentException(quelle + ": Modul '" + e.name()
+                    + "', Bibliothek '" + k + "' ist nicht gruppe:name:version");
+        }
+        Eintrag b = jeName.get(m.group(2));
+        if (b == null) {
+            throw new IllegalArgumentException(quelle + ": Stueckliste von '" + e.name() + "' nennt " + k
+                    + ", dazu fehlt ein Eintrag mit Hash");
+        }
+        if (!b.koordinate().equals(k)) {
+            throw new IllegalArgumentException(quelle + ": Stueckliste von '" + e.name() + "' nennt " + k
+                    + ", eingetragen ist " + b.koordinate());
+        }
+        if (!b.bibliotheken().isEmpty()) {
+            throw new IllegalArgumentException(quelle + ": Bibliothek '" + b.name()
+                    + "' hat selbst eine Stueckliste (die Liste ist flach, je Modul vollstaendig)");
+        }
+        return b;
+    }
+
     static boolean istPlaintext(String gruppe) {
         return STANDARD_GRUPPE.equals(gruppe) || gruppe.startsWith(STANDARD_GRUPPE + ".");
     }
@@ -204,8 +215,8 @@ final class ModulKonfig {
         String name = pflicht(m, "name", NAME, quelle, "?");
         String version = pflicht(m, "version", VERSION, quelle, name);
         String sha256 = pflicht(m, "sha256", SHA256, quelle, name, true);
-        String rootMin = m.containsKey("root-min") ? pflicht(m, "root-min", ROOT_VERSION, quelle, name) : null;
-        String gruppe = m.containsKey("gruppe") ? pflicht(m, "gruppe", GRUPPE, quelle, name) : STANDARD_GRUPPE;
+        String rootMin = m.containsKey(K_ROOT_MIN) ? pflicht(m, K_ROOT_MIN, ROOT_VERSION, quelle, name) : null;
+        String gruppe = m.containsKey(K_GRUPPE) ? pflicht(m, K_GRUPPE, GRUPPE, quelle, name) : STANDARD_GRUPPE;
         return new Eintrag(gruppe, name, version, sha256, rootMin, liste(m.get("bibliotheken"), quelle, name), false);
     }
 
