@@ -147,13 +147,13 @@ final class TableKomponenten {
 
     /**
      * Rueckfall fuer colReorder mit from/to (Indizes ueber die sichtbaren Spalten): die neue
-     * sichtbare Reihenfolge, {@code null} ohne gueltige Verschiebung. Aus TableSettings ausgelagert.
+     * sichtbare Reihenfolge, leer ohne gueltige Verschiebung. Aus TableSettings ausgelagert.
      */
     static List<String> verschoben(List<String> sichtbar, AjaxBehaviorEvent event) {
         int from = event instanceof ReorderEvent re ? re.getFromIndex() : -1;
         int to = event instanceof ReorderEvent re2 ? re2.getToIndex() : -1;
         if (from < 0 || to < 0 || from >= sichtbar.size() || to >= sichtbar.size() || from == to) {
-            return null;
+            return List.of();
         }
         List<String> neu = new ArrayList<>(sichtbar);
         neu.add(to, neu.remove(from));

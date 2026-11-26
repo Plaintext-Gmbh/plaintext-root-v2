@@ -14,7 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 /**
  * Liest die neue Spaltenreihenfolge aus dem Faces-Request (Karte 1853, Fix #32/#34: die
@@ -59,14 +59,11 @@ public final class TableReihenfolgeRequest {
         Set<String> keys = new HashSet<>(bekannteKeys);
         for (Map.Entry<String, String[]> eintrag
                 : faces.getExternalContext().getRequestParameterValuesMap().entrySet()) {
-            if (!eintrag.getKey().endsWith("_values")) {
-                continue;
-            }
             String[] werte = eintrag.getValue();
-            if (werte == null || werte.length == 0 || !keys.containsAll(java.util.Arrays.asList(werte))) {
-                continue;
+            if (eintrag.getKey().endsWith("_values") && werte != null && werte.length > 0
+                    && keys.containsAll(java.util.Arrays.asList(werte))) {
+                return new ArrayList<>(List.of(werte));
             }
-            return new ArrayList<>(List.of(werte));
         }
         return List.of();
     }
@@ -79,7 +76,7 @@ public final class TableReihenfolgeRequest {
      * deshalb direkt ueber die Kinder der Tabelle; {@code keyMapper} bildet den Kopftext
      * auf den Spalten-Schluessel ab ({@link TableSettings#keyFromHeader}).
      */
-    public static List<String> ausColumnOrderFeld(UIData data, Function<String, String> keyMapper) {
+    public static List<String> ausColumnOrderFeld(UIData data, UnaryOperator<String> keyMapper) {
         FacesContext faces = FacesContext.getCurrentInstance();
         if (faces == null || faces.getExternalContext() == null) {
             return List.of();
