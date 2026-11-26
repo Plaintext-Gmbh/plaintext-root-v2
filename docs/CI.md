@@ -171,31 +171,33 @@ failure**. No history, nothing to click — and the `.txt` files are wrong for
 
 Since card 1018 the `testbericht` step builds an **Allure** report from that XML —
 no adapter in the test code, no change to any POM, because Allure reads the common
-junit.xml dialects directly. The report is written into the volume
-`woodpecker-reports` and served by the nginx of
-`plaintext-dockercompose/tri/plaintext-reports`:
+junit.xml dialects directly. Since card 2472 the step hands the finished report as a
+tar.gz to the service `reports-upload` (HTTP, bearer token `reports_upload_token`) in
+`plaintext-dockercompose/tri/plaintext-reports`, which is the only writer of the
+`woodpecker-reports` volume its nginx serves — no `volumes:` entry in the step and no
+`trusted.volumes` on this repo anymore (card 1780: trusted is all-or-nothing).
 
 | | |
 |---|---|
-| This run | `http://192.168.1.224:1155/plaintext-root/<pipeline number>/` |
-| Latest run | `http://192.168.1.224:1155/plaintext-root/latest/` |
-| All repos | `http://192.168.1.224:1155/` |
+| This run | `https://reports.plaintext.ch/plaintext-root/<pipeline number>/` |
+| Latest run | `https://reports.plaintext.ch/plaintext-root/latest/` |
+| All repos | `https://reports.plaintext.ch/` |
 
-The URL is printed at the end of the step log. Reachable **from the LAN and through
-Twingate only** — there is no `VIRTUAL_HOST` and no entry in the Cloudflare tunnel,
-because a test report shows stack traces, class names and test data (card 1018,
-open question 1).
+The URL is printed at the end of the step log. reports.plaintext.ch runs through the
+Cloudflare tunnel behind a Keycloak gate (card 1037); on the NAS itself the nginx
+answers on `127.0.0.1:1155` without a login (card 1370).
 
 Three properties worth knowing:
 
-- **Trend.** Each run copies the `history/` of the previous report into its results
-  before generating, so the report shows how the numbers moved. The points of the
-  trend chart link back to their Woodpecker run.
-- **Housekeeping is part of the step**, not follow-up work: the 30 newest runs per
-  repo are kept (`REPORT_KEEP` in `build.yml`), older ones are deleted while writing.
-- **An empty report is an error, not an empty page** — with one exception. If the
-  step finds no XML at all it fails, the usual cause being a compile error before
-  the first test. The exception is a full build-cache hit, see below.
+- **Trend.** Each run fetches the `history/` of the previous report from the upload
+  service (`GET /verlauf/<repo>`) into its results before generating, so the report
+  shows how the numbers moved. The points of the trend chart link back to their
+  Woodpecker run.
+- **Housekeeping is server-side**: reports-upload keeps the 30 newest runs per repo
+  (`REPORT_KEEP` in its compose file) and deletes older ones while filing.
+- **A missing upload is not silent**: without the token the step says so and goes
+  green (same deliberate handling as the PR-link token below); a failing upload
+  turns the step red, because a stale report would otherwise look like a green run.
 
 ### The build cache used to hide the test output
 

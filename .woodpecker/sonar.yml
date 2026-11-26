@@ -17,9 +17,10 @@
 #
 #  All three prerequisites the old block listed are met today — checked, not assumed:
 #    1. The NVD data set lives in the named volume `github-runners_odc-cache`
-#       (card 914). This repo stands at `trusted.volumes = true` in Woodpecker
-#       ({"network":false,"volumes":true,"security":false}), so the owasp-cve step may
-#       mount it — and it is the ONLY step here that mounts anything.
+#       (card 914). Since card 2472 (25.11.2026) the AGENT mounts it into every step
+#       (WOODPECKER_BACKEND_DOCKER_VOLUMES, NAS and Oracle) — the step needs no
+#       `volumes:` entry of its own, and this repo no longer needs
+#       `trusted.volumes = true` (card 1780: trusted is all-or-nothing).
 #    2. python3 is installed in the gate step (6 seconds, 28 MB; the durable answer is an
 #       own step image, the pattern app/guild/iot describe in their docs/CI-UMSCHALTEN.md).
 #    3. The secret `nvd_api_key` exists on this repo. With it the scan updates
@@ -139,25 +140,25 @@ steps:
   # ── 2. OWASP-Dependency-Check (CVE) ────────────────────────────────────────────
   owasp-cve:
     image: maven:3.10-eclipse-temurin-25
-    # DER GRUND, WARUM DIESES REPO IN WOODPECKER `trusted.volumes = true` BRAUCHT.
-    # Nur dieser eine Step haengt das Volume ein — Sonar, SpotBugs und das Gate kommen ohne
-    # aus, und ein Mount, den niemand braucht, ist ein Mount, den irgendwann jemand
-    # missbraucht.
+    # KARTE 2472 (25.11.2026): KEIN volumes:-EINTRAG MEHR. Der NVD-Cache kommt seither
+    # aus der Agenten-Konfiguration: WOODPECKER_BACKEND_DOCKER_VOLUMES haengt
+    # `github-runners_odc-cache` in JEDEN Step nach /root/.cache/owasp-dc-data (NAS und
+    # Oracle, Muster wie woodpecker-m2). Ein Mount im Step zwang das Repo zu
+    # `trusted.volumes = true` — und das ist in Woodpecker alles oder nichts: damit waere
+    # auch /var/run/docker.sock mountbar gewesen (Karte 1780). Karte 313 ist beachtet:
+    # das Volume traegt NUR oeffentliche NVD-Daten, keine Secrets.
     #
     # Der Name traegt seine Geschichte: das Volume gehoert dem Compose-Stack
     # `tri/github-runners` (Karte 914) und heisst deshalb `github-runners_odc-cache`. Der
     # INHALT ist der Wert, nicht der Name — hier steht der einzige gepflegte NVD-Bestand
     # der Familie (vier Verzeichnisse zu je rund 199 MB, taeglich fortgeschrieben).
-    # Umbenennen hiesse: neues Volume anlegen, 199 MB kopieren, beide Compose-Staende
-    # nachziehen — Kosmetik gegen ein echtes Risiko.
+    # Umbenennen hiesse: neues Volume anlegen, Bestand kopieren, Agenten-Compose und
+    # Runner-Stack nachziehen — Kosmetik gegen ein echtes Risiko.
     #
     # ACHTUNG BEIM ABSCHALTEN DER GITHUB-RUNNER: dieses Volume NICHT mit wegwerfen.
     # `docker compose down` laesst benannte Volumes stehen, `docker compose down -v` NICHT.
     # Ein `-v` an dieser Stelle kostet jeden folgenden CVE-Lauf ein NVD-Vollupdate von rund
-    # 96 Minuten (ohne API-Key), das in das Repo-Timeout laeuft und keinen Report schreibt —
-    # also genau Fall (c) oben, in allen vier Repos gleichzeitig.
-    volumes:
-      - github-runners_odc-cache:/root/.cache/owasp-dc-data
+    # 96 Minuten (ohne API-Key), das in das Repo-Timeout laeuft und keinen Report schreibt.
     environment:
       MAVEN_OPTS: "-Xmx2g -XX:MaxMetaspaceSize=512m"
       JAVA_TOOL_OPTIONS: "-XX:MaxRAM=4g -XX:ActiveProcessorCount=2"

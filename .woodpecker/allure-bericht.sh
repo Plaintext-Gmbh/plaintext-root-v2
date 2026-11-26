@@ -9,9 +9,15 @@
 #
 #  WHAT IT DOES: collects every target/surefire-reports/*.xml and
 #  target/failsafe-reports/*.xml below the workspace, builds a finished HTML report
-#  from them and puts it under $REPORT_ROOT/<repo>/<pipeline number>/. $REPORT_ROOT is
-#  the volume `woodpecker-reports`, served by the nginx of
-#  plaintext-dockercompose/tri/plaintext-reports.
+#  from them and hands it as a tar.gz to the service `reports-upload`
+#  (plaintext-dockercompose/tri/plaintext-reports), which files it under
+#  <repo>/<pipeline number>/ in the volume that its nginx serves.
+#
+#  KARTE 2472 (25.11.2026): bis dahin mountete dieser Step das Volume
+#  `woodpecker-reports` selbst — und genau das zwang das Repo zu
+#  `trusted.volumes = true`, was in Woodpecker JEDEM Schritt jeden Host-Mount erlaubt
+#  (Karte 1780). Jetzt geht der Bericht per HTTP mit Bearer-Token dorthin; kein
+#  volumes:-Eintrag, kein trusted.volumes mehr.
 #
 #  WHY XML AND NOT THE .txt: the .txt files LIE about @Nested tests. Measured on
 #  31.08.2026 in plaintext-root-menu-visibility:
@@ -39,17 +45,19 @@ set -eu
 
 # ── Settings (all overridable from the step) ────────────────────────────────
 ALLURE_VERSION="${ALLURE_VERSION:-2.46.0}"
-REPORT_ROOT="${REPORT_ROOT:-/reports}"
+# Karte 2472: Adresse des Dienstes reports-upload. Muss zur ports:-Zeile in
+# plaintext-dockercompose/tri/plaintext-reports/docker-compose.yaml passen; der Token
+# steht als Woodpecker-Secret `reports_upload_token` am Repo (Zweitschrift im Vault:
+# "reports.upload-token (reports.plaintext.ch Upload)").
+REPORTS_UPLOAD_URL="${REPORTS_UPLOAD_URL:-http://192.168.1.224:1156}"
 # For the line in the log. Must match the publication in
 # plaintext-dockercompose/tri/plaintext-reports/docker-compose.yaml.
 REPORT_BASE_URL="${REPORT_BASE_URL:-http://192.168.1.224:1155}"
-# Runs kept per repo. Proposal from card 1018; without a limit /volume1/docker grows
-# silently, one report weighs 3-15 MB depending on the repo.
-REPORT_KEEP="${REPORT_KEEP:-30}"
 
 REPO="${CI_REPO_NAME:-unbekannt}"
 LAUF="${CI_PIPELINE_NUMBER:-0}"
-ZIEL="$REPORT_ROOT/$REPO/$LAUF"
+# Karte 2472: gebaut wird lokal im Workspace; ins Volume legt ihn der Dienst.
+ZIEL=".allure-report"
 SAMMEL=".allure-results"
 
 echo "── Test report: $REPO, run $LAUF ──"
@@ -182,13 +190,28 @@ EOF
 # <report>/history/; for the next run to draw a trend, that directory has to be inside
 # the results BEFORE `generate`. Proven on 31.08.2026: without the step
 # widgets/history-trend.json holds exactly one point, with it two.
-VORIG="$REPORT_ROOT/$REPO/latest/history"
-if [ -d "$VORIG" ]; then
-  cp -r "$VORIG" "$SAMMEL/history"
+#
+# Karte 2472: die History kommt vom Dienst (GET /verlauf), nicht mehr aus einem
+# gemounteten Volume. OHNE TOKEN wird nichts hochgeladen — dieser Schritt sagt es und
+# hoert auf, statt einen Bericht zu bauen, den niemand ablegt (Muster: der
+# GITHUB_STATUS_TOKEN weiter unten). Ein Upload-VERSUCH, der scheitert, ist dagegen rot:
+# der Bericht ist das Ergebnis dieses Schritts, und ein still fehlender Bericht saehe
+# auf reports.plaintext.ch aus wie ein gruener Lauf von gestern.
+if [ -z "${REPORTS_UPLOAD_TOKEN:-}" ]; then
+  echo "Kein REPORTS_UPLOAD_TOKEN — kein Upload. Secret reports_upload_token am Repo" >&2
+  echo "setzen, sonst erscheint auf reports.plaintext.ch kein neuer Bericht." >&2
+  exit 0
+fi
+
+VERLAUF=$(mktemp)
+if curl -fsS -H "Authorization: Bearer $REPORTS_UPLOAD_TOKEN" \
+     -o "$VERLAUF" "$REPORTS_UPLOAD_URL/verlauf/$REPO" && [ -s "$VERLAUF" ]; then
+  tar xzf "$VERLAUF" -C "$SAMMEL"
   echo "History of the previous run carried over — the report shows a trend."
 else
   echo "No history present (first run) — the trend starts here."
 fi
+rm -f "$VERLAUF"
 
 # ── 4. Obtain allure-commandline ────────────────────────────────────────────
 # Through Maven, so that the zip lands in ~/.m2 and survives in the agent volume
@@ -229,23 +252,18 @@ fi
 #     index.html, and widgets/summary.json (the numbers) is unaffected.
 export ALLURE_NO_ANALYTICS=true
 
-# ── 5. Build the report and file it ─────────────────────────────────────────
-mkdir -p "$REPORT_ROOT/$REPO"
+# ── 5. Build the report and hand it to reports-upload ──────────────────────
 rm -rf "$ZIEL"
 "$ALLURE_BIN" generate "$SAMMEL" --clean -o "$ZIEL"
 
-# `latest` is a symlink, not a second report: a copy would double the disk usage and be
-# half overwritten during the next run.
-ln -sfn "$LAUF" "$REPORT_ROOT/$REPO/latest"
-
-# ── 6. Housekeeping ─────────────────────────────────────────────────────────
-# Only purely numeric directories — `latest` is a symlink and falls through anyway, but a
-# future `archiv/` must not be swept away with them.
-ALT=$(ls -1 "$REPORT_ROOT/$REPO" 2>/dev/null | grep -E '^[0-9]+$' | sort -n | head -n "-$REPORT_KEEP" || true)
-for a in $ALT; do
-  echo "Housekeeping: old run $a removed (limit $REPORT_KEEP)."
-  rm -rf "${REPORT_ROOT:?}/$REPO/$a"
-done
+# Karte 2472: der Dienst entpackt unter <repo>/<lauf>, setzt `latest` (der Symlink, der
+# doppelte Plattennutzung verhindert) und behaelt die 30 neuesten Laeufe je Repo — das
+# Pruning, das frueher hier stand. Scheitert der Upload, ist der Schritt rot: ohne
+# Ablage gibt es keinen Bericht, und das soll niemand fuer einen gruenen Lauf halten.
+tar czf - -C "$ZIEL" . | curl -fsS -X POST \
+  -H "Authorization: Bearer $REPORTS_UPLOAD_TOKEN" \
+  --data-binary @- "$REPORTS_UPLOAD_URL/ablage/$REPO/$LAUF"
+echo "Report uploaded to reports-upload ($REPORTS_UPLOAD_URL)."
 
 # ── 7. The line this whole thing was built for ──────────────────────────────
 GESAMT=$(grep -o '"total"[^,}]*' "$ZIEL/widgets/summary.json" | head -1 | tr -dc '0-9')

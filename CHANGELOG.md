@@ -12,17 +12,30 @@ exhaustive.
 
 ## [Unreleased]
 
-### Changed
-- **Mehr Abstand in Formularen** (Karte 2425, Test Daniel im Träger): `plaintext-layout/css/layout.css`
-  gibt dem Seiteninhalt mehr Abstand zum oberen Rand (2.25rem statt 1.5rem), Fieldsets und Dialoginhalten
-  mehr Luft oben, der Suche in Dropdowns (`selectOneMenu`/`selectCheckboxMenu`) und Autocomplete Polster sowie
-  Tabellen-Kopf und Spaltenfiltern Abstand. Wirkt in allen Apps, keine Seite muss angepasst werden.
-
 ### Fixed
 
 - **`my_user_entity.roles` auf `VARCHAR(4000)`** (Karte 2517): Das Rollen-Set wird mit vielen Modulrollen
   länger als 255 Zeichen; Speichern unter Rollenzuteilung scheiterte mit «Value too long». Migration
   `V1795639075__benutzer_rollen_spalte_breiter.sql`, nur Verbreitern.
+
+## [3.82.0] - 2026-11-26
+
+### Changed
+
+- **`plaintext-root-lader`: Framework-Module von root dürfen sich in den Spring-Start einhängen** (Karte 2514,
+  Entscheid Daniel 25.11.2026). Ein nachgeladenes `plaintext-root-*`/`plaintext-admin-*` darf
+  `META-INF/spring/*.imports` bzw. `spring.factories` mitbringen: In der Hülle wirkt es so wie heute, weil die Hülle
+  `ch.plaintext` scannt und Überschreiben erlaubt. Für alle anderen Module bleibt die Regel.
+
+## [3.80.0] - 2026-11-26
+
+## [3.79.0] - 2026-11-25
+
+### Changed
+- **Mehr Abstand in Formularen** (Karte 2425, Test Daniel im Träger): `plaintext-layout/css/layout.css`
+  gibt dem Seiteninhalt mehr Abstand zum oberen Rand (2.25rem statt 1.5rem), Fieldsets und Dialoginhalten
+  mehr Luft oben, der Suche in Dropdowns (`selectOneMenu`/`selectCheckboxMenu`) und Autocomplete Polster sowie
+  Tabellen-Kopf und Spaltenfiltern Abstand. Wirkt in allen Apps, keine Seite muss angepasst werden.
 
 ## [3.78.0] - 2026-11-23
 

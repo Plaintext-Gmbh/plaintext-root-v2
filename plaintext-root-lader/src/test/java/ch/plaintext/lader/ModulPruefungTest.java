@@ -98,6 +98,18 @@ class ModulPruefungTest {
         assertThatThrownBy(this::laden).hasMessageContaining("spring.factories");
     }
 
+    /** Karte 2514: ein nachgeladenes Framework-Modul von root bringt seine AutoConfiguration mit, wie in der Huelle. */
+    @Test
+    void frameworkModulDarfAutoConfigurationImportsHaben() throws Exception {
+        modul("plaintext-admin-webhooks", "ch/plaintext/webhooks/W.class", "w",
+                "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports", "ch.plaintext.webhooks.W");
+        assertThat(laden()).hasSize(1);
+        eintraege.clear();
+        modul("plaintext-modul-admin", "ch/plaintext/x/X.class", "x",
+                "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports", "ch.plaintext.x.X");
+        assertThatThrownBy(this::laden).as("nur der Name des Frameworks, kein Teiltreffer").hasMessageContaining("AutoConfiguration.imports");
+    }
+
     @Test
     void bibliothekDarfSpringFactoriesHaben() throws Exception {
         modul("plaintext-z-a", "ch/plaintext/a/A.class", "a");

@@ -366,18 +366,13 @@ steps:
     # agent slot; a second workflow would occupy one of the four slots on the single agent
     # for twenty seconds of work.
     #
-    # THE MOUNT IS EXPLICIT AND ONLY HERE. The obvious route would be a second line in
-    # WOODPECKER_BACKEND_DOCKER_VOLUMES on the agent (today: woodpecker-m2:/root/.m2) — but
-    # that hangs the volume into EVERY step of EVERY repo, which is exactly the construction
-    # card 313 files as security-critical. Instead the pattern from
-    # plaintext-guild/.woodpecker/analyse.yml (NVD cache): `trusted.volumes` on the repo
-    # (already set for plaintext-root, checked 31.08.2026 via GET /api/repos/6) and then one
-    # mount per step.
-    #
-    # The volume belongs to the stack plaintext-dockercompose/tri/plaintext-reports; an nginx
-    # there serves it read-only on http://192.168.1.224:1155/.
-    volumes:
-      - woodpecker-reports:/reports
+    # KARTE 2472 (25.11.2026): KEIN volumes:-EINTRAG MEHR. Bis dahin mountete dieser Step
+    # das Volume `woodpecker-reports` selbst — und genau das zwang dieses Repo zu
+    # `trusted.volumes = true`, was in Woodpecker JEDEM Schritt jeden Host-Mount erlaubt
+    # (Karte 1780: alles oder nichts). Der Bericht geht jetzt als tar.gz per HTTP an den
+    # Dienst reports-upload (plaintext-dockercompose/tri/plaintext-reports), der einzige
+    # Schreiber des Volumes ist; latest-Symlink und Pruning macht er dort. Die History
+    # fuer den Trend holt sich das Skript ueber GET /verlauf vom selben Dienst.
     environment:
       # Must match the ports: entry of the plaintext-reports stack. It lives here and not
       # only in the script so that the address is visible at ONE place in this repo; the
@@ -386,11 +381,14 @@ steps:
       # 192.168.1.224:1155 — seit Karte 1037 gibt es reports.plaintext.ch hinter dem
       # Keycloak-Gate, und ein Link, der nur im LAN traegt, ist in einer PR-Checkliste wertlos.
       REPORT_BASE_URL: "https://reports.plaintext.ch"
-      # Runs kept per repo (proposal from card 1018, open question 2). Measured on
-      # pipeline 52: one root report is 24.9 MB, so 30 runs are about 750 MB. /volume1 had
-      # 4.9 TB free on 31.08.2026 — the limit exists so the directory does not grow without
-      # end, not because the space is tight.
-      REPORT_KEEP: "30"
+      # Karte 2472: Adresse des Upload-Dienstes (ports: in
+      # plaintext-dockercompose/tri/plaintext-reports/docker-compose.yaml).
+      REPORTS_UPLOAD_URL: "http://192.168.1.224:1156"
+      # Bearer-Token des Dienstes (Vault: "reports.upload-token (reports.plaintext.ch
+      # Upload)"). Fehlt er, baut der Schritt keinen Bericht und sagt das im Log —
+      # derselbe bewusste Umgang wie beim GITHUB_STATUS_TOKEN unten.
+      REPORTS_UPLOAD_TOKEN:
+        from_secret: reports_upload_token
       # Karte 1043: Damit allure-bericht.sh die Zeile "Testbericht (Allure)" samt Link in die
       # Check-Liste des Pull Requests schreiben kann. Ohne diesen Wert schweigt das Skript und
       # sagt das im Log — der Bericht selbst entsteht trotzdem.
