@@ -93,10 +93,12 @@ public final class InlineJsLinter {
     /**
      * An opening tag: name, then the attribute part. Quotation marks are read as a unit, so that
      * a {@code >} INSIDE an attribute value does not end the tag prematurely (the code base
-     * contains e.g. {@code style="…"} with a {@code >} in an EL expression).
+     * contains e.g. {@code style="…"} with a {@code >} in an EL expression). All quantifiers are
+     * possessive (Karte 2483, Sonar S5852): name and attribute part must not split the same
+     * characters anew, otherwise a long unclosed tag backtracks polynomially.
      */
     private static final Pattern TAG = Pattern.compile(
-            "<([A-Za-z][A-Za-z0-9:._-]*)((?:[^>\"']|\"[^\"]*\"|'[^']*')*+)/?>", Pattern.DOTALL);
+            "<([A-Za-z][A-Za-z0-9:._-]*+)((?:[^>\"']|\"[^\"]*+\"|'[^']*+')*+)/?>", Pattern.DOTALL);
 
     /**
      * {@code on…=} in the attribute part of a tag. The preceding space is mandatory, otherwise the

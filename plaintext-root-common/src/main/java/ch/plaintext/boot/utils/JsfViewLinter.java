@@ -89,10 +89,11 @@ public final class JsfViewLinter {
 
     /**
      * Opening {@code <p:xxx ...>} tag (also multi-line) that carries an {@code onchange} attribute
-     * with {@code submit()} resp. {@code this.form.submit()}.
+     * with {@code submit()} resp. {@code this.form.submit()}. Name and whitespace runs are
+     * possessive (Karte 2483, Sonar S5852), so that no run is split anew on a failed match.
      */
     private static final Pattern P_ONCHANGE_SUBMIT = Pattern.compile(
-            "<p:[A-Za-z]+\\b[^>]*\\bonchange\\s*=\\s*\"\\s*(?:this\\.form\\.)?submit\\(\\)\\s*;?\\s*\"",
+            "<p:[A-Za-z]++\\b[^>]*\\bonchange\\s*+=\\s*+\"\\s*+(?:this\\.form\\.)?submit\\(\\)\\s*+;?+\\s*+\"",
             Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
     /**

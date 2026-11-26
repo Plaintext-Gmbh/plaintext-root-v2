@@ -157,12 +157,56 @@ public class RateLimitFilter implements Filter {
         String path = UriUtils.decode(PFAD_PARAMETER.matcher(request.getRequestURI()).replaceAll(""), StandardCharsets.UTF_8);
         String endpunkt = path.length() > 1 && path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
 
+        if (pfadAbgewiesen(request, response, path)) {
+            return;
+        }
+
+        boolean post = "POST".equalsIgnoreCase(request.getMethod());
+        if (post && loginBremseOhneRueckgabe(path, endpunkt) && loginGebremst(response, path, getClientIp(request))) {
+            return;
+        }
+
+        if (post && endpunkt.equals("/login")) {
+            String clientIp = getClientIp(request);
+            if (loginGebremst(response, path, clientIp)) {
+                return;
+            }
+            // The limit is meant to slow down guessing attempts, not real logins. Therefore the
+            // token is returned after a demonstrably successful login. Deliberately
+            // "consume and refund if applicable" instead of "consume only on failure": should the
+            // success detection ever fail, the attempt is counted in case of doubt (fail-closed) instead of not at all.
+            filterChain.doFilter(servletRequest, servletResponse);
+            if (isAuthenticated(request)) {
+                loginLimiter.refund(clientIp);
+            }
+            return;
+        }
+
+        // Card 560: the branch for /token-login has been dropped, because the endpoint no longer
+        // exists. It thereby falls under anyRequest().authenticated() and is no longer reachable
+        // for anonymous users at all -- a rate limit on it would have nothing left to throttle.
+
+        filterChain.doFilter(servletRequest, servletResponse);
+    }
+
+    /** Verbraucht ein Token des Login-Limiters; {@code true} wenn keines mehr da war und die 429 geschrieben ist. */
+    private boolean loginGebremst(HttpServletResponse response, String path, String clientIp) throws IOException {
+        if (loginLimiter.tryConsume(clientIp)) {
+            return false;
+        }
+        rejectLogin(response, path, clientIp);
+        return true;
+    }
+
+    /** Buckets nach Pfad (API, Claude, /nosec): {@code true} wenn abgewiesen, die 429-Antwort ist dann geschrieben. */
+    private boolean pfadAbgewiesen(HttpServletRequest request, HttpServletResponse response, String path)
+            throws IOException {
         if (path.startsWith("/api/")) {
             String clientIp = getClientIp(request);
             if (!apiLimiter.tryConsume(clientIp)) {
                 log.warn("Rate limit exceeded for API from IP: {}", clientIp);
                 rejectJson(response);
-                return;
+                return true;
             }
             response.setHeader("X-RateLimit-Remaining", String.valueOf(apiLimiter.getRemainingRequests(clientIp)));
         }
@@ -174,10 +218,16 @@ public class RateLimitFilter implements Filter {
             if (!claudeLimiter.tryConsume(clientIp)) {
                 log.warn("Rate limit exceeded for Claude automation API from IP: {}", clientIp);
                 rejectJson(response);
-                return;
+                return true;
             }
         }
 
+        return nosecAbgewiesen(request, response, path);
+    }
+
+    /** Die /nosec-Buckets (Token-Pfade, DAV, Rest): {@code true} wenn abgewiesen. */
+    private boolean nosecAbgewiesen(HttpServletRequest request, HttpServletResponse response, String path)
+            throws IOException {
         // Card 1257: the watch phone link. A signed token in a query string is guessable in
         // principle, so it belongs in the STRICT bucket next to schiri-mobile and not in the
         // generous /nosec one — behind that sit publicly readable pages that several visitors
@@ -188,7 +238,7 @@ public class RateLimitFilter implements Filter {
             if (!nosecTokenLimiter.tryConsume(clientIp)) {
                 log.warn("Rate limit exceeded for nosec-token endpoint {} from IP: {}", path, clientIp);
                 rejectJson(response);
-                return;
+                return true;
             }
         } else if (path.startsWith("/nosec/caldav/") || path.startsWith("/nosec/carddav/")) {
             // Card 657: CalDAV/CardDAV gets a bucket of its OWN instead of the generic
@@ -216,7 +266,7 @@ public class RateLimitFilter implements Filter {
             if (!davLimiter.tryConsume(clientIp)) {
                 log.warn("Rate limit exceeded for CalDAV/CardDAV endpoint {} from IP: {}", path, clientIp);
                 rejectJson(response);
-                return;
+                return true;
             }
         } else if (path.startsWith("/nosec/") && !path.startsWith("/nosec/api/claude")) {
             // SECURITY (card 314, item 16): generic catch-all branch for ALL remaining
@@ -235,67 +285,31 @@ public class RateLimitFilter implements Filter {
             if (!nosecPublicLimiter.tryConsume(clientIp)) {
                 log.warn("Rate limit exceeded for public nosec endpoint {} from IP: {}", path, clientIp);
                 rejectJson(response);
-                return;
+                return true;
             }
         }
+        return false;
+    }
 
+    /**
+     * POST-Pfade auf dem Login-Limiter ohne Rueckgabe des Tokens (ausser {@code /login}, das im
+     * Filter selbst behandelt wird, weil es nach Erfolg zurueckgibt).
+     */
+    private static boolean loginBremseOhneRueckgabe(String path, String endpunkt) {
         // SECURITY (card 314, item 10): /password-reset and /register are permitAll and
         // both send mails to an address chosen by the caller. Without a limit this can be
         // abused both to misuse the mail dispatch as a spam relay and to probe the
         // existence of accounts. They run on the login limiter, because they
         // follow the same abuse pattern (login/account operations per IP).
-        if (("POST".equalsIgnoreCase(request.getMethod()))
-                && (path.startsWith("/password-reset") || path.startsWith("/register"))) {
-            String clientIp = getClientIp(request);
-            if (!loginLimiter.tryConsume(clientIp)) {
-                rejectLogin(response, path, clientIp);
-                return;
-            }
+        if (path.startsWith("/password-reset") || path.startsWith("/register")) {
+            return true;
         }
-
-        if (endpunkt.equals("/login") && "POST".equalsIgnoreCase(request.getMethod())) {
-            String clientIp = getClientIp(request);
-            if (!loginLimiter.tryConsume(clientIp)) {
-                rejectLogin(response, path, clientIp);
-                return;
-            }
-            // The limit is meant to slow down guessing attempts, not real logins. Therefore the
-            // token is returned after a demonstrably successful login. Deliberately
-            // "consume and refund if applicable" instead of "consume only on failure": should the
-            // success detection ever fail, the attempt is counted in case of doubt (fail-closed) instead of not at all.
-            filterChain.doFilter(servletRequest, servletResponse);
-            if (isAuthenticated(request)) {
-                loginLimiter.refund(clientIp);
-            }
-            return;
-        }
-
-        // Card 560: the branch for /token-login has been dropped, because the endpoint no longer
-        // exists. It thereby falls under anyRequest().authenticated() and is no longer reachable
-        // for anonymous users at all -- a rate limit on it would have nothing left to throttle.
-
         // Status report 29.08.2026 (H3): the second factor was the only login stage without a
         // brake. The lockout key "totp:<user>" in the TotpVerificationController counts
         // failed attempts per account; this branch additionally throttles per address, so that an attacker
         // who has the password cannot try the six digits second by second. No
         // refund: a legitimate user needs exactly one attempt.
-        if (endpunkt.equals("/login/totp") && "POST".equalsIgnoreCase(request.getMethod())) {
-            String clientIp = getClientIp(request);
-            if (!loginLimiter.tryConsume(clientIp)) {
-                rejectLogin(response, path, clientIp);
-                return;
-            }
-        }
-
-        if (endpunkt.equals("/ott/generate") && "POST".equalsIgnoreCase(request.getMethod())) {
-            String clientIp = getClientIp(request);
-            if (!loginLimiter.tryConsume(clientIp)) {
-                rejectLogin(response, path, clientIp);
-                return;
-            }
-        }
-
-        filterChain.doFilter(servletRequest, servletResponse);
+        return endpunkt.equals("/login/totp") || endpunkt.equals("/ott/generate");
     }
 
     /**
