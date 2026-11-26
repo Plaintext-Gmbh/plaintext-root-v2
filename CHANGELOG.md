@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.82.0] - 2026-11-26
+
 ### Changed
 
 - **`plaintext-root-lader`: Framework-Module von root dürfen sich in den Spring-Start einhängen** (Karte 2514,
