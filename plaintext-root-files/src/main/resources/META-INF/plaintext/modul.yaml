@@ -1,5 +1,6 @@
 # Erzeugt von ModulManifestTest (plaintext-root-testsupport), Karte 2377 ROOT-7.
 # Nicht von Hand aendern: -Dplaintext.manifest.schreiben=true schreibt die Datei neu.
+format: 1
 modul: files
 rollen:
   - name: files

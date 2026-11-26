@@ -66,6 +66,8 @@ class ModulManifestLeserTest {
     void unbekannteZeileIstEinFehler() {
         String kaputt = FILES.alsYaml().replace("    art: ZUGANG\n", "    art: ZUGANG\n    url: http://x\n");
         assertThrows(IllegalArgumentException.class, () -> ModulManifest.aus(kaputt));
-        assertThrows(IllegalArgumentException.class, () -> ModulManifest.aus("modul: a b\n"));
+        assertThrows(IllegalArgumentException.class, () -> ModulManifest.aus("format: 1\nmodul: a b\n"));
+        assertThrows(IllegalArgumentException.class, () -> ModulManifest.aus(FILES.alsYaml().replace("format: 1", "format: 2")),
+                "neueres Format");
     }
 }

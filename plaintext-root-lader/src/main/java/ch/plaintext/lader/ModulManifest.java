@@ -24,6 +24,7 @@ import java.util.regex.Pattern;
  *
  * <p>Nur JDK, darum eine feste Teilmenge von YAML, genau so, wie {@link #alsYaml()} sie schreibt:</p>
  * <pre>
+ * format: 1
  * modul: files
  * rollen:
  *   - name: files
@@ -49,6 +50,9 @@ public final class ModulManifest {
 
     /** Ort im Jar. */
     public static final String PFAD = "META-INF/plaintext/modul.yaml";
+
+    /** Formatstand; ein Leser lehnt einen anderen ab, statt ein neueres Manifest falsch zu lesen. */
+    public static final String FORMAT = "1";
 
     private static final String KOPF = "# Erzeugt von ModulManifestTest (plaintext-root-testsupport), Karte 2377 ROOT-7.\n"
             + "# Nicht von Hand aendern: -Dplaintext.manifest.schreiben=true schreibt die Datei neu.\n";
@@ -103,7 +107,8 @@ public final class ModulManifest {
 
     /** @return das Manifest als Text (ohne Version), stabil für den Vergleich im Test */
     public String alsYaml() {
-        StringBuilder sb = new StringBuilder(KOPF).append("modul: ").append(modul).append('\n');
+        StringBuilder sb = new StringBuilder(KOPF).append("format: ").append(FORMAT).append('\n')
+                .append("modul: ").append(modul).append('\n');
         sb.append("rollen:").append(rollen.isEmpty() ? " []\n" : "\n");
         for (Rolle r : rollen) {
             sb.append("  - name: ").append(pruefeWort("name", r.name())).append('\n')
@@ -205,6 +210,11 @@ public final class ModulManifest {
         }
 
         ModulManifest lesen(String version) {
+            String format = wert(naechste(), "", "format");
+            if (!FORMAT.equals(format)) {
+                i--;
+                throw fehler("Format " + format + " unbekannt, dieser Leser kennt " + FORMAT);
+            }
             String modul = wert(naechste(), "", "modul");
             List<Rolle> rollen = new ArrayList<>();
             List<Menue> menue = new ArrayList<>();
