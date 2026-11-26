@@ -163,6 +163,52 @@ public class MySecurityProvider implements SecurityProvider {
 }
 ```
 
+### Placement from outside
+
+*since root 3.59.0 (Karte 2377, ROOT-1/ROOT-2; ADR [0009](adr/0009-menueplatz-von-aussen.md))*
+
+The `@MenuAnnotation` of a module is the **default**. An application moves an entry by its `menuId`
+without touching the module:
+
+```yaml
+plaintext:
+  menu:
+    platzierung:              # key = menuId, every field optional
+      terminal:
+        parent: Werkzeuge     # title of the parent; "" = top level
+        order: 10
+        title: Terminal
+        icon: pi pi-desktop
+      drawio:
+        parent: Werkzeuge
+        order: 20
+      drawio-bilder:
+        sichtbar: false       # not in the menu, the page stays reachable by link
+    gruppen:                  # parents that do not exist are created as pure groups (no link)
+      Werkzeuge:
+        order: 70
+        icon: pi pi-wrench
+```
+
+* A group title with a space or a dot needs the bracket form as a map key: `"[Mein Bereich]": { order: 5 }`.
+* Placement never changes the `menuId` (frozen before moving), so automatic roles `ROLE_MENU_<menuId>`, the
+  page guard mapping and tenant visibility stay. The **full title** does change: tenant menu lists and tile
+  `menuTitle` entries written with the old title no longer match (`TileVisibilityValidator` only warns).
+* Unknown `menuId`, a missing parent that is no group, and a cycle are reported as WARN; the entry keeps its
+  default. Startup log: `MenuPlatzierung : n Eintraege umgehaengt, m Gruppen angelegt`.
+* `sichtbar: false` only hides the entry in the menu builder; it stays registered for the page guard (under
+  `STRICT` the page would otherwise be locked, under `PERMISSIVE` unprotected).
+* The page guard inherits from the **effective** parent: moving an entry under a protected branch protects it as
+  well. Moving it under *Root* brings the root-branch rule (no tenant filter) — a conscious decision.
+* Automatic roles `ROLE_MENU_<menuId>` only exist under `plaintext.menu.access-policy: STRICT`; the default is
+  `PERMISSIVE`.
+* An application that must compute placements registers its own `MenuPlatzierungProvider` bean (replaces the
+  property default). It is created early inside a `BeanFactoryPostProcessor` and must not depend on beans that
+  need post-processing.
+* `/debug/menu-scan` and the menu diagnostics show default and effective place side by side.
+* Every class with `@MenuAnnotation(moduleId = …)` needs a `menuId` (ArchUnit `menuIdPflichtBeiModuleId`, switch
+  `plaintext.arch.menu-id`: `melden` by default, `enforce` in root; ROOT-4).
+
 ## Annotation Parameters
 
 - `title`: The menu item label (default: "Dashboard")
