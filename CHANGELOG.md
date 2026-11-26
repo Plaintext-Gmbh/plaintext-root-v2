@@ -25,6 +25,19 @@ exhaustive.
   jetzt vor dem Einlesen der Beans mit einer Meldung ab (sonst Namenskonflikt `filesService` u. a. ohne Hinweis);
   allein geladen meldet root-files beim Start «veraltet». Das Modul fällt in einem späteren Release weg.
 
+### Security
+
+- **Sonar-Wochenarbeit KW48** (Karte 2483). `plaintext-root-lader`: `ModulPruefung` weist ein Archiv mit mehr als
+  200 000 Einträgen ab (Sonar S5042; vorher unbegrenzt, gelesen werden weiterhin nur Namen). Linter in
+  `plaintext-root-common`: `InlineJsLinter` (Tag-Ausdruck) und `JsfViewLinter` (`onchange="submit()"`) mit
+  possessiven Quantoren, damit lange offene Tags nicht mehr polynomiell zurücksetzen (S5852); Treffer unverändert.
+
+### Changed
+
+- Ohne Verhaltensänderung zerlegt (S3776/S1192): `ModulKonfig.parsen`/`stueckliste`, `ModulPruefung.pruefen`,
+  `TableKomponenten.kinderOrdnen`, `MyUserBackingBean.save`, `McpBearerTokenFilter.doFilter`,
+  `BenutzerMcpTools.importBenutzer`, `RateLimitFilter.doFilter`.
+
 ## [3.83.0] - 2026-11-26
 
 ### Fixed
