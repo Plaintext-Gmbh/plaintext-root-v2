@@ -4,7 +4,6 @@
 package ch.plaintext.boot.table;
 
 import jakarta.faces.component.UIData;
-import org.primefaces.component.api.UIColumn;
 import jakarta.faces.context.ExternalContext;
 import jakarta.faces.context.FacesContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -270,7 +269,7 @@ class TableSettingsTest {
     @DisplayName("Dreifach-Schalter: anpassen -> Verschieben -> Vergroessern -> anpassen, NIE gespeichert (Daniel 15.11.)")
     void modusRotiertUndPersistiert() {
         Mockito.clearInvocations(store);   // init() legt das Standardprofil ab — nicht zaehlen
-        assertThat(anzeige.getModus()).isEqualTo(0);   // Start je Anmeldung: neutral = Anpassen
+        assertThat(anzeige.getModus()).isZero();   // Start je Anmeldung: neutral = Anpassen
         assertThat(anzeige.isVerschiebenAktiv()).isFalse();
 
         anzeige.modusWechseln();
@@ -284,7 +283,7 @@ class TableSettingsTest {
         assertThat(anzeige.isGroesseAendernAktiv()).isTrue();
 
         anzeige.modusWechseln();
-        assertThat(anzeige.getModus()).isEqualTo(0);
+        assertThat(anzeige.getModus()).isZero();
 
         // Der Modus geht nicht in den Stand: kein persist() beim Wechsel.
         Mockito.verify(store, Mockito.never()).save(eq("testpage"), any(TableState.class));
@@ -390,7 +389,7 @@ class TableSettingsTest {
         Mockito.when(faces.getApplication()).thenReturn(app);
         Mockito.when(faces.getViewRoot()).thenReturn(viewRoot);
         Mockito.when(viewRoot.getLocale()).thenReturn(Locale.GERMAN);
-        Mockito.when(app.evaluateExpressionGet(eq(faces), eq("#{userPreferencesBackingBean.language}"), eq(String.class)))
+        Mockito.when(app.evaluateExpressionGet(faces, "#{userPreferencesBackingBean.language}", String.class))
                 .thenReturn("en");
 
         try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
@@ -408,7 +407,7 @@ class TableSettingsTest {
         Mockito.when(faces.getApplication()).thenReturn(app);
         Mockito.when(faces.getViewRoot()).thenReturn(viewRoot);
         Mockito.when(viewRoot.getLocale()).thenReturn(Locale.GERMAN);
-        Mockito.when(app.evaluateExpressionGet(eq(faces), eq("#{userPreferencesBackingBean.language}"), eq(String.class)))
+        Mockito.when(app.evaluateExpressionGet(faces, "#{userPreferencesBackingBean.language}", String.class))
                 .thenReturn("en");
 
         try (MockedStatic<FacesContext> holder = mockStatic(FacesContext.class)) {
@@ -484,6 +483,6 @@ class TableSettingsTest {
         Mockito.when(event.getToIndex()).thenReturn(0);
         assertThat(TableKomponenten.verschoben(java.util.List.of("x", "y", "z"), event)).containsExactly("z", "x", "y");
         Mockito.when(event.getToIndex()).thenReturn(2);
-        assertThat(TableKomponenten.verschoben(java.util.List.of("x", "y", "z"), event)).isNull();
+        assertThat(TableKomponenten.verschoben(java.util.List.of("x", "y", "z"), event)).isEmpty();
     }
 }

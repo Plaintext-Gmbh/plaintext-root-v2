@@ -433,8 +433,10 @@ public class TableSettings implements Serializable {
             boolean kopflos = c.getLabel() == null || c.getLabel().isBlank();
             nummer += kopflos ? 1 : 0;
             if (c.getKey().equals(key)) {
-                return c.getListenLabel() != null && !c.getListenLabel().isBlank() ? c.getListenLabel()
-                        : kopflos ? "-" + nummer : c.getLabel();
+                if (c.getListenLabel() != null && !c.getListenLabel().isBlank()) {
+                    return c.getListenLabel();
+                }
+                return kopflos ? "-" + nummer : c.getLabel();
             }
         }
         return key;
@@ -573,7 +575,7 @@ public class TableSettings implements Serializable {
             }
         }
         List<String> verschoben = TableKomponenten.verschoben(sichtbar, event);
-        if (verschoben == null) {
+        if (verschoben.isEmpty()) {
             return;
         }
         state.setColumnOrder(mergeSichtbar(verschoben));
@@ -715,7 +717,10 @@ public class TableSettings implements Serializable {
     public String breite(String key) {
         String stored = mitBreiten ? state.getColumnWidths().get(key) : null;
         int fallback = mitBreiten ? defaultWidth(key) : 0;
-        return stored != null && !stored.isBlank() ? stored : fallback > 0 ? fallback + "px" : null;
+        if (stored != null && !stored.isBlank()) {
+            return stored;
+        }
+        return fallback > 0 ? fallback + "px" : null;
     }
 
     /**

@@ -127,8 +127,10 @@ public final class TableSettingsTexte {
 
     /** Label uebersetzen: per gesetztem Uebersetzer (Tests), sonst per {@code #{i18n.t(...)}}. */
     public static String uebersetzeLabel(String label, java.util.function.UnaryOperator<String> uebersetzer) {
-        return label == null ? null
-                : uebersetzer != null ? uebersetzer.apply(label) : perI18nBean(label);
+        if (label == null) {
+            return null;
+        }
+        return uebersetzer != null ? uebersetzer.apply(label) : perI18nBean(label);
     }
 
     /** Label per {@code #{i18n.t(...)}}; ohne Kompilier-Abhaengigkeit, v1-Apps ohne die Bean liefern null. */
