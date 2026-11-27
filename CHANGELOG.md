@@ -12,6 +12,14 @@ exhaustive.
 
 ## [Unreleased]
 
+### Changed
+
+- **tablesettings: Sonar-Wartbarkeitsmeldungen behoben** (Karte 2380). 11 von 15 offenen Meldungen in
+  `plaintext-root-tablesettings`. `TableKomponenten.verschoben` (package-privat) liefert ohne gültige Verschiebung eine
+  leere Liste statt `null`. `TableReihenfolgeRequest.ausColumnOrderFeld` nimmt `UnaryOperator<String>` statt
+  `Function<String, String>`. Aufrufer mit einem Methodenverweis kompilieren unverändert, Aufrufer mit einer
+  `Function`-Variablen müssen angepasst werden. S7467 (`_` im catch) bleibt offen, weil das Repo mit release 21 baut.
+
 ## [3.87.0] - 2026-11-27
 
 3.86.0: Release-Lauf 413 hing nach dem Kontextstart in `ErrorDispatchChainTest` und wurde nach dem Timeout
