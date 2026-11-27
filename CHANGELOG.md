@@ -22,6 +22,14 @@ exhaustive.
   `Function<String, String>`. Aufrufer mit einem Methodenverweis kompilieren unverändert, Aufrufer mit einer
   `Function`-Variablen müssen angepasst werden. S7467 (`_` im catch) bleibt offen, weil das Repo mit release 21 baut.
 
+### Fixed
+
+- **Benutzerverwaltung: Dialog «Neuer Benutzer» verschwand beim Verlassen des E-Mail-Felds** (Auftrag Daniel,
+  27.11.2026). Die Tabellenauswahl war an `selected` gebunden, das auch der Dialog bearbeitet. Jeder Request,
+  der die Tabelle dekodiert (Filter, Sortierung, Seite), schrieb die leere Auswahl dorthin; der nächste Blur
+  im Dialog scheiterte mit «Target Unreachable, [username] returned null». Die Tabelle hat jetzt ein eigenes
+  Feld `tabellenAuswahl`, `rowSelect` öffnet den Datensatz über `edit(..)`.
+
 ## [3.87.0] - 2026-11-27
 
 3.86.0: Release-Lauf 413 hing nach dem Kontextstart in `ErrorDispatchChainTest` und wurde nach dem Timeout
