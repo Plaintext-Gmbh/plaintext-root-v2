@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.88.0] - 2026-11-27
+
 ### Changed
 
 - **tablesettings: Sonar-Wartbarkeitsmeldungen behoben** (Karte 2380). 11 von 15 offenen Meldungen in
