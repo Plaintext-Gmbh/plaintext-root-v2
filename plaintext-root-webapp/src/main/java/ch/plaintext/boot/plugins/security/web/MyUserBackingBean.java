@@ -73,6 +73,12 @@ public class MyUserBackingBean implements Serializable {
     private transient PasswordEncoder passwordEncoder;
     private boolean remlistcolapsed = false;
     private MyUserEntity selected;
+    /**
+     * Row selection of the table, kept apart from {@link #selected} (27.11.2026): every request that
+     * decodes the table (filter, sort, page) writes the selection, and with nothing selected that
+     * wiped the entity of an open "Neuer Benutzer" dialog; the next blur failed with "Target Unreachable".
+     */
+    private MyUserEntity tabellenAuswahl;
     private String myUserPw;
     private MyRememberMe selectedRememberMe;
 

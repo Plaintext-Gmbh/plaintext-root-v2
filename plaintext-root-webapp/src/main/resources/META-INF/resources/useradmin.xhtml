@@ -116,7 +116,7 @@
                          widgetVar="tbl"
                          id="tbl"
                          selectionMode="single"
-                         selection="#{myUserBackingBean.selected}"
+                         selection="#{myUserBackingBean.tabellenAuswahl}"
                          reflow="true"
                          var="obj"
                          rowKey="#{obj.id}"
@@ -144,7 +144,7 @@
                 <p:ajax event="page" listener="#{myUserBackingBean.anzeige.onPage}"/>
                 <p:ajax event="colResize" listener="#{myUserBackingBean.anzeige.onColumnResize}"/>
                 <p:ajax event="colReorder" listener="#{myUserBackingBean.anzeige.onColReorder(event, ':fm:tbl')}" update="fm:anz-bereich :fm:tbl"/>
-                <p:ajax event="rowSelect" listener="#{myUserBackingBean.select()}" update="fm"/>
+                <p:ajax event="rowSelect" listener="#{myUserBackingBean.edit(myUserBackingBean.tabellenAuswahl)}" update="fm"/>
                 <p:ajax event="rowUnselect" listener="#{myUserBackingBean.clearSelection()}" update="fm"/>
 
                 <p:column headerText="ID" priority="5"

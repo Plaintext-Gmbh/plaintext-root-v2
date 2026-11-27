@@ -136,6 +136,18 @@ class MyUserBackingBeanTest {
         verify(repo, never()).findAll();
     }
 
+    /**
+     * 27.11.2026: a table request (filter, sort) while the "Neuer Benutzer" dialog is open writes an
+     * empty row selection; it must not wipe the dialog entity.
+     */
+    @Test
+    void newUser_tabellenAuswahlNullLaesstDialogEntityStehen() {
+        backingBean.newUser();
+        MyUserEntity neu = backingBean.getSelected();
+        backingBean.setTabellenAuswahl(null);
+        assertSame(neu, backingBean.getSelected());
+    }
+
     /** Card 1449 S-8: ROOT keeps "default" as the preset and chooses the tenant in the dialog. */
     @Test
     void newUser_alsRoot_behaeltDefaultVorgabe() {
