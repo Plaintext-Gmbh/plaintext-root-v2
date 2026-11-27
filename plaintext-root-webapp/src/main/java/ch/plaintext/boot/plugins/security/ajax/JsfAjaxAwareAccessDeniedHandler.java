@@ -91,8 +91,8 @@ public class JsfAjaxAwareAccessDeniedHandler implements AccessDeniedHandler {
     }
 
     /**
-     * The page the Ajax request came from (path and query of the same-origin Referer, never its host —
-     * no open redirect), otherwise the requested view as {@code .html}.
+     * The page the Ajax request came from: only path and query of the Referer, never its host, so the
+     * redirect stays on this origin (no open redirect). Otherwise the requested view as {@code .html}.
      */
     static String reloadUrl(HttpServletRequest request) {
         String referer = request.getHeader("Referer");
@@ -100,8 +100,7 @@ public class JsfAjaxAwareAccessDeniedHandler implements AccessDeniedHandler {
             try {
                 URI uri = URI.create(referer);
                 String path = uri.getRawPath();
-                if (path != null && path.startsWith("/") && !path.startsWith("//")
-                        && request.getServerName().equalsIgnoreCase(uri.getHost())) {
+                if (path != null && path.startsWith("/") && !path.startsWith("//")) {
                     return uri.getRawQuery() == null ? path : path + "?" + uri.getRawQuery();
                 }
             } catch (IllegalArgumentException ignored) {

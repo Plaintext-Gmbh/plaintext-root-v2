@@ -255,8 +255,10 @@ class SecurityTest {
         assertNotNull(response.getBody());
         assertTrue(response.getBody().contains("<partial-response"),
                 "Antwort muss XML-partial-response sein, war: " + response.getBody());
-        assertTrue(response.getBody().contains("<redirect url=\"/login.html\"/>"),
-                "Antwort muss den Redirect auf die Anmeldung enthalten, war: " + response.getBody());
+        // Card 2548: the user is logged in, the token is only stale -> reload the own page, not the
+        // login (the login would re-authenticate via SSO, rotate the token and knock out other tabs).
+        assertTrue(response.getBody().contains("<redirect url=\"/access-denied.html\"/>"),
+                "Antwort muss die eigene Seite neu laden, war: " + response.getBody());
         assertFalse(response.getBody().contains("\"error\""),
                 "Kein JSON-Fehlerbody mehr");
     }

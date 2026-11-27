@@ -55,7 +55,6 @@ class JsfAjaxAwareHandlersTest {
         anmelden();
         try {
             MockHttpServletRequest request = ajaxRequest();
-            request.setServerName("app.plaintext.ch");
             request.addHeader("Referer", "https://app.plaintext.ch/zeiterfassung.html?fenster=1");
             MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -71,19 +70,25 @@ class JsfAjaxAwareHandlersTest {
     }
 
     @Test
-    void staleCsrfWithValidLogin_foreignRefererFallsBackToRequestedView() throws Exception {
+    void staleCsrfWithValidLogin_neverRedirectsToForeignHost() throws Exception {
         anmelden();
         try {
-            MockHttpServletRequest request = ajaxRequest();
-            request.setServerName("app.plaintext.ch");
-            request.addHeader("Referer", "https://evil.example/phish.html");
+            MockHttpServletRequest fremd = ajaxRequest();
+            fremd.addHeader("Referer", "https://evil.example/phish.html");
             MockHttpServletResponse response = new MockHttpServletResponse();
-
             new JsfAjaxAwareAccessDeniedHandler("/login.html")
-                    .handle(request, response, new MissingCsrfTokenException("token"));
-
-            assertTrue(response.getContentAsString().contains("<redirect url=\"/wiki.html\"/>"),
+                    .handle(fremd, response, new MissingCsrfTokenException("token"));
+            // host dropped: relative to this origin
+            assertTrue(response.getContentAsString().contains("<redirect url=\"/phish.html\"/>"),
                     response.getContentAsString());
+
+            MockHttpServletRequest protokollRelativ = ajaxRequest();
+            protokollRelativ.addHeader("Referer", "https://app.plaintext.ch//evil.example/x");
+            MockHttpServletResponse response2 = new MockHttpServletResponse();
+            new JsfAjaxAwareAccessDeniedHandler("/login.html")
+                    .handle(protokollRelativ, response2, new MissingCsrfTokenException("token"));
+            assertTrue(response2.getContentAsString().contains("<redirect url=\"/wiki.html\"/>"),
+                    response2.getContentAsString());
         } finally {
             SecurityContextHolder.clearContext();
         }

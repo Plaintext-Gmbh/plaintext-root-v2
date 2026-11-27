@@ -19,7 +19,7 @@ exhaustive.
   sich neu angemeldet und dabei das Token gewechselt), meldete die Login-Seite per SSO erneut an, wechselte das Token
   wieder und warf den nächsten Tab hinaus: eine endlose Schleife zwischen offenen Tabs, jeder landete auf dem
   Dashboard (PROD 20.11. rund 600 Durchläufe in 4 h, 27.11. ab 16:07 jede Minute). `JsfAjaxAwareAccessDeniedHandler`
-  lädt bei gültiger Anmeldung jetzt die eigene Seite neu (Pfad und Query des Referers derselben Domain, sonst die
+  lädt bei gültiger Anmeldung jetzt die eigene Seite neu (nur Pfad und Query des Referers, nie dessen Host, sonst die
   angefragte View als `.html`); ohne Anmeldung bleibt es beim Login.
 
 ## [3.89.0] - 2026-11-27
