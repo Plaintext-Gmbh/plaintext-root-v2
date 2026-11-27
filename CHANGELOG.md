@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.90.0] - 2026-11-27
+
 ### Fixed
 
 - **Login/Dashboard sprang mitten in der Arbeit auf** (Karte 2548, Auftrag Daniel 27.11.2026). Ein Ajax-POST mit
