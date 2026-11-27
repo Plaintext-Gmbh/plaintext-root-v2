@@ -46,6 +46,61 @@ class JsfAjaxAwareHandlersTest {
         assertTrue(response.getContentAsString().contains("<redirect url=\"/login.html\"/>"));
     }
 
+    /**
+     * Card 2548: another tab re-logged in and rotated the token. Sending this tab to the login
+     * would log in again via SSO and knock out the other tab — endless ping-pong. It reloads itself.
+     */
+    @Test
+    void staleCsrfWithValidLogin_reloadsOwnPageInsteadOfLogin() throws Exception {
+        anmelden();
+        try {
+            MockHttpServletRequest request = ajaxRequest();
+            request.addHeader("Referer", "https://app.plaintext.ch/zeiterfassung.html?fenster=1");
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            new JsfAjaxAwareAccessDeniedHandler("/login.html")
+                    .handle(request, response, new MissingCsrfTokenException("token"));
+
+            assertEquals(200, response.getStatus());
+            assertTrue(response.getContentAsString().contains("<redirect url=\"/zeiterfassung.html?fenster=1\"/>"),
+                    response.getContentAsString());
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void staleCsrfWithValidLogin_neverRedirectsToForeignHost() throws Exception {
+        anmelden();
+        try {
+            MockHttpServletRequest fremd = ajaxRequest();
+            fremd.addHeader("Referer", "https://evil.example/phish.html");
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            new JsfAjaxAwareAccessDeniedHandler("/login.html")
+                    .handle(fremd, response, new MissingCsrfTokenException("token"));
+            // host dropped: relative to this origin
+            assertTrue(response.getContentAsString().contains("<redirect url=\"/phish.html\"/>"),
+                    response.getContentAsString());
+
+            MockHttpServletRequest protokollRelativ = ajaxRequest();
+            protokollRelativ.addHeader("Referer", "https://app.plaintext.ch//evil.example/x");
+            MockHttpServletResponse response2 = new MockHttpServletResponse();
+            new JsfAjaxAwareAccessDeniedHandler("/login.html")
+                    .handle(protokollRelativ, response2, new MissingCsrfTokenException("token"));
+            assertTrue(response2.getContentAsString().contains("<redirect url=\"/wiki.html\"/>"),
+                    response2.getContentAsString());
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    private static void anmelden() {
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(
+                new UsernamePasswordAuthenticationToken("u", "p", AuthorityUtils.createAuthorityList("ROLE_USER")));
+        SecurityContextHolder.setContext(context);
+    }
+
     @Test
     void accessDeniedForAuthenticatedUserOnAjax_yieldsParsableErrorInsteadOfJson() throws Exception {
         // Deliberately a FRESH context instead of getContext().setAuthentication(...): if a previously

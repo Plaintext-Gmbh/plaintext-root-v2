@@ -17,13 +17,17 @@ import org.springframework.security.authentication.AuthenticationTrustResolverIm
 import org.springframework.security.web.csrf.CsrfException;
 
 import java.io.IOException;
+import java.net.URI;
 
 /**
  * {@link AccessDeniedHandler} that delivers a processable XML {@code partial-response} to
  * JSF/PrimeFaces Ajax requests instead of a JSON 403 (card 385).
  *
- * <p>An expired CSRF token ({@link CsrfException}) — the normal case after every deploy and after every
- * re-login in another tab — leads to a redirect to the login page. A
+ * <p>An expired CSRF token ({@link CsrfException}) without a valid login — the normal case after every
+ * deploy — leads to a redirect to the login page. With a valid login the token is merely stale
+ * (another tab re-logged in and rotated it): the page itself is reloaded instead (card 2548), because
+ * the login page would log in again via SSO, rotate the token once more and so knock out the next
+ * tab — an endless ping-pong between open tabs, each landing on the dashboard. A
  * genuine authorization denial of a logged-in user, in contrast, is returned as an
  * {@code <error>}: sending that user to the login page would be misleading, and
  * the spinner has to stop regardless.</p>
@@ -57,6 +61,14 @@ public class JsfAjaxAwareAccessDeniedHandler implements AccessDeniedHandler {
         // attack attempt or a deploy/tab side effect — one wants to find both in Graylog,
         // and the frequency is a direct measure of the residual effect of this bug.
         // Deliberately NOT logged: token, session id, user name, request parameters.
+        if (accessDeniedException instanceof CsrfException && isAuthenticated()) {
+            String reload = reloadUrl(request);
+            log.warn("Ajax-Request abgewiesen (CSRF-Token veraltet, Anmeldung gueltig): {} {} "
+                            + "— beantwortet mit JSF-partial-response, Seite neu laden: {}",
+                    request.getMethod(), request.getRequestURI(), reload);
+            JsfAjaxResponses.sendPartialRedirect(response, reload);
+            return;
+        }
         if (accessDeniedException instanceof CsrfException) {
             log.warn("Ajax-Request abgewiesen (CSRF-Token fehlt oder ist ungueltig): {} {} "
                             + "— beantwortet mit JSF-partial-response, Redirect auf {}",
@@ -76,6 +88,27 @@ public class JsfAjaxAwareAccessDeniedHandler implements AccessDeniedHandler {
                 request.getMethod(), request.getRequestURI());
         JsfAjaxResponses.sendPartialError(response, "AccessDenied",
                 "Keine Berechtigung fuer diese Aktion.");
+    }
+
+    /**
+     * The page the Ajax request came from: only path and query of the Referer, never its host, so the
+     * redirect stays on this origin (no open redirect). Otherwise the requested view as {@code .html}.
+     */
+    static String reloadUrl(HttpServletRequest request) {
+        String referer = request.getHeader("Referer");
+        if (referer != null) {
+            try {
+                URI uri = URI.create(referer);
+                String path = uri.getRawPath();
+                if (path != null && path.startsWith("/") && !path.startsWith("//")) {
+                    return uri.getRawQuery() == null ? path : path + "?" + uri.getRawQuery();
+                }
+            } catch (IllegalArgumentException ignored) {
+                // unparsable Referer -> fall back to the requested view
+            }
+        }
+        String uri = request.getRequestURI();
+        return uri.endsWith(".xhtml") ? uri.substring(0, uri.length() - ".xhtml".length()) + ".html" : uri;
     }
 
     private boolean isAuthenticated() {
