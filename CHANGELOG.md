@@ -12,9 +12,9 @@ exhaustive.
 
 ## [Unreleased]
 
-3.86.0 ist nur teilweise veröffentlicht: Release-Lauf 413 hing nach dem Kontextstart in
-`ErrorDispatchChainTest` und wurde nach dem Timeout abgebrochen; ab `plaintext-root-webapp` fehlen die Artefakte.
-Dieselben Änderungen erscheinen vollständig als 3.87.0. 3.86.0 nicht verwenden.
+3.86.0: Release-Lauf 413 hing nach dem Kontextstart in `ErrorDispatchChainTest` und wurde nach dem Timeout
+abgebrochen; `plaintext-root-webapp` und `plaintext-root-files` wurden am 27.11.2026 mit `scripts/release-nachliefern.sh`
+nachgeliefert (Gegenprobe: Reposilite und GitHub Packages je 67 von 67 Dateien). Die Einträge unten erschienen in 3.86.0.
 
 ### Added
 
