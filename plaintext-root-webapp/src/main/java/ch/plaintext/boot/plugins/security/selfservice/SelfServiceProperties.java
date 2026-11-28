@@ -57,4 +57,10 @@ public class SelfServiceProperties {
      * addition to {@code user}, e.g. {@code praesentation}.
      */
     private List<String> standardRollen = new ArrayList<>();
+
+    /** Karte 2560: Gueltigkeit einer Einladung. */
+    private Duration einladungTtl = Duration.ofDays(7);
+
+    /** Karte 2560: hoechstens so viele offene Einladungen je Mandant. */
+    private int maxOffeneEinladungen = 30;
 }

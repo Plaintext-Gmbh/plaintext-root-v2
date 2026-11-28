@@ -221,6 +221,55 @@ class RegistrationServiceTest {
         assertFalse(user.getRoles().contains(" "));
     }
 
+    /** Karte 2560: Einladung legt ein Token im Mandanten des Einladenden an und schickt die Mail. */
+    @Test
+    void einladenLegtEinladungsTokenAn() {
+        when(userRepository.findByUsername("neu@verein.ch")).thenReturn(null);
+        when(tokenRepository.countByMandatAndEinladungTrueAndConsumedAtIsNullAndExpiresAtAfter(eq("kverein"), any(Instant.class))).thenReturn(0L);
+
+        assertEquals(RegistrationService.EinladungOutcome.GESENDET,
+                service.einladen(" Neu@Verein.ch ", "kverein", "chef@verein.ch", "https://folien.example"));
+
+        ArgumentCaptor<RegistrationToken> c = ArgumentCaptor.forClass(RegistrationToken.class);
+        verify(tokenRepository).save(c.capture());
+        assertTrue(c.getValue().isEinladung());
+        assertEquals("kverein", c.getValue().getMandat());
+        assertEquals("neu@verein.ch", c.getValue().getEmail());
+        verify(systemMailSender).sendSystemMail(eq(1L), eq("neu@verein.ch"), anyString(),
+                org.mockito.ArgumentMatchers.contains("chef@verein.ch"), eq(false));
+    }
+
+    /** Karte 2560: ungueltige Adresse, bestehendes Konto und zu viele offene Einladungen. */
+    @Test
+    void einladenGrenzen() {
+        assertEquals(RegistrationService.EinladungOutcome.UNGUELTIG, service.einladen("kein-mail", "k", "x", ""));
+        when(userRepository.findByUsername("da@x.ch")).thenReturn(new MyUserEntity());
+        assertEquals(RegistrationService.EinladungOutcome.HAT_KONTO, service.einladen("da@x.ch", "k", "x", ""));
+        when(tokenRepository.countByMandatAndEinladungTrueAndConsumedAtIsNullAndExpiresAtAfter(eq("k"), any(Instant.class))).thenReturn(30L);
+        assertEquals(RegistrationService.EinladungOutcome.ZU_VIELE, service.einladen("neu@x.ch", "k", "x", ""));
+        verify(tokenRepository, never()).save(any());
+    }
+
+    /** Karte 2560: ein Einladungstoken bleibt im Mandanten, auch wenn sonst jede Registrierung einen eigenen bekommt. */
+    @Test
+    void einladungBleibtImMandanten() {
+        properties.setMandantJeRegistrierung(true);
+        properties.setStandardRollen(java.util.List.of("praesentation"));
+        RegistrationToken token = newToken("neu@verein.ch", "kverein", Duration.ofHours(1));
+        token.setEinladung(true);
+        when(tokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(token));
+        when(tokenRepository.consumeToken(anyString(), any(Instant.class))).thenReturn(1);
+        when(userRepository.findByUsername("neu@verein.ch")).thenReturn(null);
+
+        assertTrue(service.completeRegistration("good", "hunter2-strong").ok());
+
+        verify(mandateMenuConfigRepository, never()).save(any());
+        ArgumentCaptor<MyUserEntity> u = ArgumentCaptor.forClass(MyUserEntity.class);
+        verify(userRepository).save(u.capture());
+        assertTrue(u.getValue().getRoles().contains("PROPERTY_MANDAT_kverein"));
+        assertTrue(u.getValue().getRoles().contains("praesentation"));
+    }
+
     /** Karte 2410: lesende Prüfung wie consumeToken, verbraucht nichts. */
     @Test
     void tokenGueltigNurUnverbrauchtUndNichtAbgelaufen() {

@@ -17,6 +17,9 @@ public interface RegistrationTokenRepository extends JpaRepository<RegistrationT
     // in the e-mail link, never in the DB.
     Optional<RegistrationToken> findByTokenHash(String tokenHash);
 
+    /** Karte 2560: offene Einladungen eines Mandanten (Obergrenze gegen Missbrauch als Mail-Schleuder). */
+    long countByMandatAndEinladungTrueAndConsumedAtIsNullAndExpiresAtAfter(String mandat, Instant now);
+
     /**
      * Redeems a token atomically (conditional UPDATE) — prevents TOCTOU races.
      *

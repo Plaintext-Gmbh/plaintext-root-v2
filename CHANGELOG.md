@@ -12,6 +12,14 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+
+- **Personen in den eigenen Mandanten einladen** (Karte 2560, Epic 2553 SaaS Präsentationen, Abo «Verein»). Neue Seite
+  «Personen einladen» (`einladen.html`, Menü nur mit der Rolle `einladen`). Die Einladung schickt über das System-Mailkonto
+  einen Link (7 Tage, `plaintext.selfservice.einladung-ttl`) auf die bekannte Bestätigung `/register/verify`. Das Konto
+  entsteht im Mandanten des Einladenden, auch bei `mandant-je-registrierung`. Höchstens 30 offene Einladungen je Mandant
+  (`max-offene-einladungen`). Migration `V1795855117`: Spalte `REGISTRATION_TOKEN.EINLADUNG`.
+
 ## [3.91.0] - 2026-11-28
 
 ### Added

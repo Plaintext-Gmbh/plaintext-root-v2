@@ -1,0 +1,25 @@
+<ui:composition xmlns:h="http://java.sun.com/jsf/html"
+                xmlns:ui="http://java.sun.com/jsf/facelets"
+                xmlns:p="http://primefaces.org/ui"
+                xmlns="http://www.w3.org/1999/xhtml" template="/includes/template.xhtml">
+
+    <!-- Karte 2560: Personen in den eigenen Mandanten einladen (Verein). -->
+    <ui:define name="title">Personen einladen</ui:define>
+
+    <ui:define name="content">
+        <h:form id="fm">
+            <input type="hidden" name="_csrf" value="#{_csrf.token}"/>
+            <h2>Personen einladen</h2>
+            <p class="pt-gedaempft">Die eingeladene Person bekommt eine Mail mit einem Link, wählt ein Passwort und arbeitet danach
+                im selben Konto mit, mit denselben Foliensätzen. Der Link gilt 7 Tage.</p>
+            <p:messages id="meldungen" closable="true"/>
+            <div class="pt-knopfleiste pt-abstand">
+                <p:outputLabel for="email" value="E-Mail-Adresse"/>
+                <p:inputText id="email" value="#{einladenBackingBean.email}" type="email" maxlength="255" required="true"
+                             requiredMessage="Bitte eine E-Mail-Adresse eingeben."/>
+                <p:commandButton id="einladen" value="Einladung senden" icon="pi pi-send"
+                                 action="#{einladenBackingBean.einladen()}" process="@this email" update="@form"/>
+            </div>
+        </h:form>
+    </ui:define>
+</ui:composition>
