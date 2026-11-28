@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.94.0] - 2026-11-28
+
 ### Added
 
 - **Hinweis auf AGB und Datenschutzerklärung bei der Registrierung** (Karte 2574, Epic 2553). Neu
