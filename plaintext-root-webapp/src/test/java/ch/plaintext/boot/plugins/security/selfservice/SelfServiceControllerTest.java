@@ -83,6 +83,17 @@ class SelfServiceControllerTest {
                 .contains("Neues Passwort wählen").contains("type=\"password\"");
     }
 
+    /** Karte 2574: Registrierung zeigt AGB und Datenschutz nur, wenn die Instanz sie setzt; Adressen werden escaped. */
+    @Test
+    void rechtlicherHinweisNurMitAdressen() {
+        org.assertj.core.api.Assertions.assertThat(controller("").registerForm(request).getBody()).doesNotContain("AGB");
+        properties.setAgbUrl("/agb");
+        properties.setDatenschutzUrl("/datenschutz?a=1&b=\"x\"");
+        String body = controller("").registerForm(request).getBody();
+        org.assertj.core.api.Assertions.assertThat(body).contains("Mit dem Konto gelten die")
+                .contains("href=\"/agb\"").contains("/datenschutz?a=1&amp;b=&quot;x&quot;").doesNotContain("b=\"x\"");
+    }
+
     /** Karte 2554: Versandfehler zeigt eine ehrliche Meldung, nicht «Prüfen Sie Ihren Posteingang». */
     @Test
     void versandfehlerWirdAngezeigt() {
