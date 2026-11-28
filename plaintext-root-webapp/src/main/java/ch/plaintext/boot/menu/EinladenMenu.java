@@ -10,7 +10,7 @@ package ch.plaintext.boot.menu;
     link = "einladen.html",
     order = 95,
     icon = "pi pi-user-plus",
-    roles = {"einladen"}
+    roles = {"EINLADEN"}
 )
 public class EinladenMenu {
 }
