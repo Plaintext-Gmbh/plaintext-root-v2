@@ -15,7 +15,9 @@
 function initTheme() {
     const savedTheme = getCookie('plaintext-theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+    // Karte 2566: eine Instanz kann hell/dunkel voreinstellen (plaintext.oberflaeche.standard-modus).
+    const standard = document.documentElement.getAttribute('data-pt-standard-modus');
+    const theme = savedTheme || (standard === 'dark' || standard === 'light' ? standard : (prefersDark ? 'dark' : 'light'));
     applyTheme(theme);
 }
 

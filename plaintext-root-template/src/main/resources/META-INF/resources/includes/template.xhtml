@@ -149,6 +149,10 @@
     <h:outputStylesheet name="css/button-spacing.css" library="plaintext-layout"/>
     <!-- Central mobile responsive CSS: MUST load last (wins the cascade), caps dialogs/inputs to the viewport. -->
     <h:outputStylesheet name="css/mobile-responsive.css" library="plaintext-layout"/>
+    <!-- Karte 2566: Stylesheets der Instanz (z. B. plaintext-modul-stil) zuletzt, damit sie gewinnen. -->
+    <ui:repeat value="#{oberflaeche.stylesheets}" var="css" rendered="#{oberflaeche != null}">
+        <link rel="stylesheet" href="#{css}"/>
+    </ui:repeat>
 
 </h:body>
 

@@ -38,4 +38,21 @@ class PlaintextOidcUserServiceNeuerBenutzerTest {
 
         assertEquals(Set.of("user", "PROPERTY_MANDAT_M1"), neu.getRoles());
     }
+
+    /** Karte 2566: Neuanlage mit den Rollen der Selbstregistrierung (eigener Mandant), Maschinenrolle bleibt draussen. */
+    @Test
+    void neuanlageMitEigenemMandanten() throws Exception {
+        MyUserRepository repo = mock(MyUserRepository.class);
+        when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
+        PlaintextOidcUserService service = new PlaintextOidcUserService(repo, null, null);
+
+        Method m = PlaintextOidcUserService.class.getDeclaredMethod(
+                "createNewUser", String.class, String.class, Set.class);
+        m.setAccessible(true);
+        MyUserEntity neu = (MyUserEntity) m.invoke(service, "neu@example.invalid", "sub-2",
+                Set.of("user", "PROPERTY_MANDAT_kabc", "praesentation", "system"));
+
+        assertEquals(Set.of("user", "PROPERTY_MANDAT_kabc", "praesentation"), neu.getRoles());
+        assertEquals("sub-2", neu.getOidcSubject());
+    }
 }

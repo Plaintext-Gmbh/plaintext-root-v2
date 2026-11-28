@@ -117,7 +117,7 @@
                         </li>
                     </ui:fragment>
 
-                    <ui:fragment rendered="#{notificationTopbarBean != null}">
+                    <ui:fragment rendered="#{notificationTopbarBean != null and (oberflaeche == null or oberflaeche.topbarBenachrichtigungen)}">
                         <li class="topbar-item" style="position: relative;">
                             <h:form id="notifFm" style="margin:0; padding:0; display:contents;">
                                 <input type="hidden" name="_csrf" value="#{_csrf.token}"/>
@@ -196,12 +196,14 @@
                                     <span>#{i18n.t('Mein Profil')}</span>
                                 </a>
                             </li>
-                            <li role="menuitem">
-                                <a href="api-token.xhtml" class="topbar-dropdown-item">
-                                    <i class="pi pi-key"/>
-                                    <span>#{i18n.t('API Token')}</span>
-                                </a>
-                            </li>
+                            <ui:fragment rendered="#{oberflaeche == null or oberflaeche.topbarApiToken}">
+                                <li role="menuitem">
+                                    <a href="api-token.xhtml" class="topbar-dropdown-item">
+                                        <i class="pi pi-key"/>
+                                        <span>#{i18n.t('API Token')}</span>
+                                    </a>
+                                </li>
+                            </ui:fragment>
                         </ul>
                     </li>
 

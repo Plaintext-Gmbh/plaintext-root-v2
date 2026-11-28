@@ -16,6 +16,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -171,5 +172,26 @@ class SelfServiceControllerTest {
         // never request-derived — which the tests above pin.
         properties.setPublicBaseUrl("https://explizit.example");
         assertEquals("https://explizit.example", properties.getPublicBaseUrl());
+    }
+
+    /** Karte 2566: Links und Stylesheets der Instanz erscheinen auf den oeffentlichen Seiten, maskiert. */
+    @Test
+    void oeffentlicheSeiteTraegtLinksUndStil() {
+        SelfServiceController c = controller(null);
+        assertFalse(c.page("T", "<p>x</p>").contains("<nav class=\"pt-oeffentlich-links\">"));
+
+        ch.plaintext.boot.plugins.jsf.oberflaeche.Oberflaeche o = new ch.plaintext.boot.plugins.jsf.oberflaeche.Oberflaeche();
+        ch.plaintext.boot.plugins.jsf.oberflaeche.Oberflaeche.Link l = new ch.plaintext.boot.plugins.jsf.oberflaeche.Oberflaeche.Link();
+        l.setText("Datenschutz");
+        l.setUrl("/datenschutz.html?a=1&b=\"2\"");
+        o.getLinks().add(l);
+        o.getStylesheets().add("/stil/presenter.css");
+        o.setStandardModus("dark");
+        c.setOberflaeche(o);
+
+        String html = c.page("T", "<p>x</p>");
+        assertTrue(html.contains("<a href=\"/datenschutz.html?a=1&amp;b=&quot;2&quot;\">Datenschutz</a>"));
+        assertTrue(html.contains("<link rel=\"stylesheet\" href=\"/stil/presenter.css\"/>"));
+        assertTrue(html.contains("class=\"pt-dunkel\""));
     }
 }

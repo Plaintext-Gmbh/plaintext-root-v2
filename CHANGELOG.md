@@ -18,6 +18,15 @@ exhaustive.
   `plaintext.selfservice.agb-url` und `plaintext.selfservice.datenschutz-url` (Vorgabe leer = kein Hinweis): `/register`
   zeigt dann «Mit dem Konto gelten die AGB und die Datenschutzerklärung» mit Links (escaped). Bestehende Instanzen
   sind unverändert.
+- **`plaintext.oberflaeche`: Links, Stylesheets, Topbar-Schalter und hell/dunkel je Instanz** (Karte 2566, Presenter
+  Karte 2565). `links` erscheinen in der Fusszeile der App, auf der Login-Seite und auf den Self-Service-Seiten
+  (Registrierung, Bestaetigung, Passwort-Reset); `stylesheets` werden dort zuletzt geladen (fuer
+  plaintext-modul-stil). `topbar-benachrichtigungen: false` und `topbar-api-token: false` blenden Glocke und
+  «API Token» im Benutzermenue aus. `standard-modus: dark|light` gilt fuer Anonyme und neue Benutzer, bestehende
+  behalten ihre Wahl. Ohne Eintrag bleibt alles wie bisher.
+- **OIDC-Neuanlage mit eigenem Mandanten** (Karte 2566): mit `plaintext.selfservice.mandant-je-registrierung` bekommt
+  ein per OIDC automatisch angelegtes Konto wie die Registrierung einen eigenen Mandanten und die `standard-rollen`
+  (Google/Microsoft/GitHub ueber Keycloak). Dafuer verlangt die Neuanlage dann `email_verified=true`.
 
 ## [3.93.0] - 2026-11-28
 

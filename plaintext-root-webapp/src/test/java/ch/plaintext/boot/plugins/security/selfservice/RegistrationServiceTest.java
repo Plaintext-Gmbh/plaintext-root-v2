@@ -300,4 +300,26 @@ class RegistrationServiceTest {
         t.setExpiresAt(Instant.now().plus(ttl));
         return t;
     }
+
+    // Karte 2566: Neuanlage ueber OIDC bekommt dieselben Rollen wie die Registrierung.
+    @Test
+    void rollenFuerNeuesKonto_eigenerMandantUndStandardrollen() {
+        properties.setMandantJeRegistrierung(true);
+        properties.setStandardRollen(java.util.List.of("praesentation", " einladen "));
+        when(mandateMenuConfigRepository.existsByMandateName(anyString())).thenReturn(false);
+
+        java.util.Set<String> rollen = service.rollenFuerNeuesKonto();
+
+        assertTrue(rollen.contains("user"));
+        assertTrue(rollen.contains("praesentation"));
+        assertTrue(rollen.contains("einladen"));
+        assertEquals(1, rollen.stream().filter(r -> r.matches("PROPERTY_MANDAT_k[a-z0-9]{10}")).count());
+        verify(mandateMenuConfigRepository).save(any());
+    }
+
+    @Test
+    void rollenFuerNeuesKonto_ohneMandantJeRegistrierung_leer() {
+        assertTrue(service.rollenFuerNeuesKonto().isEmpty());
+        verify(mandateMenuConfigRepository, never()).save(any());
+    }
 }
