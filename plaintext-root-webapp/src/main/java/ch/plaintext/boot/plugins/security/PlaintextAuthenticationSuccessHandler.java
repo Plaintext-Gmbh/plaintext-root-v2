@@ -102,6 +102,13 @@ public class PlaintextAuthenticationSuccessHandler implements AuthenticationSucc
             if (deepLink != null) {
                 page = deepLink;
             }
+            // Karte 2566: ein Modul (KI-Verbindung, OAuth) hat die Anmeldung angestossen und will zurueck.
+            if (deepLink == null) {
+                String zurueck = ruecksprungZiel(request);
+                if (zurueck != null) {
+                    page = zurueck;
+                }
+            }
         }
         String contextPath = (request.getContextPath() != null) ? request.getContextPath() : "";
 
@@ -218,6 +225,42 @@ public class PlaintextAuthenticationSuccessHandler implements AuthenticationSucc
             log.warn("Gemerkter Deep-Link konnte nicht aufgeloest werden: {}", e.getMessage());
             return null;
         }
+    }
+
+    /** Karte 2566: Ruecksprung-Ziele der Module; leer, wenn keines da ist (Tests bauen den Handler von Hand). */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private java.util.List<LoginRuecksprung> ruecksprung = java.util.List.of();
+
+    String ruecksprungZiel(HttpServletRequest request) {
+        for (LoginRuecksprung r : ruecksprung) {
+            try {
+                String pfad = lokalerPfad(r.ziel(request));
+                if (pfad != null) {
+                    return pfad;
+                }
+            } catch (RuntimeException e) {
+                log.warn("Login-Ruecksprung {} fehlgeschlagen: {}", r.getClass().getSimpleName(), e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Karte 2566: nur ein Pfad dieser Anwendung, ohne fuehrenden Schraegstrich (der Aufrufer setzt ihn davor);
+     * {@code //host}, Backslash, Steuerzeichen und alles mit Schema ergeben {@code null} (kein offener Redirect).
+     */
+    static String lokalerPfad(String ziel) {
+        if (ziel == null || ziel.length() < 2 || ziel.length() > 4000 || ziel.charAt(0) != '/'
+                || ziel.charAt(1) == '/' || ziel.indexOf('\\') >= 0 || ziel.contains("/\\")) {
+            return null;
+        }
+        for (int i = 0; i < ziel.length(); i++) {
+            char c = ziel.charAt(i);
+            if (c < 0x21 || c > 0x7e) {
+                return null;
+            }
+        }
+        return ziel.substring(1);
     }
 
     private Long extractUserId(Authentication auth) {

@@ -459,4 +459,37 @@ class UserPreferencesBackingBeanTest {
         zweite.init();
         assertEquals("fr", zweite.getLanguage());
     }
+
+    // ==================== Karte 2566: plaintext.oberflaeche.standard-modus ====================
+
+    @Test
+    void standardModusDunkel_giltFuerNeue_nichtFuerBestehende() {
+        ReflectionTestUtils.setField(bean, "standardModus", "dark");
+        when(storage.findByUniqueId("test@example.com")).thenReturn(null);
+        bean.init();
+        assertEquals("layout-dark", bean.getLayout());
+
+        UserPreferencesBackingBean alt = new UserPreferencesBackingBean();
+        ReflectionTestUtils.setField(alt, "storage", storage);
+        ReflectionTestUtils.setField(alt, "standardModus", "dark");
+        when(storage.findByUniqueId("test@example.com")).thenReturn(existingPrefs);
+        alt.init();
+        assertEquals("layout-light", alt.getLayout());
+    }
+
+    @Test
+    void standardModusDunkel_giltFuerAnonyme() {
+        SecurityContextHolder.clearContext();
+        ReflectionTestUtils.setField(bean, "standardModus", "dark");
+        bean.init();
+        assertEquals("layout-dark", bean.getLayout());
+    }
+
+    @Test
+    void ungueltigerStandardModus_wirdIgnoriert() {
+        SecurityContextHolder.clearContext();
+        ReflectionTestUtils.setField(bean, "standardModus", "auto");
+        bean.init();
+        assertEquals("layout-light", bean.getLayout());
+    }
 }

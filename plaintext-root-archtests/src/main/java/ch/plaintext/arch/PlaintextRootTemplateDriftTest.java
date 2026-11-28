@@ -154,7 +154,7 @@ class PlaintextRootTemplateDriftTest {
         GETEILTE_DATEIEN.put("META-INF/resources/includes/config.xhtml",
                 "6b8b5014e22ff48a43d9e9bf3adc746cca506f4cadc761ceca0e98935206666b");
         GETEILTE_DATEIEN.put("META-INF/resources/includes/footer.xhtml",
-                "576a659b0674cb4fd0a6c9efcc827d09136c39135792adad9c1d3819dda19845");
+                "8728d1010eb010e93f805c09d1d2c3f879add4d0398bd4a4bb447d96a0805649");
         GETEILTE_DATEIEN.put("META-INF/resources/plaintext-layout/css/button-spacing.css",
                 "d4c2cdb58df54b3c7653ee25933648ac5f6564becbe77ff24af685c86bd3293a");
         GETEILTE_DATEIEN.put("META-INF/resources/plaintext-layout/css/colors/color-avocado.css",

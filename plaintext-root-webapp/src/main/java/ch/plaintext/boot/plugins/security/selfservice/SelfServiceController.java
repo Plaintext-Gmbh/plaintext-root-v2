@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import ch.plaintext.boot.plugins.jsf.oberflaeche.Oberflaeche;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -69,6 +70,14 @@ public class SelfServiceController {
         this.properties = properties;
         this.eigeneAdresse = eigeneAdresse;
         this.plaintextBaseurl = plaintextBaseurl == null ? "" : plaintextBaseurl;
+    }
+
+    /** Karte 2566: Links und Stylesheets der Instanz; fehlt die Bean (andere App), bleibt die Seite wie bisher. */
+    private Oberflaeche oberflaeche;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setOberflaeche(Oberflaeche oberflaeche) {
+        this.oberflaeche = oberflaeche;
     }
 
     // ---------- Registration ----------
@@ -320,10 +329,27 @@ public class SelfServiceController {
         return s == null ? "" : org.springframework.web.util.HtmlUtils.htmlEscape(s);
     }
 
-    private static String page(String title, String body) {
+    String page(String title, String body) {
+        StringBuilder css = new StringBuilder();
+        StringBuilder links = new StringBuilder();
+        boolean dunkel = false;
+        if (oberflaeche != null) {
+            oberflaeche.getStylesheets().stream().filter(u -> u != null && !u.isBlank())
+                    .forEach(u -> css.append("<link rel=\"stylesheet\" href=\"").append(escape(u)).append("\"/>"));
+            oberflaeche.getLinks().stream().filter(l -> l.getUrl() != null && !l.getUrl().isBlank())
+                    .forEach(l -> links.append(links.isEmpty() ? "" : " &middot; ")
+                            .append("<a href=\"").append(escape(l.getUrl())).append("\">")
+                            .append(escape(l.getText())).append("</a>"));
+            dunkel = "dark".equals(oberflaeche.getStandardModus());
+        }
+        String fuss = links.isEmpty() ? "" : "<nav class=\"pt-oeffentlich-links\">" + links + "</nav>";
+        return seite(escape(title), body + fuss, css.toString(), dunkel ? "pt-dunkel" : "");
+    }
+
+    private static String seite(String title, String body, String css, String htmlKlasse) {
         return """
                 <!DOCTYPE html>
-                <html lang="de">
+                <html lang="de" class="%s">
                 <head>
                     <meta charset="UTF-8">
                     <title>%s &middot; Plaintext</title>
@@ -368,12 +394,19 @@ public class SelfServiceController {
                         .subtle { color: #6c757d; font-size: 0.9rem; text-align: center; }
                         a { color: #4183c4; text-decoration: none; }
                         a:hover { text-decoration: underline; }
+                        .pt-dunkel { color-scheme: dark; }
+                        .pt-dunkel body { background: linear-gradient(135deg, #1a1a2e 0%%, #16213e 100%%); color: #e0e0e0; }
+                        .pt-dunkel .card { background: #2a2b3d; border-color: #3c3d4f; }
+                        .pt-dunkel input { background: #1a1a2e; color: #e0e0e0; border-color: #3c3d4f; }
+                        body { flex-direction: column; }
+                        .pt-oeffentlich-links { margin-top: 1.25rem; font-size: 0.85rem; text-align: center; }
                     </style>
+                    %s
                 </head>
                 <body>
                     %s
                 </body>
                 </html>
-                """.formatted(escape(title), body);
+                """.formatted(htmlKlasse, title, css, body);
     }
 }

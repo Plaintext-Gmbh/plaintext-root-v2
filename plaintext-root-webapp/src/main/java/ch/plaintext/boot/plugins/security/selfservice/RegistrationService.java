@@ -203,6 +203,27 @@ public class RegistrationService {
     }
 
     /**
+     * Karte 2566: the roles a new account gets when it arrives through another door than the
+     * registration form (OIDC auto-create: Google, Microsoft, GitHub via Keycloak). With
+     * {@code mandant-je-registrierung} it is a mandant of its own plus the standard roles, exactly as
+     * {@link #completeRegistration}; otherwise empty, and the caller keeps its own defaults.
+     */
+    @Transactional
+    public java.util.Set<String> rollenFuerNeuesKonto() {
+        if (!properties.isMandantJeRegistrierung()) {
+            return java.util.Set.of();
+        }
+        java.util.Set<String> rollen = new java.util.LinkedHashSet<>();
+        rollen.add("user");
+        rollen.add("PROPERTY_MANDAT_" + neuerMandant());
+        properties.getStandardRollen().stream()
+                .filter(r -> r != null && !r.isBlank())
+                .map(String::trim)
+                .forEach(rollen::add);
+        return rollen;
+    }
+
+    /**
      * Karte 2554: a mandant of its own for one self-registered customer. The key is random (no
      * personal data in role names or logs); the {@link MandateMenuConfig} row makes it a regular
      * mandant, exactly as «Mandate › Neu» does.

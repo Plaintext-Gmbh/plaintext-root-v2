@@ -37,6 +37,18 @@ public class PlaintextOidcUserService implements OAuth2UserService<OidcUserReque
     private final OidcUserService delegate = new OidcUserService();
 
     /**
+     * Karte 2566: damit eine Neuanlage per OIDC wie die Registrierung einen eigenen Mandanten bekommt. Erst beim Login
+     * aufgeloest: RegistrationService braucht den PasswordEncoder der Security-Konfiguration, die ihrerseits diesen
+     * Dienst braucht (sonst Kreis beim Start).
+     */
+    private org.springframework.beans.factory.ObjectProvider<ch.plaintext.boot.plugins.security.selfservice.RegistrationService> registrationService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setRegistrationService(org.springframework.beans.factory.ObjectProvider<ch.plaintext.boot.plugins.security.selfservice.RegistrationService> registrationService) {
+        this.registrationService = registrationService;
+    }
+
+    /**
      * SECURITY (card 314, item 12): requires {@code email_verified=true} before an existing
      * local account is bound to an IdP {@code sub} for the first time. Fail-closed: a missing
      * claim counts as "not verified". Can be switched off via
@@ -119,7 +131,16 @@ public class PlaintextOidcUserService implements OAuth2UserService<OidcUserReque
                         "Benutzer '" + username + "' ist nicht registriert");
             }
 
-            localUser = createNewUser(username, oidcSubject, config);
+            ch.plaintext.boot.plugins.security.selfservice.RegistrationService reg =
+                    registrationService == null ? null : registrationService.getIfAvailable();
+            java.util.Set<String> eigene = reg == null ? java.util.Set.of() : reg.rollenFuerNeuesKonto();
+            if (!eigene.isEmpty()) {
+                // Karte 2566: ein Konto mit eigenem Mandanten entsteht nur mit verifizierter Adresse,
+                // sonst koennte jemand eine fremde Adresse belegen (die echte Person kaeme nicht mehr hinein).
+                requireVerifiedEmail(oidcUser, username, usernameAttr);
+            }
+            localUser = eigene.isEmpty() ? createNewUser(username, oidcSubject, config)
+                    : createNewUser(username, oidcSubject, eigene);
             log.info("Auto-created new user '{}' (id={}) from OIDC login", Log.mail(username), localUser.getId());
         }
 
@@ -141,6 +162,18 @@ public class PlaintextOidcUserService implements OAuth2UserService<OidcUserReque
             return value.toString();
         }
         return null;
+    }
+
+    /** Karte 2566: Neuanlage mit den Rollen der Selbstregistrierung (eigener Mandant). */
+    private MyUserEntity createNewUser(String username, String oidcSubject, java.util.Set<String> rollen) {
+        MyUserEntity user = new MyUserEntity();
+        user.setUsername(username);
+        user.setPassword("");
+        user.setOidcSubject(oidcSubject);
+        Set<String> roles = new HashSet<>();
+        rollen.stream().filter(r -> !PrivilegedRoleRules.isNieVergebbar(r)).forEach(roles::add);
+        user.setRoles(roles);
+        return userRepository.save(user);
     }
 
     private MyUserEntity createNewUser(String username, String oidcSubject, OidcConfig config) {

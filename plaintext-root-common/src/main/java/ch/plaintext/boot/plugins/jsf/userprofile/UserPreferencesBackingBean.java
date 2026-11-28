@@ -73,6 +73,10 @@ public class UserPreferencesBackingBean implements Serializable {
     @Value("${plaintext.i18n.default-language:de}")
     private String defaultLanguage = "de";
 
+    /** Karte 2566: hell/dunkel fuer Anonyme und neue Benutzer ({@code plaintext.oberflaeche.standard-modus}). */
+    @Value("${plaintext.oberflaeche.standard-modus:}")
+    private String standardModus = "";
+
     /**
      * Single source of truth for all user preference data.
      * Replaces previous field duplication.
@@ -148,6 +152,7 @@ public class UserPreferencesBackingBean implements Serializable {
         if (username == null) {
             prefs = new UserPreference();
             prefs.setLanguage(defaultLanguage);
+            standardModusSetzen();
             return;
         }
         prefs = storage.findByUniqueId(username);
@@ -178,7 +183,14 @@ public class UserPreferencesBackingBean implements Serializable {
             prefs = new UserPreference();
             prefs.setUniqueId(username);
             prefs.setLanguage(defaultLanguage);
+            standardModusSetzen();
             save();
+        }
+    }
+
+    private void standardModusSetzen() {
+        if ("dark".equals(standardModus) || "light".equals(standardModus)) {
+            prefs.setDarkMode(standardModus);
         }
     }
 
