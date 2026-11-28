@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.92.0] - 2026-11-28
+
 ### Added
 
 - **Personen in den eigenen Mandanten einladen** (Karte 2560, Epic 2553 SaaS Präsentationen, Abo «Verein»). Neue Seite
