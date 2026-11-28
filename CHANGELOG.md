@@ -12,6 +12,14 @@ exhaustive.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`KonfigurierteAblagenRegister`: kein Kreisaufruf mehr zwischen Registern** (Karte 2544). `andere()`
+  filterte nur `r != this`; ein Proxy desselben Registers (TimingAspect) oder ein zweites konfiguriertes
+  Register galt als «weiteres Register», `namen()` rief sich bis zum `StackOverflowError` im Kreis. In app
+  2.2140.0 und 2.2142.0 brach so der Start ab (`ModulZugriff`). Jetzt zaehlt kein `KonfigurierteAblagenRegister`
+  als weiteres Register.
+
 ## [3.92.0] - 2026-11-28
 
 ### Added

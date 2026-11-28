@@ -9,10 +9,14 @@ import ch.plaintext.ablagen.DateiAblagenRegister;
 import ch.plaintext.settings.ISettingsService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -154,6 +158,67 @@ class KonfigurierteAblagenRegisterTest {
                     assertThat(geoeffnet).singleElement().satisfies(k ->
                             assertThat(k).containsEntry("passwort-secret", "speicher.gut.passwort"));
                 });
+    }
+
+    /**
+     * Karte 2544: ein Aspekt (TimingAspect) legt einen CGLIB-Proxy um das Register. Der Proxy steht dann selbst in
+     * {@code weitere} und ist nie {@code this}; namen() rief sich ohne Proxy-Abgleich endlos auf (StackOverflowError
+     * beim Start von app 2.2140.0/2.2142.0).
+     */
+    @Test
+    void eigenerProxyZaehltNichtAlsWeiteresRegister(@TempDir Path basis) {
+        runner.withUserConfiguration(Weitere.class, Proxy.class)
+                .withPropertyValues("plaintext.speicher.doku.art=codeservice", "plaintext.speicher.doku.ordner=/a")
+                .run(ctx -> {
+                    DateiAblagenRegister r = ctx.getBean(KonfigurierteAblagenRegister.class);
+                    assertThat(r.getClass().getName()).contains("SpringCGLIB");
+                    assertThat(r.namen()).containsExactly("db", "doku", "sidecar");
+                    assertThat(r.ablage("sidecar").orElseThrow().name()).isEqualTo("aus-sidecars");
+                    assertThat(r.ablage("gibtsnicht")).isEmpty();
+                });
+    }
+
+    /** Karte 2544: zwei konfigurierte Register sehen sich gegenseitig in {@code weitere}; sie dürfen sich nicht im Kreis rufen. */
+    @Test
+    void zweiKonfigurierteRegisterRufenSichNichtImKreis() {
+        runner.withUserConfiguration(Weitere.class, Zweites.class)
+                .withPropertyValues("plaintext.speicher.doku.art=codeservice", "plaintext.speicher.doku.ordner=/a")
+                .run(ctx -> {
+                    assertThat(ctx.getBeansOfType(KonfigurierteAblagenRegister.class)).hasSize(2);
+                    for (KonfigurierteAblagenRegister r : ctx.getBeansOfType(KonfigurierteAblagenRegister.class).values()) {
+                        assertThat(r.namen()).containsExactly("db", "doku", "sidecar");
+                        assertThat(r.ablage("gibtsnicht")).isEmpty();
+                    }
+                });
+    }
+
+    @Configuration
+    static class Zweites {
+        @Bean
+        KonfigurierteAblagenRegister zweitesRegister(Environment env,
+                                                     ObjectProvider<DateiAblageArt> arten,
+                                                     ObjectProvider<DateiAblagenRegister> weitere,
+                                                     ObjectProvider<ISettingsService> settings) {
+            return new AblagenAutoConfiguration().konfigurierteAblagenRegister(env, arten, weitere, settings);
+        }
+    }
+
+    @Configuration
+    static class Proxy {
+        @Bean
+        static BeanPostProcessor registerProxy() {
+            return new BeanPostProcessor() {
+                @Override
+                public Object postProcessAfterInitialization(Object bean, String name) {
+                    if (!(bean instanceof KonfigurierteAblagenRegister)) {
+                        return bean;
+                    }
+                    ProxyFactory f = new ProxyFactory(bean);
+                    f.setProxyTargetClass(true);
+                    return f.getProxy();
+                }
+            };
+        }
     }
 
     @Configuration
