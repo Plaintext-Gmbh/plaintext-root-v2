@@ -12,6 +12,22 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+
+- **Selbstregistrierung mit eigenem Mandanten** (Karte 2554, Epic 2553 SaaS Präsentationen). Neu
+  `plaintext.selfservice.mandant-je-registrierung` (Vorgabe `false`): Jede abgeschlossene Registrierung bekommt einen
+  eigenen Mandanten `k` + 10 Zufallszeichen (wie «Mandate › Neu», `MandateMenuConfig`), statt alle in `default`.
+  `plaintext.selfservice.standard-rollen` vergibt zusätzliche Rollen. Bestehende Instanzen sind unverändert.
+- **Nach der Bestätigung direkt angemeldet**: Nach der Passwortwahl baut `SessionLoginFinalizer` die Sitzung auf, auf
+  demselben Weg wie der Formular-Login (Session-Id neu, Sperre, 2FA, Startseite). Scheitert das, bleibt die Seite
+  «Zur Anmeldung».
+
+### Fixed
+
+- **Versandfehler der Verifikationsmail wurde verschluckt** (Karte 2554). `/register` zeigte «Prüfen Sie Ihren
+  Posteingang», auch wenn die Mail nicht ging (gemessen modules.plaintext.ch 27.11.2026 23:33: `Invalid Addresses`).
+  Jetzt «Mail konnte nicht gesendet werden». Das gilt nur für Adressen ohne Konto und verrät darum keine Konten.
+
 ## [3.90.0] - 2026-11-27
 
 ### Fixed

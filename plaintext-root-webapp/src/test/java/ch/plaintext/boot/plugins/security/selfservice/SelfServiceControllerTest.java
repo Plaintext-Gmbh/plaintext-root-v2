@@ -16,6 +16,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,6 +39,9 @@ class SelfServiceControllerTest {
     @Mock RegistrationService registrationService;
     @Mock PasswordResetService passwordResetService;
     @Mock HttpServletRequest request;
+    @Mock jakarta.servlet.http.HttpServletResponse response;
+    @Mock org.springframework.security.core.userdetails.UserDetailsService userDetailsService;
+    @Mock ch.plaintext.boot.plugins.security.SessionLoginFinalizer sessionLoginFinalizer;
 
     private SelfServiceProperties properties;
     private EigeneAdresse eigeneAdresse;
@@ -55,7 +60,7 @@ class SelfServiceControllerTest {
 
     private SelfServiceController controller(String plaintextBaseurl) {
         return new SelfServiceController(registrationService, passwordResetService, properties,
-                eigeneAdresse, plaintextBaseurl);
+                eigeneAdresse, plaintextBaseurl, userDetailsService, sessionLoginFinalizer);
     }
 
     /** Karte 2410: ein verbrauchter oder abgelaufener Link zeigt beim Aufruf gleich «Link ungültig», kein Formular. */
@@ -76,6 +81,44 @@ class SelfServiceControllerTest {
         org.assertj.core.api.Assertions.assertThat(res).contains("Link ungültig").doesNotContain("type=\"password\"");
         org.assertj.core.api.Assertions.assertThat(c.resetConfirmForm("frisch", request).getBody())
                 .contains("Neues Passwort wählen").contains("type=\"password\"");
+    }
+
+    /** Karte 2554: Versandfehler zeigt eine ehrliche Meldung, nicht «Prüfen Sie Ihren Posteingang». */
+    @Test
+    void versandfehlerWirdAngezeigt() {
+        when(registrationService.startRegistration(anyString(), anyString(), anyString()))
+                .thenReturn(RegistrationService.RegistrationOutcome.VERSAND_FEHLER);
+
+        String body = controller("https://x.example").registerSubmit("a@example.org", request).getBody();
+
+        org.assertj.core.api.Assertions.assertThat(body).contains("nicht gesendet").doesNotContain("Posteingang");
+    }
+
+    /** Karte 2554: nach dem Passwort direkt angemeldet, über den gemeinsamen Login-Weg. */
+    @Test
+    void nachBestaetigungDirektAngemeldet() throws Exception {
+        when(registrationService.completeRegistration("t", "passwort-1"))
+                .thenReturn(RegistrationService.RegistrationResult.success("a@example.org"));
+        org.springframework.security.core.userdetails.UserDetails ud =
+                org.springframework.security.core.userdetails.User.withUsername("a@example.org").password("x").roles("USER").build();
+        when(userDetailsService.loadUserByUsername("a@example.org")).thenReturn(ud);
+
+        var antwort = controller("").registerVerifySubmit("t", "passwort-1", request, response);
+
+        org.junit.jupiter.api.Assertions.assertNull(antwort);
+        verify(sessionLoginFinalizer).finalizeLogin(eq(ud), any(), eq("Selbstregistrierung"), eq(request), eq(response));
+    }
+
+    /** Karte 2554: scheitert die Anmeldung (z.B. gesperrt), bleibt die bisherige Seite «Zur Anmeldung». */
+    @Test
+    void ohneAnmeldungBleibtHinweisAufLogin() throws Exception {
+        when(registrationService.completeRegistration("t", "passwort-1"))
+                .thenReturn(RegistrationService.RegistrationResult.success("a@example.org"));
+        when(userDetailsService.loadUserByUsername("a@example.org")).thenThrow(new RuntimeException("weg"));
+
+        String body = controller("").registerVerifySubmit("t", "passwort-1", request, response).getBody();
+
+        org.assertj.core.api.Assertions.assertThat(body).contains("Zur Anmeldung");
     }
 
     @Test

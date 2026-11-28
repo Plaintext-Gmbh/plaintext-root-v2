@@ -9,6 +9,8 @@ import ch.plaintext.boot.plugins.security.model.MyUserEntity;
 import ch.plaintext.boot.plugins.security.persistence.MyUserRepository;
 import ch.plaintext.mailtemplate.IMailTemplateProvider;
 import ch.plaintext.mailtemplate.IMailTemplateProvider.RenderedMail;
+import ch.plaintext.menuesteuerung.model.MandateMenuConfig;
+import ch.plaintext.menuesteuerung.persistence.MandateMenuConfigRepository;
 import ch.plaintext.settings.ISetupConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +53,7 @@ public class RegistrationService {
     private final PasswordEncoder passwordEncoder;
     private final SelfServiceProperties properties;
     private final IMailTemplateProvider mailTemplateProvider;
+    private final MandateMenuConfigRepository mandateMenuConfigRepository;
 
     /**
      * Initiate registration for {@code email} on {@code mandat}.
@@ -86,8 +89,11 @@ public class RegistrationService {
         tokenRepository.save(token);
 
         String link = buildLink(publicBaseUrl, "/register/verify", rawToken);
-        sendVerificationEmail(mandat, normalised, link);
-        return RegistrationOutcome.ACCEPTED;
+        // Karte 2554: a failed send is reported, otherwise the customer waits for a mail that never comes.
+        // Only reachable for addresses WITHOUT an account (existing users return above), so it does not reveal accounts.
+        return sendVerificationEmail(mandat, normalised, link)
+                ? RegistrationOutcome.ACCEPTED
+                : RegistrationOutcome.VERSAND_FEHLER;
     }
 
     /**
@@ -138,23 +144,55 @@ public class RegistrationService {
         // "ROLE_" at login. Previously "ROLE_USER" stood here by mistake -> the authority became
         // "ROLE_ROLE_USER" (ineffective). Correct is "user" (card 306, existing data migrated via Flyway).
         user.addRole("user");
-        user.addRole("PROPERTY_MANDAT_" + token.getMandat().toLowerCase());
+        String mandat = properties.isMandantJeRegistrierung() ? neuerMandant() : token.getMandat().toLowerCase();
+        user.addRole("PROPERTY_MANDAT_" + mandat);
+        properties.getStandardRollen().stream()
+                .filter(r -> r != null && !r.isBlank())
+                .map(String::trim)
+                .forEach(user::addRole);
         userRepository.save(user);
 
-        log.info("Self-registration completed for {} on mandat={}", Log.mail(token.getEmail()), token.getMandat());
+        log.info("Self-registration completed for {} on mandat={}", Log.mail(token.getEmail()), mandat);
         return RegistrationResult.success(token.getEmail());
     }
 
-    private void sendVerificationEmail(String mandat, String to, String link) {
+    /**
+     * Karte 2554: a mandant of its own for one self-registered customer. The key is random (no
+     * personal data in role names or logs); the {@link MandateMenuConfig} row makes it a regular
+     * mandant, exactly as «Mandate › Neu» does.
+     */
+    private String neuerMandant() {
+        for (int versuch = 0; versuch < 5; versuch++) {
+            String kandidat = "k" + zufall(10);
+            if (!mandateMenuConfigRepository.existsByMandateName(kandidat)) {
+                MandateMenuConfig config = new MandateMenuConfig();
+                config.setMandateName(kandidat);
+                mandateMenuConfigRepository.save(config);
+                return kandidat;
+            }
+        }
+        throw new IllegalStateException("Kein freier Mandantenname gefunden");
+    }
+
+    private static String zufall(int laenge) {
+        String zeichen = "abcdefghijkmnpqrstuvwxyz23456789";
+        StringBuilder sb = new StringBuilder(laenge);
+        for (int i = 0; i < laenge; i++) {
+            sb.append(zeichen.charAt(RANDOM.nextInt(zeichen.length())));
+        }
+        return sb.toString();
+    }
+
+    private boolean sendVerificationEmail(String mandat, String to, String link) {
         SystemMailSender sender = systemMailSenderProvider.getIfAvailable();
         if (sender == null) {
             log.warn("Verification e-mail not sent (no SystemMailSender / Mailbox unavailable), mandat={}", mandat);
-            return;
+            return false;
         }
         Long accountId = setupConfigService.getSystemMailAccountId();
         if (accountId == null) {
             log.warn("Verification e-mail not sent: no GLOBAL system mail account configured (mandat={})", mandat);
-            return;
+            return false;
         }
         String defaultBetreff = "Bitte bestätigen Sie Ihre E-Mail-Adresse";
         String defaultBody = """
@@ -173,9 +211,12 @@ public class RegistrationService {
         try {
             if (!sender.sendSystemMail(accountId, to, mail.betreff(), mail.body(), false)) {
                 log.warn("Verification e-mail could not be sent for mandat={}", mandat);
+                return false;
             }
+            return true;
         } catch (Exception e) {
             log.warn("Could not send verification e-mail for mandat={}: {}", mandat, e.getMessage());
+            return false;
         }
     }
 
@@ -196,7 +237,7 @@ public class RegistrationService {
     }
 
     public enum RegistrationOutcome {
-        ACCEPTED, DISABLED, INVALID_INPUT
+        ACCEPTED, DISABLED, INVALID_INPUT, VERSAND_FEHLER
     }
 
     public record RegistrationResult(boolean ok, String username) {
