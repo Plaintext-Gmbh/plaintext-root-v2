@@ -27,6 +27,9 @@ exhaustive.
 - **OIDC-Neuanlage mit eigenem Mandanten** (Karte 2566): mit `plaintext.selfservice.mandant-je-registrierung` bekommt
   ein per OIDC automatisch angelegtes Konto wie die Registrierung einen eigenen Mandanten und die `standard-rollen`
   (Google/Microsoft/GitHub ueber Keycloak). Dafuer verlangt die Neuanlage dann `email_verified=true`.
+- **`LoginRuecksprung`: ein Modul kann nach dem Login zurueck auf seine Seite fuehren** (Karte 2566), fuer den
+  OAuth-Ablauf von plaintext-modul-ki-verbindung (Claude-Connector). Nur lokale Pfade, kein offener Redirect;
+  erzwungener Passwortwechsel und gemerkter Deep-Link gehen vor.
 
 ## [3.93.0] - 2026-11-28
 
