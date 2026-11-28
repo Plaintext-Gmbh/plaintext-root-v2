@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.91.0] - 2026-11-28
+
 ### Added
 
 - **Selbstregistrierung mit eigenem Mandanten** (Karte 2554, Epic 2553 SaaS Präsentationen). Neu
