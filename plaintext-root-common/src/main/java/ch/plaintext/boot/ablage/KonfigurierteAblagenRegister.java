@@ -184,8 +184,11 @@ public class KonfigurierteAblagenRegister implements DateiAblagenRegister {
         }
     }
 
-    /** Die übrigen Register (z. B. Sidecars), ohne dieses selbst. */
+    /**
+     * Die übrigen Register (z. B. Sidecars), ohne dieses selbst. Karte 2544: auch ohne seinen Proxy und ohne ein
+     * zweites konfiguriertes Register (instanceof trifft beide); sonst rufen sie sich bis zum StackOverflowError im Kreis.
+     */
     private Stream<DateiAblagenRegister> andere() {
-        return weitere.orderedStream().filter(r -> r != this);
+        return weitere.orderedStream().filter(r -> !(r instanceof KonfigurierteAblagenRegister));
     }
 }
