@@ -30,6 +30,9 @@ exhaustive.
 - **`LoginRuecksprung`: ein Modul kann nach dem Login zurueck auf seine Seite fuehren** (Karte 2566), fuer den
   OAuth-Ablauf von plaintext-modul-ki-verbindung (Claude-Connector). Nur lokale Pfade, kein offener Redirect;
   erzwungener Passwortwechsel und gemerkter Deep-Link gehen vor.
+- **`MandantDaten`: Export und Loeschung je Mandant** (Karte 2566/2571), Vertrag fuer plaintext-modul-loeschung
+  (Loesch-Lebenszyklus Presenter). Ein Fachmodul exportiert die Daten eines Mandanten (etwa Foliensaetze als PPTX)
+  und loescht sie, auch ausserhalb der Datenbank.
 
 ## [3.93.0] - 2026-11-28
 
