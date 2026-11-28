@@ -71,6 +71,8 @@ class SelfServicePlaywrightIT {
     @Autowired RegistrationTokenRepository registrationTokenRepository;
     @Autowired PasswordResetTokenRepository passwordResetTokenRepository;
     @Autowired MyUserRepository userRepository;
+    /** Karte 2554: ein Versandfehler wird jetzt gemeldet; der Test braucht darum einen Versand, der gelingt. */
+    @org.springframework.test.context.bean.override.mockito.MockitoBean ch.plaintext.SystemMailSender systemMailSender;
 
     private Playwright playwright;
     private Browser browser;
@@ -115,7 +117,11 @@ class SelfServicePlaywrightIT {
         // Operator turns the flow on for the default mandant.
         SetupConfig cfg = setupConfigService.getOrCreate("default");
         cfg.setSelfRegistrationEnabled(true);
+        cfg.setSystemMailAccountId(1L);
         setupConfigService.save(cfg);
+        org.mockito.Mockito.when(systemMailSender.sendSystemMail(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean())).thenReturn(true);
 
         // 1. User opens the registration form and submits an address.
         page.navigate(url("/register"));
@@ -142,13 +148,33 @@ class SelfServicePlaywrightIT {
         assertTrue(page.content().contains("Passwort wählen"));
         page.fill("input[name=password]", "playwright-password");
         page.click("button[type=submit]");
-        assertTrue(page.content().contains("Willkommen"),
-                "expected success page, got: " + page.content());
+        // Karte 2554: directly logged in — no «Link ungültig», no login form, we left the verify page.
+        assertFalse(page.content().contains("Link ungültig"), "verify failed: " + page.content());
+        assertFalse(page.url().contains("/register/verify"), "still on the verify page: " + page.url());
+        assertFalse(page.url().contains("login"), "landed on the login page instead of being logged in: " + page.url());
 
         // 4. The MyUserEntity exists with the right mandant role.
         assertNotNull(userRepository.findByUsername("playwright-user@example.com"));
         assertTrue(userRepository.findByUsername("playwright-user@example.com")
                 .getRoles().contains("PROPERTY_MANDAT_default"));
+    }
+
+    /** Karte 2554: scheitert der Versand, sagt die Seite es, statt auf eine Mail warten zu lassen. */
+    @Test
+    void registration_versandfehlerWirdAngezeigt() {
+        SetupConfig cfg = setupConfigService.getOrCreate("default");
+        cfg.setSelfRegistrationEnabled(true);
+        cfg.setSystemMailAccountId(1L);
+        setupConfigService.save(cfg);
+        org.mockito.Mockito.when(systemMailSender.sendSystemMail(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean())).thenReturn(false);
+
+        page.navigate(url("/register"));
+        page.fill("input[name=email]", "geht-nicht@example.com");
+        page.click("button[type=submit]");
+        assertTrue(page.content().contains("nicht gesendet"), "expected error page, got: " + page.content());
+        assertFalse(page.content().contains("Posteingang"));
     }
 
     @Test
