@@ -12,6 +12,13 @@ exhaustive.
 
 ## [Unreleased]
 
+### Added
+
+- **Hinweis auf AGB und Datenschutzerklärung bei der Registrierung** (Karte 2574, Epic 2553). Neu
+  `plaintext.selfservice.agb-url` und `plaintext.selfservice.datenschutz-url` (Vorgabe leer = kein Hinweis): `/register`
+  zeigt dann «Mit dem Konto gelten die AGB und die Datenschutzerklärung» mit Links (escaped). Bestehende Instanzen
+  sind unverändert.
+
 ## [3.93.0] - 2026-11-28
 
 ### Fixed

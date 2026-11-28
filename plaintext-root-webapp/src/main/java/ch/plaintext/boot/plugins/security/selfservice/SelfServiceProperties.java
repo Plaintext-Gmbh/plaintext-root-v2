@@ -63,4 +63,10 @@ public class SelfServiceProperties {
 
     /** Karte 2560: hoechstens so viele offene Einladungen je Mandant. */
     private int maxOffeneEinladungen = 30;
+
+    /** Karte 2574: Link auf die AGB unter dem Registrierungsformular; leer = kein Hinweis. */
+    private String agbUrl = "";
+
+    /** Karte 2574: Link auf die Datenschutzerklaerung unter dem Registrierungsformular; leer = kein Hinweis. */
+    private String datenschutzUrl = "";
 }

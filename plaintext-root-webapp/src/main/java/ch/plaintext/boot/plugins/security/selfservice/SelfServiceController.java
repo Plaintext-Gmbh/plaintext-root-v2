@@ -83,9 +83,10 @@ public class SelfServiceController {
                     <input type="email" name="email" required autofocus/>
                   </label>
                   <button type="submit">Verifikations-E-Mail senden</button>
+                  %s
                   <p class="subtle"><a href="/login.html">Zur Anmeldung</a></p>
                 </form>
-                """.formatted(csrfField(request))));
+                """.formatted(csrfField(request), rechtlicherHinweis())));
     }
 
     @PostMapping(value = "/register", produces = MediaType.TEXT_HTML_VALUE)
@@ -231,6 +232,22 @@ public class SelfServiceController {
     }
 
     // ---------- Helpers ----------
+
+    /**
+     * Karte 2574: Hinweis auf AGB und Datenschutzerklaerung unter dem Formular, wenn die Instanz die Adressen setzt
+     * ({@code plaintext.selfservice.agb-url}, {@code datenschutz-url}); sonst nichts (bestehende Instanzen unveraendert).
+     */
+    String rechtlicherHinweis() {
+        String agb = properties.getAgbUrl() == null ? "" : properties.getAgbUrl().strip();
+        String ds = properties.getDatenschutzUrl() == null ? "" : properties.getDatenschutzUrl().strip();
+        if (agb.isEmpty() && ds.isEmpty()) {
+            return "";
+        }
+        String agbLink = agb.isEmpty() ? "" : "<a href=\"" + escape(agb) + "\" target=\"_blank\" rel=\"noopener\">AGB</a>";
+        String dsLink = ds.isEmpty() ? "" : "<a href=\"" + escape(ds) + "\" target=\"_blank\" rel=\"noopener\">Datenschutzerklärung</a>";
+        String beide = agbLink.isEmpty() ? dsLink : dsLink.isEmpty() ? agbLink : agbLink + " und die " + dsLink;
+        return "<p class=\"subtle\">Mit dem Konto gelten die " + beide + ".</p>";
+    }
 
     private ResponseEntity<String> registrierungLinkUngueltig() {
         return html(page("Fehler", """
