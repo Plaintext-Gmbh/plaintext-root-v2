@@ -41,6 +41,10 @@ public class RegistrationToken {
     @Column(name = "CONSUMED_AT")
     private Instant consumedAt;
 
+    /** Karte 2560: Einladung in {@link #mandat} (bleibt dort, auch bei mandant-je-registrierung). */
+    @Column(name = "EINLADUNG", nullable = false)
+    private boolean einladung;
+
     public boolean isConsumed() {
         return consumedAt != null;
     }

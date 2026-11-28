@@ -97,6 +97,50 @@ public class RegistrationService {
     }
 
     /**
+     * Karte 2560: {@code email} in den Mandanten {@code mandat} einladen (Verein). Der Link fuehrt auf dieselbe
+     * Bestaetigung wie die Selbstregistrierung; das Konto entsteht im Mandanten des Einladenden.
+     */
+    @Transactional
+    public EinladungOutcome einladen(String email, String mandat, String einladender, String publicBaseUrl) {
+        String normalised = email == null ? "" : email.trim().toLowerCase();
+        if (!normalised.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+") || mandat == null || mandat.isBlank()) {
+            return EinladungOutcome.UNGUELTIG;
+        }
+        if (userRepository.findByUsername(normalised) != null) {
+            return EinladungOutcome.HAT_KONTO;
+        }
+        Instant now = Instant.now();
+        if (tokenRepository.countByMandatAndEinladungTrueAndConsumedAtIsNullAndExpiresAtAfter(mandat, now)
+                >= properties.getMaxOffeneEinladungen()) {
+            return EinladungOutcome.ZU_VIELE;
+        }
+        String rawToken = generateToken();
+        RegistrationToken token = new RegistrationToken();
+        token.setTokenHash(SelfServiceTokenHash.sha256Hex(rawToken));
+        token.setEmail(normalised);
+        token.setMandat(mandat);
+        token.setEinladung(true);
+        token.setIssuedAt(now);
+        token.setExpiresAt(now.plus(properties.getEinladungTtl()));
+        tokenRepository.save(token);
+        String link = buildLink(publicBaseUrl, "/register/verify", rawToken);
+        RenderedMail mail = mailTemplateProvider.render(mandat, "auth.einladung", "Einladung zu Plaintext",
+                """
+                Hallo,
+
+                {von} lädt Sie ein, im gemeinsamen Konto mitzuarbeiten.
+                Wählen Sie über den folgenden Link ein Passwort (gültig für {tage} Tage):
+
+                {link}
+
+                Falls Sie damit nichts anfangen können, ignorieren Sie diese Nachricht.
+                """,
+                Map.of("von", einladender == null ? "Jemand" : einladender,
+                        "tage", String.valueOf(properties.getEinladungTtl().toDays()), "link", link));
+        return sende(mandat, normalised, mail) ? EinladungOutcome.GESENDET : EinladungOutcome.VERSAND_FEHLER;
+    }
+
+    /**
      * Card 2410: whether the link can still be used — without consuming it. Same condition as {@code consumeToken}
      * (exists, not consumed, {@code expiresAt > now}), so the GET shows the form only when the POST would accept it.
      */
@@ -144,7 +188,9 @@ public class RegistrationService {
         // "ROLE_" at login. Previously "ROLE_USER" stood here by mistake -> the authority became
         // "ROLE_ROLE_USER" (ineffective). Correct is "user" (card 306, existing data migrated via Flyway).
         user.addRole("user");
-        String mandat = properties.isMandantJeRegistrierung() ? neuerMandant() : token.getMandat().toLowerCase();
+        // Karte 2560: eine Einladung bleibt im Mandanten des Einladenden.
+        String mandat = !token.isEinladung() && properties.isMandantJeRegistrierung()
+                ? neuerMandant() : token.getMandat().toLowerCase();
         user.addRole("PROPERTY_MANDAT_" + mandat);
         properties.getStandardRollen().stream()
                 .filter(r -> r != null && !r.isBlank())
@@ -208,6 +254,17 @@ public class RegistrationService {
                 """;
         RenderedMail mail = mailTemplateProvider.render(mandat, "auth.registration", defaultBetreff, defaultBody,
                 Map.of("stunden", String.valueOf(properties.getRegistrationTokenTtl().toHours()), "link", link));
+        return sende(mandat, to, mail);
+    }
+
+    /** Ein Auth-Mail ueber das GLOBAL-System-Konto senden; {@code false} bei jedem Fehler (geloggt, ohne Adresse). */
+    private boolean sende(String mandat, String to, RenderedMail mail) {
+        SystemMailSender sender = systemMailSenderProvider.getIfAvailable();
+        Long accountId = setupConfigService.getSystemMailAccountId();
+        if (sender == null || accountId == null) {
+            log.warn("Auth-Mail nicht gesendet: kein SystemMailSender oder kein System-Konto (mandat={})", mandat);
+            return false;
+        }
         try {
             if (!sender.sendSystemMail(accountId, to, mail.betreff(), mail.body(), false)) {
                 log.warn("Verification e-mail could not be sent for mandat={}", mandat);
@@ -234,6 +291,10 @@ public class RegistrationService {
         byte[] bytes = new byte[32];
         RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    public enum EinladungOutcome {
+        GESENDET, HAT_KONTO, ZU_VIELE, UNGUELTIG, VERSAND_FEHLER
     }
 
     public enum RegistrationOutcome {
