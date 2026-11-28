@@ -12,6 +12,8 @@ exhaustive.
 
 ## [Unreleased]
 
+## [3.93.0] - 2026-11-28
+
 ### Fixed
 
 - **`KonfigurierteAblagenRegister`: kein Kreisaufruf mehr zwischen Registern** (Karte 2544). `andere()`
