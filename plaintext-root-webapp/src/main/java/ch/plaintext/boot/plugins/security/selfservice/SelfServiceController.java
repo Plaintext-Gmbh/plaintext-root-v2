@@ -4,7 +4,11 @@
 package ch.plaintext.boot.plugins.security.selfservice;
 
 import ch.plaintext.framework.EigeneAdresse;
+import ch.plaintext.boot.plugins.security.SessionLoginFinalizer;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -48,12 +52,18 @@ public class SelfServiceController {
     private final SelfServiceProperties properties;
     private final EigeneAdresse eigeneAdresse;
     private final String plaintextBaseurl;
+    private final UserDetailsService userDetailsService;
+    private final SessionLoginFinalizer sessionLoginFinalizer;
 
     public SelfServiceController(RegistrationService registrationService,
                                  PasswordResetService passwordResetService,
                                  SelfServiceProperties properties,
                                  EigeneAdresse eigeneAdresse,
-                                 @Value("${plaintext.baseurl:}") String plaintextBaseurl) {
+                                 @Value("${plaintext.baseurl:}") String plaintextBaseurl,
+                                 UserDetailsService userDetailsService,
+                                 SessionLoginFinalizer sessionLoginFinalizer) {
+        this.userDetailsService = userDetailsService;
+        this.sessionLoginFinalizer = sessionLoginFinalizer;
         this.registrationService = registrationService;
         this.passwordResetService = passwordResetService;
         this.properties = properties;
@@ -81,7 +91,19 @@ public class SelfServiceController {
     @PostMapping(value = "/register", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> registerSubmit(@RequestParam("email") String email,
                                                  HttpServletRequest request) {
-        registrationService.startRegistration(email, mandat(), basisUrl());
+        RegistrationService.RegistrationOutcome outcome =
+                registrationService.startRegistration(email, mandat(), basisUrl());
+        if (outcome == RegistrationService.RegistrationOutcome.VERSAND_FEHLER) {
+            // Karte 2554: say it, instead of «check your inbox» for a mail that was never sent.
+            return html(page("Registrieren", """
+                    <div class="card">
+                      <h1>Mail konnte nicht gesendet werden</h1>
+                      <p>An diese Adresse konnten wir den Bestätigungslink nicht schicken.
+                      Bitte prüfen Sie die Schreibweise oder versuchen Sie es später erneut.</p>
+                      <p class="subtle"><a href="/register">Erneut versuchen</a></p>
+                    </div>
+                    """));
+        }
         return html(page("Registrieren", """
                 <div class="card">
                   <h1>Prüfen Sie Ihren Posteingang</h1>
@@ -114,11 +136,22 @@ public class SelfServiceController {
 
     @PostMapping(value = "/register/verify", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> registerVerifySubmit(@RequestParam("token") String token,
-                                                       @RequestParam("password") String password) {
+                                                       @RequestParam("password") String password,
+                                                       HttpServletRequest request,
+                                                       HttpServletResponse response) {
         RegistrationService.RegistrationResult result =
                 registrationService.completeRegistration(token, password);
         if (!result.ok()) {
             return registrierungLinkUngueltig();
+        }
+        // Karte 2554: the user has just proven the address and chosen the password — log in right away,
+        // along the same path as the form login (session fixation, lockout, 2FA gate, start page).
+        try {
+            UserDetails user = userDetailsService.loadUserByUsername(result.username());
+            sessionLoginFinalizer.finalizeLogin(user, user.getAuthorities(), "Selbstregistrierung", request, response);
+            return null; // the success handler has written the redirect
+        } catch (Exception e) {
+            log.warn("Self-Service: automatische Anmeldung nach der Registrierung nicht moeglich: {}", e.getMessage());
         }
         return html(page("Konto angelegt", """
                 <div class="card">

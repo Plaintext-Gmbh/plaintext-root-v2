@@ -40,6 +40,7 @@ class RegistrationServiceTest {
     @Mock ObjectProvider<SystemMailSender> systemMailSenderProvider;
     @Mock SystemMailSender systemMailSender;
     @Mock PasswordEncoder passwordEncoder;
+    @Mock ch.plaintext.menuesteuerung.persistence.MandateMenuConfigRepository mandateMenuConfigRepository;
 
     private final IMailTemplateProvider mailTemplateProvider = new MailTemplateService(mock(MailTemplateRepository.class));
 
@@ -53,7 +54,7 @@ class RegistrationServiceTest {
         properties.setDefaultMandat("default");
         service = new RegistrationService(
                 tokenRepository, userRepository, setupConfigService,
-                systemMailSenderProvider, passwordEncoder, properties, mailTemplateProvider);
+                systemMailSenderProvider, passwordEncoder, properties, mailTemplateProvider, mandateMenuConfigRepository);
 
         when(systemMailSenderProvider.getIfAvailable()).thenReturn(systemMailSender);
         when(setupConfigService.getSystemMailAccountId()).thenReturn(1L);
@@ -168,6 +169,56 @@ class RegistrationServiceTest {
         assertTrue(user.getRoles().contains("PROPERTY_MANDAT_tenanta"));
         // Redeemed atomically (consumeToken == 1) — no manual setConsumedAt any more.
         verify(tokenRepository).consumeToken(anyString(), any(Instant.class));
+    }
+
+    /** Karte 2554: Versandfehler wird gemeldet statt verschluckt. */
+    @Test
+    void startRegistration_meldetVersandfehler() {
+        when(setupConfigService.isSelfRegistrationEnabled("default")).thenReturn(true);
+        when(userRepository.findByUsername("neu@example.com")).thenReturn(null);
+        when(systemMailSender.sendSystemMail(anyLong(), anyString(), anyString(), anyString(), anyBoolean()))
+                .thenReturn(false);
+
+        assertEquals(RegistrationService.RegistrationOutcome.VERSAND_FEHLER,
+                service.startRegistration("neu@example.com", "default", "https://example.com"));
+    }
+
+    /** Karte 2554: ohne Mailkonto ebenfalls Versandfehler. */
+    @Test
+    void startRegistration_ohneMailkontoIstVersandfehler() {
+        when(setupConfigService.isSelfRegistrationEnabled("default")).thenReturn(true);
+        when(setupConfigService.getSystemMailAccountId()).thenReturn(null);
+
+        assertEquals(RegistrationService.RegistrationOutcome.VERSAND_FEHLER,
+                service.startRegistration("neu@example.com", "default", "https://example.com"));
+    }
+
+    /** Karte 2554: mit Schalter bekommt jede Registrierung einen eigenen Mandanten und die Standardrollen. */
+    @Test
+    void completeRegistration_mitEigenemMandantenUndStandardrollen() {
+        properties.setMandantJeRegistrierung(true);
+        properties.setStandardRollen(java.util.List.of("praesentation", " ", "drawio"));
+        RegistrationToken token = newToken("u@example.com", "default", Duration.ofHours(1));
+        when(tokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(token));
+        when(tokenRepository.consumeToken(anyString(), any(Instant.class))).thenReturn(1);
+        when(userRepository.findByUsername("u@example.com")).thenReturn(null);
+        when(mandateMenuConfigRepository.existsByMandateName(anyString())).thenReturn(true, false);
+
+        assertTrue(service.completeRegistration("good", "hunter2-strong").ok());
+
+        ArgumentCaptor<ch.plaintext.menuesteuerung.model.MandateMenuConfig> cfg =
+                ArgumentCaptor.forClass(ch.plaintext.menuesteuerung.model.MandateMenuConfig.class);
+        verify(mandateMenuConfigRepository).save(cfg.capture());
+        String mandat = cfg.getValue().getMandateName();
+        assertTrue(mandat.matches("k[a-z2-9]{10}"), mandat);
+        ArgumentCaptor<MyUserEntity> userCaptor = ArgumentCaptor.forClass(MyUserEntity.class);
+        verify(userRepository).save(userCaptor.capture());
+        MyUserEntity user = userCaptor.getValue();
+        assertTrue(user.getRoles().contains("PROPERTY_MANDAT_" + mandat));
+        assertFalse(user.getRoles().contains("PROPERTY_MANDAT_default"));
+        assertTrue(user.getRoles().contains("praesentation"));
+        assertTrue(user.getRoles().contains("drawio"));
+        assertFalse(user.getRoles().contains(" "));
     }
 
     /** Karte 2410: lesende Prüfung wie consumeToken, verbraucht nichts. */

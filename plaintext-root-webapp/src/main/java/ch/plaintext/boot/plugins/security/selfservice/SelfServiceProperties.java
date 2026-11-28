@@ -8,6 +8,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Tunables for the self-registration and password-reset-via-link flows.
@@ -43,4 +45,16 @@ public class SelfServiceProperties {
      * in mailboxes long after they have served their purpose.
      */
     private Duration passwordResetTokenTtl = Duration.ofHours(1);
+
+    /**
+     * Karte 2554 (SaaS): each completed self-registration gets a mandant of its own instead of
+     * {@link #defaultMandat}. Off by default — the existing instances keep their behaviour.
+     */
+    private boolean mandantJeRegistrierung = false;
+
+    /**
+     * Karte 2554: bare role names (without {@code ROLE_}) every self-registered user receives in
+     * addition to {@code user}, e.g. {@code praesentation}.
+     */
+    private List<String> standardRollen = new ArrayList<>();
 }
