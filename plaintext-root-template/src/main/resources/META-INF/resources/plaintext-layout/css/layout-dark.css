@@ -672,3 +672,8 @@ body.plaintext-menu-ready .layout-menu li > ul { visibility: visible; }
 
 .fadeInDown { animation: fadeInDown 0.2s ease-out; }
 .fadeOutUp  { animation: fadeOutUp 0.2s ease-out; }
+
+/* Karte 2566: Links der Instanz in der Fusszeile (plaintext.oberflaeche.links) */
+.layout-footer a.pt-fusslink {
+    color: inherit;
+}

@@ -18,7 +18,7 @@
                     </ui:fragment>
                     <!-- Karte 2566: Links der Instanz (Datenschutz, Impressum), plaintext.oberflaeche.links -->
                     <ui:repeat value="#{oberflaeche.links}" var="l" rendered="#{oberflaeche != null}">
-                        | <a href="#{l.url}" style="color:inherit;">#{i18n.t(l.text)}</a>
+                        | <a href="#{l.url}" class="pt-fusslink">#{i18n.t(l.text)}</a>
                     </ui:repeat>
                 </p>
             </div>

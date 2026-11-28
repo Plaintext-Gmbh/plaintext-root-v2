@@ -36,11 +36,15 @@ public class PlaintextOidcUserService implements OAuth2UserService<OidcUserReque
     private final ch.plaintext.boot.plugins.security.PlaintextSecurityProperties securityProperties;
     private final OidcUserService delegate = new OidcUserService();
 
-    /** Karte 2566: optional, damit eine Neuanlage per OIDC wie die Registrierung einen eigenen Mandanten bekommt. */
-    private ch.plaintext.boot.plugins.security.selfservice.RegistrationService registrationService;
+    /**
+     * Karte 2566: damit eine Neuanlage per OIDC wie die Registrierung einen eigenen Mandanten bekommt. Erst beim Login
+     * aufgeloest: RegistrationService braucht den PasswordEncoder der Security-Konfiguration, die ihrerseits diesen
+     * Dienst braucht (sonst Kreis beim Start).
+     */
+    private org.springframework.beans.factory.ObjectProvider<ch.plaintext.boot.plugins.security.selfservice.RegistrationService> registrationService;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
-    void setRegistrationService(ch.plaintext.boot.plugins.security.selfservice.RegistrationService registrationService) {
+    void setRegistrationService(org.springframework.beans.factory.ObjectProvider<ch.plaintext.boot.plugins.security.selfservice.RegistrationService> registrationService) {
         this.registrationService = registrationService;
     }
 
@@ -127,8 +131,9 @@ public class PlaintextOidcUserService implements OAuth2UserService<OidcUserReque
                         "Benutzer '" + username + "' ist nicht registriert");
             }
 
-            java.util.Set<String> eigene = registrationService == null
-                    ? java.util.Set.of() : registrationService.rollenFuerNeuesKonto();
+            ch.plaintext.boot.plugins.security.selfservice.RegistrationService reg =
+                    registrationService == null ? null : registrationService.getIfAvailable();
+            java.util.Set<String> eigene = reg == null ? java.util.Set.of() : reg.rollenFuerNeuesKonto();
             if (!eigene.isEmpty()) {
                 // Karte 2566: ein Konto mit eigenem Mandanten entsteht nur mit verifizierter Adresse,
                 // sonst koennte jemand eine fremde Adresse belegen (die echte Person kaeme nicht mehr hinein).
